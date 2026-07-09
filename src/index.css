@@ -1,0 +1,239 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-navy: #1B2A6B;
+  --color-brand-red: #C0152A;
+  --color-brand-bg: #F5F6FA;
+  --font-sans: "Inter", sans-serif;
+  
+  --animate-spin-slow: spin 3s linear infinite;
+  --animate-fade-in-up: fade-in-up 0.6s ease-out forwards;
+  --animate-shimmer: shimmer 3s linear infinite;
+  --animate-slideInRight: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  @keyframes fade-in-up {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  @keyframes slide-in-right {
+    0% {
+      transform: translateX(100%);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+}
+
+.animation-delay-100 { animation-delay: 100ms; }
+.animation-delay-200 { animation-delay: 200ms; }
+.animation-delay-300 { animation-delay: 300ms; }
+.animation-delay-400 { animation-delay: 400ms; }
+
+/* Page background pattern */
+body {
+  background-color: var(--color-brand-bg);
+  background-image: radial-gradient(rgba(27, 42, 107, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Custom styles not easily done in Tailwind utility classes */
+
+/* Custom Tooltip Styling */
+.tooltip-container {
+  position: relative;
+}
+
+.tooltip-text {
+  visibility: hidden;
+  position: absolute;
+  z-index: 1050;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #0f172a;
+  color: #ffffff;
+  text-align: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #0f172a transparent transparent transparent;
+}
+
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Microsoft Login Background Gradient (Authentic Pattern) */
+.microsoft-login-bg {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f3f4f6;
+  position: relative;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  background-image: radial-gradient(circle at 100% 150%, #e5e7eb 24%, #f3f4f6 25%, #f3f4f6 28%, #e5e7eb 29%, #e5e7eb 36%, #f3f4f6 37%, #f3f4f6 40%, #e5e7eb 41%, #e5e7eb 44%, #f3f4f6 45%);
+  background-size: 40px 40px;
+}
+
+/* Microsoft styled inputs and buttons */
+.microsoft-login-card {
+  width: 440px;
+  background: #ffffff;
+  border: 1px solid #d2d2d2;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 44px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border-radius: 2px;
+}
+
+.microsoft-login-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.microsoft-input-group {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.microsoft-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #8a8b8d;
+  background: transparent;
+  color: #0f172a;
+  padding: 10px 0;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.microsoft-input:focus {
+  border-bottom-color: #0067b8;
+}
+
+.microsoft-input::placeholder {
+  color: #94a3b8;
+}
+
+.microsoft-help-link {
+  font-size: 13px;
+  color: #0067b8;
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 24px;
+}
+
+.microsoft-help-link:hover {
+  text-decoration: underline;
+  color: #005a9e;
+}
+
+.microsoft-button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.microsoft-btn {
+  padding: 8px 32px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.microsoft-btn-primary {
+  background: #0067b8;
+  color: white;
+}
+
+.microsoft-btn-primary:hover {
+  background: #005a9e;
+}
+
+.login-footer-security {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Stepper Connector Lines */
+.stepper-connector-horizontal {
+  height: 2px;
+  background-color: #e2e8f0;
+  flex-grow: 1;
+  position: relative;
+  top: 18px;
+  margin: 0 -12px;
+  z-index: 1;
+}
+
+.stepper-connector-horizontal.active {
+  background-color: #10b981;
+}
+
+/* Row Left Borders (Corporate table Left-border effect) */
+.table-row-corporate {
+  border-left: 4px solid transparent;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.table-row-corporate:hover {
+  background-color: #f8fafc; /* Light gray hover background */
+  border-left-color: #1B2A6B; /* Navy left border on hover */
+}
+
+.table-row-corporate.selected {
+  background-color: rgba(27, 42, 107, 0.03);
+  border-left-color: #C0152A; /* Red left border when selected */
+}
