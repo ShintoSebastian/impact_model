@@ -1,5 +1,5 @@
-import { MOCK_EMPLOYEES } from '../mockData.ts';
-import type { Submission, Employee } from '../mockData.ts';
+import React, { useState, useEffect } from 'react';
+import type { Submission, Employee } from '../types.ts';
 import { Database, Users, ListFilter, RotateCcw } from 'lucide-react';
 
 interface DbViewerProps {
@@ -8,6 +8,27 @@ interface DbViewerProps {
 }
 
 export const DbViewer: React.FC<DbViewerProps> = ({ submissions, resetDb }) => {
+  const [dbEmployees, setDbEmployees] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const token = sessionStorage.getItem('impact_token');
+      try {
+        const res = await fetch('http://localhost:5000/api/employees', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDbEmployees(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch employees for DbViewer', err);
+      }
+    };
+    fetchEmployees();
+  }, []);
   return (
     <div className="w-full">
       {/* Page Header */}
@@ -75,7 +96,7 @@ export const DbViewer: React.FC<DbViewerProps> = ({ submissions, resetDb }) => {
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 mb-6">
         <h2 className="text-sm font-extrabold text-brand-navy mb-4 flex items-center gap-2 uppercase tracking-wider">
           <Users size={18} className="text-blue-600" />
-          Table: `hrms_employees` ({MOCK_EMPLOYEES.length} rows)
+          Table: `hrms_employees` ({dbEmployees.length} rows)
         </h2>
 
         <div className="overflow-x-auto rounded-xl border border-slate-100">
@@ -91,7 +112,7 @@ export const DbViewer: React.FC<DbViewerProps> = ({ submissions, resetDb }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {MOCK_EMPLOYEES.map((emp: Employee) => (
+              {dbEmployees.map((emp: Employee) => (
                 <tr key={emp.employeeId} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-4 py-3 font-mono font-bold text-slate-800">{emp.employeeId}</td>
                   <td className="px-4 py-3 font-bold text-slate-800">{emp.name}</td>

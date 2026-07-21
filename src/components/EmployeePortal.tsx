@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import type { Employee, Submission } from '../mockData.ts';
-import { generateIntelligenceId, triggerMailer } from '../utils.ts';
+import type { Employee, Submission } from '../types.ts';
+import { generateIntelligenceId } from '../utils.ts';
 import { Shield, Sparkles, Send, PhoneCall, ArrowLeft, Mail } from 'lucide-react';
 
 interface EmployeePortalProps {
   submissions: Submission[];
-  addSubmission: (sub: Submission) => void;
+  addSubmission: (sub: Submission) => Promise<boolean> | void;
   logEmails: (emails: any[]) => void;
   loggedInUser: Employee;
   navigate: (path: string) => void;
@@ -26,7 +26,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
   const [clientName, setClientName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Clear errors
@@ -70,7 +70,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       contactPhone: hasContact ? contactPhone.trim() : undefined,
       contactEmail: hasContact ? contactEmail.trim() : undefined,
       clientName: clientName.trim(),
-      status: 'Under Review',
+      status: 'Opportunity Registered',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       reportingManager: loggedInUser.reportingManager,
@@ -79,20 +79,19 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       hrbp: loggedInUser.hrbp || 'Deepa Menon (deepa.m@nestdigital.com)',
       salesPerson: loggedInUser.salesPerson || 'Jacob Varghese (jacob.varghese@nestdigital.com)',
       statusHistory: [
-        { status: 'Under Review', changedBy: 'System', timestamp: new Date().toISOString(), comment: 'Submission recorded' }
+        { status: 'Opportunity Registered', changedBy: 'System', timestamp: new Date().toISOString(), comment: 'Submission recorded' }
       ]
     };
 
     // Save submission
-    addSubmission(newSubmission);
+    const success = await addSubmission(newSubmission);
 
-    // Trigger acknowledgement and alert emails
-    const ackEmails = triggerMailer('submission_ack', newSubmission);
-    const alertEmails = triggerMailer('stakeholder_alert', newSubmission);
-    logEmails([...ackEmails, ...alertEmails]);
-
-    // Redirect to home dashboard
-    navigate('/home');
+    if (success !== false) {
+      // Redirect to home dashboard
+      navigate('/home');
+    } else {
+      setErrors({ ...newErrors, submit: 'Failed to submit opportunity. Please check if the server is running and try again.' });
+    }
   };
 
   return (
@@ -115,6 +114,11 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col gap-6">
+        {errors.submit && (
+          <div className="bg-red-50 text-red-700 p-4 rounded-lg text-sm font-bold border border-red-200">
+            {errors.submit}
+          </div>
+        )}
         
         {/* Read-Only HRMS Profile Block */}
         <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
@@ -300,7 +304,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
         <div className="flex flex-wrap gap-4 items-center justify-between border-t border-slate-100 pt-5">
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold">
             <Sparkles size={14} className="text-brand-navy" />
-            <span>✦ Policy note: Acknowledgment within 2 working days.</span>
+            <span>✦ Policy note: Acknowledgment within 7 working days.</span>
           </div>
 
           <button 

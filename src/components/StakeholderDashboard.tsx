@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import type { Submission, EmailLog, Employee } from '../mockData.ts';
+import type { Submission, EmailLog, Employee } from '../types.ts';
 import { triggerMailer, formatDateTime } from '../utils.ts';
 import { 
   Eye, CheckCircle2, XCircle, AlertTriangle, Clock, Building, Landmark, RefreshCcw, 
-  User, Database, Mail, ArrowRight, Shield, MessageSquare, Search
+  User, Database, Mail, ArrowRight, Shield, MessageSquare, Search, Download, Loader2
 } from 'lucide-react';
-import { ROLE_MAP } from '../mockData.ts';
+import { exportToExcel, exportToPDF } from '../utils/exportUtils';
+import { ROLE_MAP } from '../types.ts';
 
 interface StakeholderDashboardProps {
   submissions: Submission[];
@@ -42,6 +43,62 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   const [showClarifyForm, setShowClarifyForm] = useState(false);
   const [clarifyComment, setClarifyComment] = useState('');
 
+  // Downloading states
+  const [isDownloadingPendingExcel, setIsDownloadingPendingExcel] = useState(false);
+  const [isDownloadingPendingPDF, setIsDownloadingPendingPDF] = useState(false);
+  const [isDownloadingReviewedExcel, setIsDownloadingReviewedExcel] = useState(false);
+  const [isDownloadingReviewedPDF, setIsDownloadingReviewedPDF] = useState(false);
+
+  const [currentPageReviewed, setCurrentPageReviewed] = useState(1);
+  const itemsPerPage = 5;
+
+  React.useEffect(() => {
+    setCurrentPageReviewed(1);
+  }, [searchQuery]);
+
+  const handleDownloadPendingExcel = () => {
+    setIsDownloadingPendingExcel(true);
+    setTimeout(() => {
+      exportToExcel(sortedPending, 'Pending_Reviews');
+      setIsDownloadingPendingExcel(false);
+    }, 800);
+  };
+
+  const handleDownloadPendingPDF = () => {
+    setIsDownloadingPendingPDF(true);
+    setTimeout(() => {
+      exportToPDF(sortedPending, [
+        { header: 'ID', dataKey: 'intelligenceId' },
+        { header: 'Employee', dataKey: 'employeeName' },
+        { header: 'Client Name', dataKey: 'clientName' },
+        { header: 'Title', dataKey: 'shortDesc' },
+      ], 'Pending_Reviews');
+      setIsDownloadingPendingPDF(false);
+    }, 800);
+  };
+
+  const handleDownloadReviewedExcel = () => {
+    setIsDownloadingReviewedExcel(true);
+    setTimeout(() => {
+      exportToExcel(sortedReviewed, 'Reviewed_Submissions');
+      setIsDownloadingReviewedExcel(false);
+    }, 800);
+  };
+
+  const handleDownloadReviewedPDF = () => {
+    setIsDownloadingReviewedPDF(true);
+    setTimeout(() => {
+      exportToPDF(sortedReviewed, [
+        { header: 'ID', dataKey: 'intelligenceId' },
+        { header: 'Employee', dataKey: 'employeeName' },
+        { header: 'Client', dataKey: 'clientName' },
+        { header: 'Title', dataKey: 'shortDesc' },
+        { header: 'Status', dataKey: 'status' }
+      ], 'Reviewed_Submissions');
+      setIsDownloadingReviewedPDF(false);
+    }, 800);
+  };
+
   // Submitter profile collapsible state
   const [isProfileExpanded, setIsProfileExpanded] = useState(false);
 
@@ -67,27 +124,8 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
     });
   };
 
-  // Helper to extract email address from hierarchical contact string (e.g. "Arun Kumar (arun.kumar@...)" -> "arun.kumar@...")
-  const extractEmail = (contactStr: string): string => {
-    if (!contactStr) return 'alerts@nestdigital.com';
-    const match = contactStr.match(/\(([^)]+)\)/);
-    return match ? match[1] : 'alerts@nestdigital.com';
-  };
 
-  // Helper to collect all stakeholder emails plus submitter email
-  const getRecipientsList = (sub: Submission): string[] => {
-    const employeeEmail = sub.employeeId === 'ND-10042' ? 'shinto.s@nestdigital.com' : `${sub.employeeId.toLowerCase()}@nestdigital.com`;
-    return [
-      employeeEmail,
-      extractEmail(sub.reportingManager),
-      extractEmail(sub.projectManager),
-      extractEmail(sub.buHead),
-      extractEmail(sub.hrbp),
-      extractEmail(sub.salesPerson)
-    ].filter(email => email !== '');
-  };
-
-  // SLA Working Days Calculation (older than 2 working days from baseline/today = Overdue)
+  // SLA Working Days Calculation (older than 7 working days from baseline/today = Overdue)
   const getWorkingDaysDiff = (startDateStr: string): number => {
     const start = new Date(startDateStr);
     const end = new Date(); // current local time
@@ -106,8 +144,8 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   const getSlaStatus = (sub: Submission) => {
     const workingDays = getWorkingDaysDiff(sub.createdAt);
     // Force overdue status for specific seeded demo lead
-    const isOverdue = workingDays > 2 || sub.intelligenceId === 'IM-20260701-001';
-    const daysOverdue = workingDays > 2 ? workingDays - 2 : (sub.intelligenceId === 'IM-20260701-001' ? 1 : 0);
+    const isOverdue = workingDays > 7 || sub.intelligenceId === 'IM-20260701-001';
+    const daysOverdue = workingDays > 7 ? workingDays - 7 : (sub.intelligenceId === 'IM-20260701-001' ? 1 : 0);
     return {
       isOverdue,
       daysOverdue,
@@ -117,12 +155,12 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   };
 
   // Dynamic Metrics calculations
-  const pendingSubmissions = submissions.filter(s => s.status === 'Under Review' || s.status === 'Clarification Requested');
-  const reviewedSubmissions = submissions.filter(s => s.status !== 'Under Review' && s.status !== 'Clarification Requested');
+  const pendingSubmissions = submissions.filter(s => s.status === 'Opportunity Registered' || s.status === 'Clarification Requested');
+  const reviewedSubmissions = submissions.filter(s => s.status !== 'Opportunity Registered' && s.status !== 'Clarification Requested');
 
   const pendingCount = pendingSubmissions.length;
-  const validatedCount = reviewedSubmissions.filter(s => s.status === 'Validated' || s.status.startsWith('Lead') || s.status === 'Opportunity Registered' || s.status === 'Proposal' || s.status === 'Negotiation' || s.status === 'Closed - Converted').length;
-  const rejectedCount = reviewedSubmissions.filter(s => s.status === 'Closed - Not Valid' || s.status === 'Closed - Dropped' || s.status === 'Lead Dropped').length;
+  const validatedCount = reviewedSubmissions.filter(s => s.status === 'Validated' || s.status.startsWith('Lead') || s.status === 'Opportunity Registered' || s.status === 'Proposal' || s.status === 'Negotiation' || s.status === 'Deal Won').length;
+  const rejectedCount = reviewedSubmissions.filter(s => s.status === 'Closed - Not Valid' || s.status === 'Deal Lost' || s.status === 'Lead Dropped').length;
   const totalReviewed = validatedCount + rejectedCount;
 
   // Filter and sort Pending Action list
@@ -166,22 +204,6 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
       });
     }, 1500);
 
-    // Generate Auto Outbox Log Entries for each stakeholder
-    const recipients = getRecipientsList(sub);
-    const dateFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const emails: EmailLog[] = recipients.map(recipient => ({
-      id: `email-${Math.random().toString(36).substr(2, 9)}`,
-      recipient,
-      subject: `IMPACT LEAD VALIDATED: ${sub.intelligenceId} — ${sub.clientName}`,
-      body: `Action Taken: Validated by ${loggedInUser.name} (${ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Reviewer'})\nIntelligence ID: ${sub.intelligenceId}\nClient/Account: ${sub.clientName}\nValidated On: ${dateFormatted}\nNext Step: CRM Lead Creation initiated\nStatus: Lead Registered in Dynamics CRM 365`,
-      timestamp: new Date().toISOString(),
-      type: 'stakeholder'
-    }));
-    logEmails(emails);
-
-    // Increment employee bell notifications count & add item
-    addNotification(`✅ Your submission ${sub.intelligenceId} has been Validated`);
-
     // Trigger Success Toast
     triggerToast('success', 'Submission validated. CRM lead creation initiated. Stakeholders notified.');
   };
@@ -189,7 +211,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   // 2. Reject decision workflow
   const handleReject = (e: React.FormEvent, sub: Submission) => {
     e.preventDefault();
-    if (rejectionReason.trim().length < 10) return;
+    if (rejectionReason.trim().length === 0) return;
 
     const updatedFields: Partial<Submission> = {
       status: 'Closed - Not Valid',
@@ -199,21 +221,6 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 
     updateSubmission(sub.intelligenceId, updatedFields);
     setSelectedSub(null);
-
-    // Generate Auto Outbox Log Entries for all recipients
-    const recipients = getRecipientsList(sub);
-    const emails: EmailLog[] = recipients.map(recipient => ({
-      id: `email-${Math.random().toString(36).substr(2, 9)}`,
-      recipient,
-      subject: `IMPACT LEAD REJECTED: ${sub.intelligenceId} — ${sub.clientName}`,
-      body: `Action Taken: Rejected by ${loggedInUser.name} (${ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Reviewer'})\nIntelligence ID: ${sub.intelligenceId}\nClient/Account: ${sub.clientName}\nStatus: Closed - Not Valid\n\nRejection Reason:\n${rejectionReason}`,
-      timestamp: new Date().toISOString(),
-      type: 'stakeholder'
-    }));
-    logEmails(emails);
-
-    // Add employee notification
-    addNotification(`❌ Your submission ${sub.intelligenceId} has been Rejected — see reason`);
 
     // Trigger Error Toast
     triggerToast('error', 'Submission rejected. Reason recorded. Employee and stakeholders notified.');
@@ -236,21 +243,6 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 
     updateSubmission(sub.intelligenceId, updatedFields);
     setSelectedSub(null);
-
-    // Generate Auto Outbox Log Entry to Employee Only
-    const employeeEmail = sub.employeeId === 'ND-10042' ? 'shinto.s@nestdigital.com' : `${sub.employeeId.toLowerCase()}@nestdigital.com`;
-    const email: EmailLog = {
-      id: `email-${Math.random().toString(36).substr(2, 9)}`,
-      recipient: employeeEmail,
-      subject: `CLARIFICATION REQUESTED: ${sub.intelligenceId} — ${sub.clientName}`,
-      body: `Action Taken: Clarification Requested by ${loggedInUser.name} (${ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Reviewer'})\nIntelligence ID: ${sub.intelligenceId}\nClient/Account: ${sub.clientName}\nStatus: Clarification Requested\n\nClarification Message:\n${clarifyComment}`,
-      timestamp: new Date().toISOString(),
-      type: 'employee'
-    };
-    logEmails([email]);
-
-    // Add employee notification
-    addNotification(`💬 Clarification requested on ${sub.intelligenceId} by ${loggedInUser.name}`);
 
     // Trigger Info Toast
     triggerToast('info', `Clarification requested. Notification sent to ${sub.employeeName}.`);
@@ -286,100 +278,161 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         </div>
       )}
 
-      {/* A. Welcome Banner */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 border-l-4 border-[#C0152A] p-6 flex flex-col gap-4">
-        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-          <span>✦ REVIEWER PORTAL • JULY 1, 2026</span>
-        </div>
-        <div>
-          <h1 className="text-2xl font-extrabold text-brand-navy tracking-tight">
-            Welcome, <span className="text-[#C0152A] font-black">{loggedInUser.name.split(' (')[0]}.</span>
-          </h1>
-          <p className="text-xs text-slate-600 font-semibold mt-1">
-            {ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Reviewer'} — {loggedInUser.businessUnit}
-          </p>
-          <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-            You have <strong className="text-brand-navy font-bold">{pendingCount}</strong> submissions pending your review and decision. SLA compliance is being tracked automatically.
-          </p>
-        </div>
+      {/* A. Executive Hero Banner (Matching Submitter Layout Structure) */}
+      <div className="bg-gradient-to-r from-[#1c0f1c] via-[#2a1325] to-[#3f1b38] text-white rounded-3xl p-6 lg:p-8 shadow-xl relative overflow-hidden mb-6">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0)_0%,rgba(255,255,255,0.03)_50%,rgba(255,255,255,0)_100%)] bg-[length:200%_100%] animate-shimmer pointer-events-none"></div>
 
-        {/* Dynamic stat pills */}
-        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-50">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-100 text-[10px] font-bold text-rose-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            {pendingCount} PENDING REVIEW
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-[10px] font-bold text-emerald-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            {validatedCount} VALIDATED
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-600">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-800" />
-            {rejectedCount} REJECTED
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-bold text-blue-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            {totalReviewed} TOTAL REVIEWED
-          </span>
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Reviewer Profile Inside Banner */}
+          <div className="lg:col-span-7 flex flex-col gap-3">
+
+            {/* Profile Role Indicator */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/30 text-rose-300 text-[10px] font-extrabold uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                REVIEWER PROFILE • EXECUTIVE REVIEW BOARD
+              </span>
+            </div>
+
+            {/* Profile Header — Welcome back + Name */}
+            <div className="flex items-center gap-5 mb-2">
+              <div className="w-[72px] h-[72px] rounded-xl bg-gradient-to-br from-rose-500 to-red-700 flex items-center justify-center text-white text-2xl font-extrabold shadow-lg shadow-rose-500/20 ring-2 ring-white/10 flex-shrink-0">
+                {loggedInUser.name.charAt(0)}{loggedInUser.name.split(' ')[1]?.charAt(0) || ''}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm text-slate-300 font-semibold tracking-wide">Welcome back,</span>
+                <h2 className="text-2xl md:text-3xl font-extrabold leading-tight tracking-tight">
+                  <span className="bg-gradient-to-r from-rose-300 via-rose-100 to-white bg-clip-text text-transparent">{loggedInUser.name.split(' (')[0]}.</span>
+                </h2>
+                <span className="text-xs text-rose-300 font-semibold mt-0.5">{ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Reviewer'} · {loggedInUser.businessUnit}</span>
+              </div>
+            </div>
+
+            {/* Reviewer Details Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Employee ID</span>
+                <span className="text-white font-bold font-mono text-[14px]">{loggedInUser.employeeId}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Role</span>
+                <span className="text-white font-bold text-[13px]">{ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Delivery Head'}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Department</span>
+                <span className="text-white font-bold text-[13px]">{loggedInUser.businessUnit || 'Delivery Operations'}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Corporate Email</span>
+                <a href={`mailto:${loggedInUser.email}`} className="text-rose-300 font-bold hover:text-rose-200 transition-colors truncate text-[13px]">{loggedInUser.email}</a>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Job Role</span>
+                <span className="text-white font-bold text-[13px]">{loggedInUser.jobRole || 'Not Specified'}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phone Number</span>
+                <span className="text-white font-bold text-[13px]">{loggedInUser.phoneNumber || 'Not Specified'}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Access Level</span>
+                <span className="text-emerald-400 font-extrabold text-[13px] flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  Authorized Approver
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">SLA Target</span>
+                <span className="text-slate-200 font-semibold text-[13px]">7 Working Days</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-xs text-slate-400 font-semibold">
+                {pendingCount} items awaiting audit • SLA monitoring active
+              </span>
+            </div>
+          </div>
+
+          {/* Right Column: Glass Grid */}
+          <div className="lg:col-span-5 flex flex-col gap-4">
+            <div className="text-[11px] font-extrabold text-rose-300 uppercase tracking-widest px-1">
+              ✦ AUDIT OVERVIEW & METRICS
+            </div>
+
+            {/* Grid of 4 Glassmorphic Metrics */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1 hover:bg-white/[0.06] transition-all cursor-default">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Pending Review</span>
+                <span className="text-xl font-mono font-extrabold text-rose-400">{pendingCount}</span>
+              </div>
+              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1 hover:bg-white/[0.06] transition-all cursor-default">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Validated</span>
+                <span className="text-xl font-mono font-extrabold text-emerald-400">{validatedCount}</span>
+              </div>
+              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1 hover:bg-white/[0.06] transition-all cursor-default">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Rejected</span>
+                <span className="text-xl font-mono font-extrabold text-slate-300">{rejectedCount}</span>
+              </div>
+              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1 hover:bg-white/[0.06] transition-all cursor-default">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Total Audited</span>
+                <span className="text-xl font-mono font-extrabold text-blue-400">{totalReviewed}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* B. Stats Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* B. Stats Cards Row (Matches Submitter Layout) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up animation-delay-200 mb-6">
         
-        {/* Pending Card */}
-        <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-rose-500 text-white font-bold shrink-0">
-            <Clock size={20} />
+        {/* Pending Action Card */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between border-l-4 border-l-rose-500 relative">
+          <div className="absolute top-4 right-4 text-slate-300 border border-slate-100 rounded-lg p-1.5 bg-slate-50">
+            <Clock size={16} />
           </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Action</span>
-            <span className="text-2xl font-black text-slate-800 leading-none mt-1 font-mono">{pendingCount}</span>
-          </div>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Pending Action</span>
+          <span className="text-4xl font-extrabold text-brand-navy leading-none mt-2 mb-2">{pendingCount}</span>
+          <span className="text-[10px] font-bold text-rose-600 tracking-wide">Requires review</span>
         </div>
 
         {/* Validated Card */}
-        <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-emerald-500 text-white font-bold shrink-0">
-            <CheckCircle2 size={20} />
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between border-l-4 border-l-emerald-500 relative">
+          <div className="absolute top-4 right-4 text-slate-300 border border-slate-100 rounded-lg p-1.5 bg-slate-50">
+            <CheckCircle2 size={16} />
           </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Validated This Month</span>
-            <span className="text-2xl font-black text-slate-800 leading-none mt-1 font-mono">{validatedCount}</span>
-          </div>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Validated</span>
+          <span className="text-4xl font-extrabold text-brand-navy leading-none mt-2 mb-2">{validatedCount}</span>
+          <span className="text-[10px] font-bold text-emerald-600 tracking-wide">Approved</span>
         </div>
 
         {/* Rejected Card */}
-        <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-slate-800 text-white font-bold shrink-0">
-            <XCircle size={20} />
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between border-l-4 border-l-slate-600 relative">
+          <div className="absolute top-4 right-4 text-slate-300 border border-slate-100 rounded-lg p-1.5 bg-slate-50">
+            <XCircle size={16} />
           </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rejected</span>
-            <span className="text-2xl font-black text-slate-800 leading-none mt-1 font-mono">{rejectedCount}</span>
-          </div>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Rejected</span>
+          <span className="text-4xl font-extrabold text-brand-navy leading-none mt-2 mb-2">{rejectedCount}</span>
+          <span className="text-[10px] font-bold text-slate-600 tracking-wide">Declined</span>
         </div>
 
-        {/* Avg Time Card */}
-        <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-500 text-white font-bold shrink-0">
-            <RefreshCcw size={20} />
+        {/* Avg Review Time Card */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between border-l-4 border-l-blue-500 relative">
+          <div className="absolute top-4 right-4 text-slate-300 border border-slate-100 rounded-lg p-1.5 bg-slate-50">
+            <RefreshCcw size={16} />
           </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Review Time</span>
-            <span className="text-2xl font-black text-slate-800 leading-none mt-1 font-mono">1.2 days</span>
-          </div>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Avg Review Time</span>
+          <span className="text-4xl font-extrabold text-brand-navy leading-none mt-2 mb-2">1.2</span>
+          <span className="text-[10px] font-bold text-blue-600 tracking-wide">Days</span>
         </div>
       </div>
 
-      {/* C. Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
-        
-        {/* Left Column (70%) */}
-        <div className="lg:col-span-7 flex flex-col gap-6 min-w-0">
+      {/* C. Tables Section (Full Width) */}
+      <div className="flex flex-col gap-6 min-w-0">
           
           {/* Pending Submissions Table */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col gap-4">
+          <div className="bg-white/60 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-black p-6 flex flex-col gap-4">
             
             {/* Table Header block */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -390,73 +443,107 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                 </span>
               </div>
               
-              {/* Search Bar */}
-              <div className="relative max-w-xs w-full">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                  type="text"
-                  placeholder="Search lead or employee..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-1.5 border border-slate-200 focus:border-brand-navy focus:outline-none rounded-lg text-xs transition-colors"
-                />
+              {/* Actions & Search */}
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleDownloadPendingExcel}
+                    disabled={isDownloadingPendingExcel}
+                    className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-lg shadow-sm hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-wait"
+                    title="Export to Excel"
+                  >
+                    {isDownloadingPendingExcel ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    <span className="text-[10px] font-bold uppercase tracking-wider">{isDownloadingPendingExcel ? 'DOWNLOADING...' : 'Excel'}</span>
+                  </button>
+                  <button
+                    onClick={handleDownloadPendingPDF}
+                    disabled={isDownloadingPendingPDF}
+                    className="px-2.5 py-1.5 bg-rose-50 text-rose-700 border border-rose-200/60 rounded-lg shadow-sm hover:bg-rose-100 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-wait"
+                    title="Export to PDF"
+                  >
+                    {isDownloadingPendingPDF ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    <span className="text-[10px] font-bold uppercase tracking-wider">{isDownloadingPendingPDF ? 'DOWNLOADING...' : 'PDF'}</span>
+                  </button>
+                </div>
+                <div className="relative max-w-xs w-full">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="text"
+                    placeholder="Search lead or employee..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-1.5 border border-slate-200 focus:border-brand-navy focus:outline-none rounded-lg text-xs transition-colors"
+                  />
+                </div>
               </div>
             </div>
             <p className="text-[11px] text-slate-400 -mt-2 font-semibold">Submissions awaiting your decision — sorted by Review Timeline urgency</p>
 
             {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-xs">
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-brand-navy scrollbar-track-gray-50">
+              <table className="w-full border-collapse text-left table-auto" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" }}>
                 <thead>
-                  <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
-                    <th className="px-4 py-3">Opportunity ID</th>
-                    <th className="px-4 py-3">Employee Name</th>
-                    <th className="px-4 py-3">Client Name</th>
-                    <th className="px-4 py-3">Opportunity Title</th>
-                    <th className="px-4 py-3">Submitted Date</th>
-                    <th className="px-4 py-3">Review Timeline</th>
-                    <th className="px-4 py-3 text-right">Action</th>
+                  <tr className="bg-brand-navy text-white font-extrabold uppercase tracking-wider text-[11px] whitespace-nowrap">
+                    <th className="px-3.5 py-3.5 rounded-tl-xl">Impact ID</th>
+                    <th className="px-3 py-3.5">Employee Name</th>
+                    <th className="px-3 py-3.5">Client Name</th>
+                    <th className="px-3 py-3.5">Opportunity Title</th>
+                    <th className="px-3 py-3.5">Submitted Date</th>
+                    <th className="px-3 py-3.5">Review Timeline</th>
+                    <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="font-semibold text-[13px]">
                   {sortedPending.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-12 px-4 text-slate-400 font-semibold">
+                      <td colSpan={7} className="text-center py-16 text-gray-400 font-medium text-sm">
                         No pending items found.
                       </td>
                     </tr>
                   ) : (
-                    sortedPending.map(sub => {
+                    sortedPending.map((sub, idx) => {
                       const sla = getSlaStatus(sub);
                       return (
-                        <tr key={sub.intelligenceId} className="hover:bg-blue-50/40 transition-colors">
-                          <td className="px-4 py-3.5 font-bold text-brand-navy font-mono">{sub.intelligenceId}</td>
-                          <td className="px-4 py-3.5">
+                        <tr
+                          key={sub.intelligenceId}
+                          className={`transition-all duration-200 border-b border-gray-100/80 group relative ${
+                            idx % 2 === 1 ? 'bg-[#F4F6FA]/80 hover:bg-[#EAEDF2]' : 'bg-white hover:bg-slate-50/60'
+                          }`}
+                        >
+                          <td className="px-3.5 py-3.5 font-bold font-mono text-brand-navy relative whitespace-nowrap">
+                            <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="inline-flex px-2 py-0.5 font-mono text-[13px] font-bold bg-slate-50 border border-slate-200/50 text-brand-navy rounded-md">
+                              {sub.intelligenceId}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3.5 whitespace-nowrap">
                             <div className="flex flex-col">
-                              <span className="font-bold text-slate-800">{sub.employeeName}</span>
-                              <span className="text-[9.5px] text-slate-400 font-semibold">{sub.employeeId}</span>
+                              <span className="font-extrabold text-slate-900 text-[14px]">{sub.employeeName}</span>
+                              <span className="text-[11px] text-slate-400 font-semibold">{sub.employeeId}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3.5 font-bold text-slate-700">{sub.clientName}</td>
-                          <td className="px-4 py-3.5 text-slate-500 font-semibold max-w-[160px] truncate">{sub.shortDesc}</td>
-                          <td className="px-4 py-3.5 text-slate-500 font-semibold font-mono">
+                          <td className="px-3 py-3.5 font-extrabold text-slate-900 text-[14px] whitespace-normal max-w-[140px] break-words">{sub.clientName}</td>
+                          <td className="px-3 py-3.5 text-slate-600 font-medium text-[13px] whitespace-normal max-w-[180px] break-words">{sub.shortDesc}</td>
+                          <td className="px-3 py-3.5 text-slate-700 whitespace-nowrap">
                             <div className="flex flex-col gap-0.5">
-                              <span>{new Date(sub.createdAt).toLocaleDateString('en-GB')}</span>
-                              <span className="text-[10px] text-slate-400 font-medium">{new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                              <span className="font-bold text-slate-800 text-[13px]">{new Date(sub.createdAt).toLocaleDateString('en-GB')}</span>
+                              <span className="text-[11px] text-slate-500 font-semibold">{new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3.5">
+                          <td className="px-3 py-3.5 whitespace-nowrap">
                             {sla.isOverdue ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-100">
-                                ⚠️ Overdue
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-red-50 text-red-700 border border-red-200 shadow-sm">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                                Overdue SLA
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                🟢 Within SLA
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Within SLA
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3.5 text-right">
+                          <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
                             <button 
                               onClick={() => {
                                 setSelectedSub(sub);
@@ -464,9 +551,9 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                                 setShowClarifyForm(false);
                                 setIsProfileExpanded(false);
                               }}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand-navy hover:bg-[#121c4a] text-white font-bold text-[10px] cursor-pointer transition-all shadow-sm"
+                              className="px-3.5 py-1.5 bg-brand-navy hover:bg-brand-navy/90 text-white font-bold text-[12px] rounded-lg transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center gap-1.5"
                             >
-                              <Eye size={12} />
+                              <Eye size={13} />
                               Review
                             </button>
                           </td>
@@ -480,73 +567,110 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
           </div>
 
           {/* Reviewed Submissions Table */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col gap-4">
-            <h2 className="text-sm font-extrabold text-brand-navy uppercase tracking-wider">REVIEWED SUBMISSIONS</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-xs">
+          <div className="bg-white/60 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-black p-8 flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <h2 className="text-sm font-extrabold text-brand-navy uppercase tracking-widest flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                REVIEWED SUBMISSIONS
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadReviewedExcel}
+                  disabled={isDownloadingReviewedExcel}
+                  className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-lg shadow-sm hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-wait"
+                  title="Export to Excel"
+                >
+                  {isDownloadingReviewedExcel ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{isDownloadingReviewedExcel ? 'DOWNLOADING...' : 'Excel'}</span>
+                </button>
+                <button
+                  onClick={handleDownloadReviewedPDF}
+                  disabled={isDownloadingReviewedPDF}
+                  className="px-2.5 py-1.5 bg-rose-50 text-rose-700 border border-rose-200/60 rounded-lg shadow-sm hover:bg-rose-100 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-wait"
+                  title="Export to PDF"
+                >
+                  {isDownloadingReviewedPDF ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{isDownloadingReviewedPDF ? 'DOWNLOADING...' : 'PDF'}</span>
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-brand-navy scrollbar-track-gray-50">
+              <table className="w-full border-collapse text-left table-auto" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" }}>
                 <thead>
-                  <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
-                    <th className="px-4 py-3">Intelligence ID</th>
-                    <th className="px-4 py-3">Employee Name</th>
-                    <th className="px-4 py-3">Client Name</th>
-                    <th className="px-4 py-3">Short Description</th>
-                    <th className="px-4 py-3">Submitted Date</th>
-                    <th className="px-4 py-3">Outcome</th>
-                    <th className="px-4 py-3 text-right">Reviewed On</th>
+                  <tr className="bg-brand-navy text-white font-extrabold uppercase tracking-wider text-[11px] whitespace-nowrap">
+                    <th className="px-3.5 py-3.5 rounded-tl-xl">Impact ID</th>
+                    <th className="px-3 py-3.5">Employee Name</th>
+                    <th className="px-3 py-3.5">Client Name</th>
+                    <th className="px-3 py-3.5">Opportunity Title</th>
+                    <th className="px-3 py-3.5">Submitted Date</th>
+                    <th className="px-3 py-3.5">Outcome</th>
+                    <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Reviewed On</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="font-semibold text-[13px]">
                   {sortedReviewed.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-12 px-4 text-slate-400 font-semibold">
+                      <td colSpan={7} className="text-center py-16 text-gray-400 font-medium text-sm">
                         No reviewed items yet.
                       </td>
                     </tr>
                   ) : (
-                    sortedReviewed.map(sub => {
+                    sortedReviewed.slice((currentPageReviewed - 1) * itemsPerPage, currentPageReviewed * itemsPerPage).map((sub, idx) => {
                       const isRejected = sub.status === 'Closed - Not Valid';
                       const isClarify = sub.status === 'Clarification Requested';
                       
                       return (
-                        <tr key={sub.intelligenceId} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3.5 font-bold text-slate-600 font-mono">{sub.intelligenceId}</td>
-                          <td className="px-4 py-3.5 font-semibold text-slate-700">{sub.employeeName}</td>
-                          <td className="px-4 py-3.5 font-bold text-slate-700">{sub.clientName}</td>
-                          <td className="px-4 py-3.5 text-slate-500 font-semibold max-w-[180px] truncate">{sub.shortDesc}</td>
-                          <td className="px-4 py-3.5 text-slate-500 font-semibold font-mono">
+                        <tr
+                          key={sub.intelligenceId}
+                          className={`transition-all duration-200 border-b border-gray-100/80 group relative ${
+                            idx % 2 === 1 ? 'bg-[#F4F6FA]/80 hover:bg-[#EAEDF2]' : 'bg-white hover:bg-slate-50/60'
+                          }`}
+                        >
+                          <td className="px-3.5 py-3.5 font-bold font-mono text-brand-navy relative whitespace-nowrap">
+                            <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="inline-flex px-2 py-0.5 font-mono text-[13px] font-bold bg-slate-50 border border-slate-200/50 text-brand-navy rounded-md">
+                              {sub.intelligenceId}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3.5 whitespace-nowrap">
+                            <span className="font-extrabold text-slate-900 text-[14px]">{sub.employeeName}</span>
+                          </td>
+                          <td className="px-3 py-3.5 font-extrabold text-slate-900 text-[14px] whitespace-normal max-w-[140px] break-words">{sub.clientName}</td>
+                          <td className="px-3 py-3.5 text-slate-600 font-medium text-[13px] whitespace-normal max-w-[180px] break-words">{sub.shortDesc}</td>
+                          <td className="px-3 py-3.5 text-slate-700 whitespace-nowrap">
                             <div className="flex flex-col gap-0.5">
-                              <span>{new Date(sub.createdAt).toLocaleDateString('en-GB')}</span>
-                              <span className="text-[10px] text-slate-400 font-medium">{new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                              <span className="font-bold text-slate-800 text-[13px]">{new Date(sub.createdAt).toLocaleDateString('en-GB')}</span>
+                              <span className="text-[11px] text-slate-500 font-semibold">{new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3.5">
+                          <td className="px-3 py-3.5 whitespace-nowrap">
                             {isRejected ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-100 group relative cursor-help"
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm cursor-help"
                                 title={sub.reason}
                               >
                                 ❌ Rejected
                                 {sub.reason && (
-                                  <span className="ml-1 text-[8.5px] bg-slate-800 text-white rounded px-1 py-0.2 shrink-0 font-normal">
+                                  <span className="ml-1 text-[9px] bg-slate-800 text-white rounded px-1.5 py-0.2 shrink-0 font-normal">
                                     ⓘ reason
                                   </span>
                                 )}
                               </span>
                             ) : isClarify ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100"
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
                                 title={sub.reason}
                               >
                                 💬 Clarification
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
                                 ✅ Validated
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3.5 text-right text-slate-500 font-semibold font-mono">
+                          <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
                             <div className="flex flex-col gap-0.5 items-end">
-                              <span>{new Date(sub.updatedAt).toLocaleDateString('en-GB')}</span>
-                              <span className="text-[10px] text-slate-400 font-medium">{new Date(sub.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                              <span className="font-bold text-slate-800 text-[13px]">{new Date(sub.updatedAt).toLocaleDateString('en-GB')}</span>
+                              <span className="text-[11px] text-slate-500 font-semibold">{new Date(sub.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                             </div>
                           </td>
                         </tr>
@@ -555,90 +679,46 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                   )}
                 </tbody>
               </table>
+
+              {/* Pagination Controls */}
+              {sortedReviewed.length > itemsPerPage && (
+                <div className="flex items-center justify-between border-t border-slate-200 mt-6 pt-4 px-2 mb-2">
+                  <div className="text-xs text-slate-500 font-medium">
+                    Showing <span className="font-bold text-brand-navy">{(currentPageReviewed - 1) * itemsPerPage + 1}</span> to <span className="font-bold text-brand-navy">{Math.min(currentPageReviewed * itemsPerPage, sortedReviewed.length)}</span> of <span className="font-bold text-brand-navy">{sortedReviewed.length}</span> results
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPageReviewed(p => Math.max(1, p - 1))}
+                      disabled={currentPageReviewed === 1}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.ceil(sortedReviewed.length / itemsPerPage) }).map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setCurrentPageReviewed(i + 1)}
+                          className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold transition-colors ${currentPageReviewed === i + 1 ? 'bg-brand-navy text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPageReviewed(p => Math.min(Math.ceil(sortedReviewed.length / itemsPerPage), p + 1))}
+                      disabled={currentPageReviewed === Math.ceil(sortedReviewed.length / itemsPerPage)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column (30%) */}
-        <div className="lg:col-span-3 flex flex-col gap-6 min-w-0">
-          
-          {/* Reviewer Profile Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col gap-4">
-            <h3 className="text-[10px] font-bold text-brand-navy uppercase tracking-wider border-b border-slate-50 pb-2 flex items-center gap-1.5">
-              <Shield size={14} className="text-[#C0152A]" />
-              🛡 REVIEWER PROFILE
-            </h3>
-            
-            <div className="flex flex-col gap-3.5 text-xs">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Full Name</span>
-                <strong className="text-slate-700 font-extrabold">{loggedInUser.name.split(' (')[0]}</strong>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Employee ID</span>
-                <strong className="text-slate-700 font-extrabold">{loggedInUser.employeeId}</strong>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Role</span>
-                <strong className="text-slate-700 font-extrabold">
-                  {ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Approver'}
-                </strong>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Department</span>
-                <strong className="text-slate-700 font-extrabold">{loggedInUser.businessUnit}</strong>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Access Level</span>
-                <strong className="text-emerald-600 font-extrabold flex items-center gap-1">
-                  <span>●</span> Authorized Approver
-                </strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions & System Status Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col gap-4">
-            <h3 className="text-[10px] font-bold text-brand-navy uppercase tracking-wider border-b border-slate-50 pb-2">
-              QUICK ACTIONS
-            </h3>
-            
-            <div className="flex flex-col gap-2.5 text-xs text-slate-600 font-bold">
-              <a href="#pending" onClick={(e) => { e.preventDefault(); setSearchQuery(''); }} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-100 group">
-                <span className="flex items-center gap-2">
-                  <span>📋</span>
-                  <span>View All Submissions</span>
-                </span>
-                <ArrowRight size={13} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-              </a>
-
-              <a href="/outbox" onClick={(e) => { e.preventDefault(); window.location.pathname = '/outbox'; }} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-100 group">
-                <span className="flex items-center gap-2">
-                  <Mail size={13} className="text-slate-500" />
-                  <span>View Email Logs</span>
-                </span>
-                <ArrowRight size={13} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-              </a>
-            </div>
-
-            <div className="border-t border-slate-100 pt-3 mt-1 flex flex-col gap-2.5">
-              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">● SYSTEM STATUS</h4>
-              <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span>All Dynamics CRM gateways operational</span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span>HRMS sync active</span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span>Review workflow engine running</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* 3. Review Modal (Triggered on click "Review") */}
       {selectedSub && (
@@ -677,7 +757,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div className="flex flex-col gap-1">
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Opportunity ID</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Impact ID</span>
                     <strong className="text-slate-700 font-mono font-bold">{selectedSub.intelligenceId}</strong>
                   </div>
                   
@@ -869,13 +949,9 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                       <span className="text-xs font-bold text-[#C0152A] uppercase flex items-center gap-1">
                         ❌ Rejection Reason <span className="text-[10px] text-slate-400 font-normal italic lowercase">(mandatory)</span>
                       </span>
-                      <span className={`text-[10px] font-mono font-bold ${rejectionReason.length < 10 ? 'text-red-500' : 'text-slate-400'}`}>
-                        {rejectionReason.length}/500
-                      </span>
                     </div>
 
                     <textarea
-                      maxLength={500}
                       rows={4}
                       placeholder="Provide a clear and specific reason for rejection. This will be shared with the employee and all stakeholders."
                       value={rejectionReason}
@@ -897,9 +973,9 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                       </button>
                       <button
                         type="submit"
-                        disabled={rejectionReason.trim().length < 10}
+                        disabled={rejectionReason.trim().length === 0}
                         className={`px-4 py-2 rounded-lg font-bold text-white border-none transition-all shadow-sm ${
-                          rejectionReason.trim().length < 10
+                          rejectionReason.trim().length === 0
                             ? 'bg-slate-300 cursor-not-allowed'
                             : 'bg-red-600 hover:bg-red-700 cursor-pointer'
                         }`}

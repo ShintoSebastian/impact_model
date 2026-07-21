@@ -1,0 +1,80 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Employee {
+  id               String       @id @default(uuid())
+  employeeId       String       @unique
+  name             String
+  email            String       @unique
+  businessUnit     String
+  reportingManager String
+  projectManager   String
+  buHead           String
+  hrbp             String
+  salesPerson      String
+  role             String?
+  designation      String?
+  jobRole          String?
+  phoneNumber      String?
+  submissions      Submission[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Submission {
+  id                    String          @id @default(uuid())
+  intelligenceId        String          @unique
+  employeeId            String
+  employee              Employee        @relation(fields: [employeeId], references: [employeeId])
+  shortDesc             String
+  detailedDesc          String
+  hasContact            Boolean         @default(false)
+  contactPhone          String?
+  contactEmail          String?
+  clientName            String
+  status                String
+  reason                String?
+  clarificationResponse String?
+  crmLeadId             String?
+  reportingManager      String
+  projectManager        String
+  buHead                String
+  hrbp                  String
+  salesPerson           String
+  statusHistory         StatusHistory[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+}
+
+model StatusHistory {
+  id           String     @id @default(uuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  status       String
+  changedBy    String
+  comment      String?
+  timestamp    DateTime   @default(now())
+}
+
+model EmailLog {
+  id        String   @id @default(uuid())
+  recipient String
+  subject   String
+  body      String
+  type      String
+  timestamp DateTime @default(now())
+}
+
+model Notification {
+  id             String   @id @default(uuid())
+  recipientEmail String?
+  message        String
+  read           Boolean  @default(false)
+  timestamp      DateTime @default(now())
+}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { EmailLog } from '../mockData.ts';
+import type { EmailLog } from '../types.ts';
 import { Mail, User, Clock, Search, Filter } from 'lucide-react';
 
 interface EmailSimulatorProps {

@@ -1,4 +1,4 @@
-import type { Submission, EmailLog } from './mockData.ts';
+import type { Submission, EmailLog } from './types.ts';
 
 // Generates unique intelligence IDs: IM-YYYYMMDD-XXXX
 export function generateIntelligenceId(existingSubmissions: Submission[]): string {
@@ -70,7 +70,7 @@ Submission Details:
 - Status: Under Review
 
 Required SLA Action:
-Our delivery and sales teams will review your submission. Acknowledgment and initial assessment will be completed within 2 working days.
+Our delivery and sales teams will review your submission. Acknowledgment and initial assessment will be completed within 7 working days.
 
 Best regards,
 IMPACT Portal Administration`,
