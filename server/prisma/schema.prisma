@@ -47,6 +47,11 @@ model Submission {
   buHead                String
   hrbp                  String
   salesPerson           String
+  rewardTier            String?
+  rewardTitle           String?
+  rewardGrantedBy       String?
+  rewardGrantedAt       DateTime?
+  rewardNotes           String?
   statusHistory         StatusHistory[]
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt

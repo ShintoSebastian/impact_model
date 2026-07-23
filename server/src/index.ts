@@ -808,6 +808,75 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
   }
 });
 
+// POST /api/submissions/:id/reward
+app.post('/api/submissions/:id/reward', authenticateToken, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { rewardTier, rewardNotes } = req.body;
+
+    if (!['Reward 1', 'Reward 2', 'Reward 3'].includes(rewardTier)) {
+      return res.status(400).json({ error: 'Invalid reward tier specified.' });
+    }
+
+    const existing = await prisma.submission.findUnique({
+      where: { intelligenceId: id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    if (existing.status !== 'Deal Won') {
+      return res.status(400).json({ error: 'Rewards can only be initiated after a deal is won.' });
+    }
+
+    const rewardTitleMap: Record<string, string> = {
+      'Reward 1': 'Bronze Impact Award (Spot Recognition)',
+      'Reward 2': 'Silver Excellence Award (Performance Bonus)',
+      'Reward 3': 'Gold Leadership Award (Executive Excellence)'
+    };
+
+    const rewardTitle = rewardTitleMap[rewardTier] || rewardTier;
+    const reviewerName = req.user.name || req.user.email;
+
+    const updated = await prisma.submission.update({
+      where: { intelligenceId: id },
+      data: {
+        rewardTier,
+        rewardTitle,
+        rewardGrantedBy: reviewerName,
+        rewardGrantedAt: new Date(),
+        rewardNotes: rewardNotes || null
+      },
+      include: {
+        statusHistory: {
+          orderBy: { timestamp: 'asc' }
+        }
+      }
+    });
+
+    const emp = await prisma.employee.findUnique({ where: { employeeId: updated.employeeId } });
+
+    if (emp) {
+      // Create notification for employee
+      await prisma.notification.create({
+        data: {
+          message: `🏆 Congratulations! You have been awarded ${rewardTitle} by ${reviewerName} for winning deal ${id}!`,
+          recipientEmail: emp.email
+        }
+      });
+    }
+
+    res.json({
+      ...updated,
+      employeeName: emp ? emp.name : 'Employee'
+    });
+  } catch (error) {
+    console.error('Reward initiation error:', error);
+    res.status(500).json({ error: 'Failed to initiate reward' });
+  }
+});
+
 // ----------------------------------------------------
 // NOTIFICATIONS ENDPOINTS
 // ----------------------------------------------------

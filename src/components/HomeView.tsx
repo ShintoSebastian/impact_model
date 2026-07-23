@@ -588,8 +588,39 @@ export function HomeView({
                   })}
                 </div>
 
+                {/* Celebratory Reward Card Banner (Rendered when reward is initiated) */}
+                {selectedSub.rewardTier && (
+                  <div className="mt-8 p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/10 border border-amber-300 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 animate-scale-up">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-white flex items-center justify-center font-black text-2xl shadow-lg shadow-amber-500/30 border border-amber-300">
+                        🏆
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black text-amber-900 uppercase tracking-widest">Achievement Reward Granted</span>
+                          <span className="bg-amber-200 text-amber-950 font-black text-[10px] px-2.5 py-0.5 rounded-full border border-amber-300 shadow-sm">
+                            {selectedSub.rewardTier}
+                          </span>
+                        </div>
+                        <h4 className="text-base font-black text-slate-900 mt-1">{selectedSub.rewardTitle || selectedSub.rewardTier}</h4>
+                        {selectedSub.rewardNotes && (
+                          <p className="text-xs text-slate-700 italic mt-1.5 font-medium bg-white/90 p-3 rounded-xl border border-amber-200/80 shadow-inner">
+                            "{selectedSub.rewardNotes}" — <span className="font-bold text-brand-navy">{selectedSub.rewardGrantedBy || 'Management'}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-start md:items-end flex-shrink-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Granted On</span>
+                      <span className="text-xs font-mono font-bold text-slate-800">
+                        {selectedSub.rewardGrantedAt ? new Date(selectedSub.rewardGrantedAt).toLocaleDateString('en-GB') : 'Recently'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Review Deadline Warning Chip */}
-                <div className="flex items-center gap-2 mt-20 px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-bold self-start max-w-fit border border-amber-100">
+                <div className="flex items-center gap-2 mt-8 px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-bold self-start max-w-fit border border-amber-100">
                   <span className="text-xs">⚠️</span>
                   <span>Acknowledgment due within 7 working days — Review Deadline active</span>
                 </div>

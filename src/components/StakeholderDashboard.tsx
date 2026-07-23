@@ -3,7 +3,8 @@ import type { Submission, EmailLog, Employee } from '../types.ts';
 import { triggerMailer, formatDateTime } from '../utils.ts';
 import { 
   Eye, CheckCircle2, XCircle, AlertTriangle, Clock, Building, Landmark, RefreshCcw, 
-  User, Database, Mail, ArrowRight, Shield, MessageSquare, Search, Download, Loader2
+  User, Database, Mail, ArrowRight, Shield, MessageSquare, Search, Download, Loader2,
+  Award, Trophy, Star, Gift, Sparkles
 } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { ROLE_MAP } from '../types.ts';
@@ -42,6 +43,69 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   // Clarification sub-flow states
   const [showClarifyForm, setShowClarifyForm] = useState(false);
   const [clarifyComment, setClarifyComment] = useState('');
+
+  // Reward initiation states
+  const [rewardSub, setRewardSub] = useState<Submission | null>(null);
+  const [selectedRewardTier, setSelectedRewardTier] = useState<'Reward 1' | 'Reward 2' | 'Reward 3'>('Reward 1');
+  const [rewardNotes, setRewardNotes] = useState('');
+  const [isSubmittingReward, setIsSubmittingReward] = useState(false);
+
+  const handleGrantReward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rewardSub) return;
+    setIsSubmittingReward(true);
+
+    try {
+      const token = sessionStorage.getItem('impact_token');
+      const res = await fetch(`http://localhost:5000/api/submissions/${rewardSub.intelligenceId}/reward`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          rewardTier: selectedRewardTier,
+          rewardNotes
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to initiate reward');
+      }
+
+      const updated = await res.json();
+      updateSubmission(rewardSub.intelligenceId, updated);
+
+      const rewardTitles: Record<string, string> = {
+        'Reward 1': 'Bronze Impact Award (Spot Recognition)',
+        'Reward 2': 'Silver Excellence Award (Performance Bonus)',
+        'Reward 3': 'Gold Leadership Award (Executive Excellence)'
+      };
+      const title = rewardTitles[selectedRewardTier] || selectedRewardTier;
+
+      const email: EmailLog = {
+        id: `email-${Math.random().toString(36).substring(2, 9)}`,
+        recipient: `${rewardSub.employeeName} (${rewardSub.employeeId})`,
+        subject: `🏆 REWARD INITIATED: ${title} for Deal ${rewardSub.intelligenceId}`,
+        body: `Dear ${rewardSub.employeeName},\n\nCongratulations! In recognition of your outstanding achievement in bringing deal "${rewardSub.clientName} — ${rewardSub.shortDesc}" to a successful conclusion (Deal Won), reviewer ${loggedInUser.name} has initiated the following reward for you:\n\nReward Tier: ${title}\nCommendation Notes: "${rewardNotes || 'Outstanding contribution to NeST Digital growth.'}"\n\nThank you for your dedicated efforts!\n\nBest regards,\nIMPACT Portal Workflow & Recognition Engine`,
+        timestamp: new Date().toISOString(),
+        type: 'employee'
+      };
+      logEmails([email]);
+
+      addNotification(`🏆 Reward initiated: ${title} for ${rewardSub.employeeName} (${rewardSub.intelligenceId})`);
+      triggerToast('success', `Successfully initiated ${title} for ${rewardSub.employeeName}!`);
+
+      setRewardSub(null);
+      setRewardNotes('');
+    } catch (err: any) {
+      console.error('Reward initiation error:', err);
+      triggerToast('error', err.message || 'Failed to grant reward.');
+    } finally {
+      setIsSubmittingReward(false);
+    }
+  };
 
   // Downloading states
   const [isDownloadingPendingExcel, setIsDownloadingPendingExcel] = useState(false);
@@ -661,9 +725,32 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                               >
                                 💬 Clarification
                               </span>
+                            ) : sub.status === 'Deal Won' ? (
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
+                                  🎉 Deal Won
+                                </span>
+                                {sub.rewardTier ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200" title={sub.rewardTitle || sub.rewardTier}>
+                                    🏆 {sub.rewardTier}
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setRewardSub(sub);
+                                      setSelectedRewardTier('Reward 1');
+                                      setRewardNotes('');
+                                    }}
+                                    className="px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-[10px] rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1 mt-0.5 active:scale-95"
+                                  >
+                                    <Gift size={11} />
+                                    <span>Initiate Reward</span>
+                                  </button>
+                                )}
+                              </div>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
-                                ✅ Validated
+                                ✅ {sub.status}
                               </span>
                             )}
                           </td>
@@ -1025,6 +1112,161 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Initiate Reward Modal */}
+      {rewardSub && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[1100] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-amber-200 max-w-xl w-full overflow-hidden flex flex-col animate-scale-up">
+            
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#0F172A] text-white p-5 flex items-center justify-between border-b border-amber-500/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center font-bold">
+                  <Trophy size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold tracking-tight">Initiate Employee Reward</h3>
+                  <p className="text-xs text-amber-300/80 font-medium">Deal Won: <span className="font-mono font-bold text-white">{rewardSub.intelligenceId}</span> — {rewardSub.clientName}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setRewardSub(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleGrantReward} className="p-6 flex flex-col gap-5">
+              
+              {/* Employee Info Header */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center">
+                    {rewardSub.employeeName.charAt(0)}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-extrabold text-slate-800">{rewardSub.employeeName}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">{rewardSub.employeeId} · {rewardSub.businessUnit}</span>
+                  </div>
+                </div>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-200">
+                  🎉 Deal Won
+                </span>
+              </div>
+
+              {/* Reward Tier Selection (3 Choices) */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Select Achievement Reward Level</label>
+                
+                <div className="grid grid-cols-1 gap-2.5">
+                  
+                  {/* Reward 1 */}
+                  <label 
+                    onClick={() => setSelectedRewardTier('Reward 1')}
+                    className={`flex items-start gap-3.5 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                      selectedRewardTier === 'Reward 1' 
+                        ? 'bg-amber-50/80 border-amber-400 shadow-md ring-2 ring-amber-400/20' 
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <input type="radio" name="rewardTier" checked={selectedRewardTier === 'Reward 1'} onChange={() => setSelectedRewardTier('Reward 1')} className="mt-1" />
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center flex-shrink-0">
+                      <Award size={18} />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-xs text-slate-900">Reward 1: Bronze Impact Award</span>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-200/60 text-amber-900">Spot Award</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Spot Recognition Certificate & Corporate Commendation for lead contribution.</p>
+                    </div>
+                  </label>
+
+                  {/* Reward 2 */}
+                  <label 
+                    onClick={() => setSelectedRewardTier('Reward 2')}
+                    className={`flex items-start gap-3.5 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                      selectedRewardTier === 'Reward 2' 
+                        ? 'bg-slate-100/80 border-blue-500 shadow-md ring-2 ring-blue-500/20' 
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <input type="radio" name="rewardTier" checked={selectedRewardTier === 'Reward 2'} onChange={() => setSelectedRewardTier('Reward 2')} className="mt-1" />
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 border border-blue-200 text-blue-700 flex items-center justify-center flex-shrink-0">
+                      <Gift size={18} />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-xs text-slate-900">Reward 2: Silver Excellence Award</span>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-200/60 text-blue-900">Performance Bonus</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Performance Cash Voucher & Official Leadership Commendation Letter.</p>
+                    </div>
+                  </label>
+
+                  {/* Reward 3 */}
+                  <label 
+                    onClick={() => setSelectedRewardTier('Reward 3')}
+                    className={`flex items-start gap-3.5 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                      selectedRewardTier === 'Reward 3' 
+                        ? 'bg-purple-50/80 border-purple-500 shadow-md ring-2 ring-purple-500/20' 
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <input type="radio" name="rewardTier" checked={selectedRewardTier === 'Reward 3'} onChange={() => setSelectedRewardTier('Reward 3')} className="mt-1" />
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 border border-purple-200 text-purple-700 flex items-center justify-center flex-shrink-0">
+                      <Star size={18} />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-xs text-slate-900">Reward 3: Gold Leadership Award</span>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-purple-200/60 text-purple-900">Executive Star</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Executive Level Recognition, High-Value Achievement Bonus & Board Commendation.</p>
+                    </div>
+                  </label>
+
+                </div>
+              </div>
+
+              {/* Commendation Notes */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Reviewer Commendation Note</label>
+                <textarea
+                  rows={3}
+                  placeholder="Add a personal congratulatory message to the employee..."
+                  value={rewardNotes}
+                  onChange={(e) => setRewardNotes(e.target.value)}
+                  className="p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-xs font-sans"
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setRewardSub(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReward}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-2 active:scale-98 disabled:opacity-60 cursor-pointer"
+                >
+                  {isSubmittingReward ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  <span>{isSubmittingReward ? 'Granting Reward...' : 'Confirm & Issue Reward'}</span>
+                </button>
+              </div>
+
+            </form>
+
           </div>
         </div>
       )}

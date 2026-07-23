@@ -44,6 +44,11 @@ export interface Submission {
   buHead: string;
   hrbp: string;
   salesPerson: string;
+  rewardTier?: 'Reward 1' | 'Reward 2' | 'Reward 3';
+  rewardTitle?: string;
+  rewardGrantedBy?: string;
+  rewardGrantedAt?: string;
+  rewardNotes?: string;
   statusHistory: StatusHistoryEntry[];
 }
 
