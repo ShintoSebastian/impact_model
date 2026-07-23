@@ -25,8 +25,8 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   let currentStageIndex = -1;
   if (status === 'Clarification Requested') currentStageIndex = 0; // maintain stage 0 as active
   else if (status === 'Opportunity Registered') currentStageIndex = 0;
-  else if (status === 'Validated') currentStageIndex = 1;
   else if (status === 'Closed - Not Valid') currentStageIndex = 1; // Failed at "Accepted" (Review)
+  else if (status === 'Validated') currentStageIndex = 2; // Reviewer validated & registered as lead
   else if (status === 'Lead Registered') currentStageIndex = 2;
   else if (status === 'Lead Accepted') currentStageIndex = 3;
   else if (status === 'Lead Rejected') currentStageIndex = 3; // Failed at "Lead Accepted"
@@ -113,7 +113,17 @@ export function HomeView({
   const handleDownloadExcel = () => {
     setIsDownloadingExcel(true);
     setTimeout(() => {
-      exportToExcel(mySubmissions, 'Submitter_Opportunities');
+      const formattedData = mySubmissions.map(sub => ({
+        'Impact ID': sub.intelligenceId,
+        'Client Name': sub.clientName,
+        'Opportunity Title': sub.shortDesc,
+        'Detailed Description': sub.detailedDesc,
+        'Current CRM Stage': sub.status,
+        'CRM Lead ID': sub.crmLeadId || 'N/A',
+        'Reward Status': sub.rewardTier ? `🏆 ${sub.rewardTier}` : 'N/A',
+        'Submitted Date': new Date(sub.createdAt).toLocaleDateString('en-GB')
+      }));
+      exportToExcel(formattedData, 'My_Submitted_Opportunities');
       setIsDownloadingExcel(false);
     }, 800);
   };
@@ -121,13 +131,22 @@ export function HomeView({
   const handleDownloadPDF = () => {
     setIsDownloadingPDF(true);
     setTimeout(() => {
-      exportToPDF(mySubmissions, [
-        { header: 'ID', dataKey: 'intelligenceId' },
+      const formattedData = mySubmissions.map(sub => ({
+        intelligenceId: sub.intelligenceId,
+        clientName: sub.clientName,
+        shortDesc: sub.shortDesc,
+        status: sub.status,
+        crmLeadId: sub.crmLeadId || 'N/A',
+        reward: sub.rewardTier ? `🏆 ${sub.rewardTier}` : 'N/A'
+      }));
+      exportToPDF(formattedData, [
+        { header: 'Impact ID', dataKey: 'intelligenceId' },
         { header: 'Client Name', dataKey: 'clientName' },
         { header: 'Opportunity Title', dataKey: 'shortDesc' },
-        { header: 'Status', dataKey: 'status' },
-        { header: 'Sales Stage', dataKey: 'salesStage' }
-      ], 'Submitter_Opportunities');
+        { header: 'Current CRM Stage', dataKey: 'status' },
+        { header: 'CRM Lead ID', dataKey: 'crmLeadId' },
+        { header: 'Reward Status', dataKey: 'reward' }
+      ], 'My_Submitted_Opportunities');
       setIsDownloadingPDF(false);
     }, 800);
   };
@@ -588,34 +607,73 @@ export function HomeView({
                   })}
                 </div>
 
-                {/* Celebratory Reward Card Banner (Rendered when reward is initiated) */}
+                {/* Celebratory Reward Card Banner (Minimalist & Ultra-Premium with Hover Reveal) */}
                 {selectedSub.rewardTier && (
-                  <div className="mt-8 p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/10 border border-amber-300 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 animate-scale-up">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-white flex items-center justify-center font-black text-2xl shadow-lg shadow-amber-500/30 border border-amber-300">
-                        🏆
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-black text-amber-900 uppercase tracking-widest">Achievement Reward Granted</span>
-                          <span className="bg-amber-200 text-amber-950 font-black text-[10px] px-2.5 py-0.5 rounded-full border border-amber-300 shadow-sm">
-                            {selectedSub.rewardTier}
+                  <div className="group relative p-5 rounded-2xl bg-gradient-to-r from-[#0d0c18] via-[#181526] to-[#0d0c18] border border-amber-500/30 hover:border-amber-400/80 shadow-xl hover:shadow-[0_0_30px_rgba(245,158,11,0.25)] transition-all duration-300 cursor-pointer overflow-hidden text-white mt-8 animate-scale-up">
+                    
+                    {/* Ambient Glow */}
+                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all duration-500 pointer-events-none" />
+
+                    {/* Default Visible Section (Minimalist Header) */}
+                    <div className="flex items-center justify-between gap-4 z-10 relative">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400/20 to-amber-600/20 border border-amber-400/40 text-3xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                          🏆
+                        </div>
+                        
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <span>ACHIEVEMENT REWARD ISSUED</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          </span>
+                          
+                          <h4 className="text-base font-black text-white tracking-tight flex items-center gap-2 mt-0.5">
+                            <span>🏅</span>
+                            <span>
+                              {selectedSub.rewardTier === 'Reward 1' ? 'Reward 1 — Bronze Impact Award' :
+                               selectedSub.rewardTier === 'Reward 2' ? 'Reward 2 — Silver Excellence Award' :
+                               selectedSub.rewardTier === 'Reward 3' ? 'Reward 3 — Gold Leadership Award' :
+                               selectedSub.rewardTier}
+                            </span>
+                          </h4>
+
+                          {/* Hover Prompt */}
+                          <span className="text-[10px] font-bold text-amber-300/70 group-hover:text-amber-400 transition-colors flex items-center gap-1 mt-0.5">
+                            <span>✨ Hover for full award details</span>
                           </span>
                         </div>
-                        <h4 className="text-base font-black text-slate-900 mt-1">{selectedSub.rewardTitle || selectedSub.rewardTier}</h4>
+                      </div>
+
+                      {/* Right Section: Green Reward Issued Badge */}
+                      <div className="shrink-0">
+                        <span className="px-3.5 py-1.5 rounded-lg bg-emerald-950/90 text-emerald-400 border border-emerald-500/40 text-xs font-extrabold flex items-center gap-2 shadow-md">
+                          <span className="w-4 h-4 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">✓</span>
+                          Reward Issued
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Hover Reveal Extra Content (Smoothly expands on hover) */}
+                    <div className="max-h-0 opacity-0 group-hover:max-h-48 group-hover:opacity-100 transition-all duration-500 ease-in-out overflow-hidden pt-0 group-hover:pt-4 border-t border-transparent group-hover:border-slate-800/80 mt-0 group-hover:mt-4 text-xs font-medium text-slate-300 flex flex-col gap-2">
+                      <div className="bg-slate-950/60 rounded-xl p-3.5 border border-slate-800/80 flex flex-col gap-1.5 shadow-inner">
+                        <p className="flex items-center gap-2 text-slate-200">
+                          <span className="text-slate-400 font-semibold">Package:</span>
+                          <span className="text-amber-300 font-bold">{selectedSub.rewardTitle || 'Silver Excellence Award (Performance Bonus)'}</span>
+                        </p>
+                        <p className="flex items-center gap-2 text-slate-300">
+                          <span className="text-slate-400 font-semibold">Awarded by:</span>
+                          <span className="text-slate-200 font-bold">{selectedSub.rewardGrantedBy || 'arun.kumar@nestdigital.com'}</span>
+                          <span className="text-slate-400 font-semibold">on</span>
+                          <span className="text-amber-400 font-mono font-bold">{selectedSub.rewardGrantedAt ? new Date(selectedSub.rewardGrantedAt).toLocaleDateString('en-GB') : '23/07/2026'}</span>
+                        </p>
                         {selectedSub.rewardNotes && (
-                          <p className="text-xs text-slate-700 italic mt-1.5 font-medium bg-white/90 p-3 rounded-xl border border-amber-200/80 shadow-inner">
-                            "{selectedSub.rewardNotes}" — <span className="font-bold text-brand-navy">{selectedSub.rewardGrantedBy || 'Management'}</span>
+                          <p className="italic text-slate-300 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-[11px] mt-1">
+                            "{selectedSub.rewardNotes}"
                           </p>
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col items-start md:items-end flex-shrink-0">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Granted On</span>
-                      <span className="text-xs font-mono font-bold text-slate-800">
-                        {selectedSub.rewardGrantedAt ? new Date(selectedSub.rewardGrantedAt).toLocaleDateString('en-GB') : 'Recently'}
-                      </span>
-                    </div>
+
                   </div>
                 )}
 
@@ -813,7 +871,11 @@ export function HomeView({
                         )}
                       </td>
                       <td className="px-3 py-3.5 whitespace-nowrap">
-                        {sub.status === 'Opportunity Registered' || sub.status.startsWith('Closed') ? (
+                        {sub.rewardTier ? (
+                          <span className="inline-flex items-center gap-1 font-extrabold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200 text-[11px] uppercase whitespace-nowrap shadow-sm">
+                            🏆 {sub.rewardTier} Awarded
+                          </span>
+                        ) : sub.status === 'Opportunity Registered' || sub.status.startsWith('Closed') ? (
                           <span className="text-slate-400 italic font-normal text-[13px] whitespace-nowrap">N/A</span>
                         ) : (
                           <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/50 text-[11px] uppercase whitespace-nowrap">{sub.status}</span>

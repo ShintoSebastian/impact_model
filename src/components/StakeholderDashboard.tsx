@@ -4,7 +4,7 @@ import { triggerMailer, formatDateTime } from '../utils.ts';
 import { 
   Eye, CheckCircle2, XCircle, AlertTriangle, Clock, Building, Landmark, RefreshCcw, 
   User, Database, Mail, ArrowRight, Shield, MessageSquare, Search, Download, Loader2,
-  Award, Trophy, Star, Gift, Sparkles, ClipboardList, Check, Target, FileText, Handshake
+  Award, Trophy, Star, Gift, Sparkles, ClipboardList, Check, Target, FileText, Handshake, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { ROLE_MAP } from '../types.ts';
@@ -28,8 +28,8 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   let currentStageIndex = -1;
   if (status === 'Clarification Requested') currentStageIndex = 0;
   else if (status === 'Opportunity Registered') currentStageIndex = 0;
-  else if (status === 'Validated') currentStageIndex = 1;
   else if (status === 'Closed - Not Valid') currentStageIndex = 1;
+  else if (status === 'Validated') currentStageIndex = 2; // Reviewer validated & registered as lead
   else if (status === 'Lead Registered') currentStageIndex = 2;
   else if (status === 'Lead Accepted') currentStageIndex = 3;
   else if (status === 'Lead Rejected') currentStageIndex = 3;
@@ -119,6 +119,9 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 
       const updated = await res.json();
       updateSubmission(rewardSub.intelligenceId, updated);
+      if (selectedSub && selectedSub.intelligenceId === rewardSub.intelligenceId) {
+        setSelectedSub(updated);
+      }
 
       const rewardTitles: Record<string, string> = {
         'Reward 1': 'Bronze Impact Award (Spot Recognition)',
@@ -166,7 +169,17 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   const handleDownloadPendingExcel = () => {
     setIsDownloadingPendingExcel(true);
     setTimeout(() => {
-      exportToExcel(sortedPending, 'Pending_Reviews');
+      const formattedData = sortedPending.map(sub => ({
+        'Impact ID': sub.intelligenceId,
+        'Employee ID': sub.employeeId,
+        'Employee Name': sub.employeeName,
+        'Client Name': sub.clientName,
+        'Opportunity Title': sub.shortDesc,
+        'Detailed Description': sub.detailedDesc,
+        'Submitted Date': new Date(sub.createdAt).toLocaleDateString('en-GB'),
+        'SLA Target': '7 Working Days'
+      }));
+      exportToExcel(formattedData, 'Pending_Reviews');
       setIsDownloadingPendingExcel(false);
     }, 800);
   };
@@ -174,11 +187,19 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   const handleDownloadPendingPDF = () => {
     setIsDownloadingPendingPDF(true);
     setTimeout(() => {
-      exportToPDF(sortedPending, [
-        { header: 'ID', dataKey: 'intelligenceId' },
+      const formattedData = sortedPending.map(sub => ({
+        intelligenceId: sub.intelligenceId,
+        employeeName: `${sub.employeeName} (${sub.employeeId})`,
+        clientName: sub.clientName,
+        shortDesc: sub.shortDesc,
+        createdAt: new Date(sub.createdAt).toLocaleDateString('en-GB')
+      }));
+      exportToPDF(formattedData, [
+        { header: 'Impact ID', dataKey: 'intelligenceId' },
         { header: 'Employee', dataKey: 'employeeName' },
         { header: 'Client Name', dataKey: 'clientName' },
-        { header: 'Title', dataKey: 'shortDesc' },
+        { header: 'Opportunity Title', dataKey: 'shortDesc' },
+        { header: 'Submitted Date', dataKey: 'createdAt' }
       ], 'Pending_Reviews');
       setIsDownloadingPendingPDF(false);
     }, 800);
@@ -187,7 +208,20 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   const handleDownloadReviewedExcel = () => {
     setIsDownloadingReviewedExcel(true);
     setTimeout(() => {
-      exportToExcel(sortedReviewed, 'Reviewed_Submissions');
+      const formattedData = sortedReviewed.map(sub => ({
+        'Impact ID': sub.intelligenceId,
+        'Employee ID': sub.employeeId,
+        'Employee Name': sub.employeeName,
+        'Client Name': sub.clientName,
+        'Opportunity Title': sub.shortDesc,
+        'Current CRM Stage': sub.status,
+        'CRM Lead ID': sub.crmLeadId || 'N/A',
+        'Reward Tier': sub.rewardTier || 'N/A',
+        'Reward Package': sub.rewardTitle || 'N/A',
+        'Awarded By': sub.rewardGrantedBy || 'N/A',
+        'Submitted Date': new Date(sub.createdAt).toLocaleDateString('en-GB')
+      }));
+      exportToExcel(formattedData, 'Reviewed_Submissions');
       setIsDownloadingReviewedExcel(false);
     }, 800);
   };
@@ -195,12 +229,23 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   const handleDownloadReviewedPDF = () => {
     setIsDownloadingReviewedPDF(true);
     setTimeout(() => {
-      exportToPDF(sortedReviewed, [
-        { header: 'ID', dataKey: 'intelligenceId' },
+      const formattedData = sortedReviewed.map(sub => ({
+        intelligenceId: sub.intelligenceId,
+        employeeName: sub.employeeName,
+        clientName: sub.clientName,
+        shortDesc: sub.shortDesc,
+        status: sub.status,
+        crmLeadId: sub.crmLeadId || 'N/A',
+        reward: sub.rewardTier ? `🏆 ${sub.rewardTier}` : 'N/A'
+      }));
+      exportToPDF(formattedData, [
+        { header: 'Impact ID', dataKey: 'intelligenceId' },
         { header: 'Employee', dataKey: 'employeeName' },
         { header: 'Client', dataKey: 'clientName' },
-        { header: 'Title', dataKey: 'shortDesc' },
-        { header: 'Status', dataKey: 'status' }
+        { header: 'Opportunity Title', dataKey: 'shortDesc' },
+        { header: 'Current CRM Stage', dataKey: 'status' },
+        { header: 'CRM Lead ID', dataKey: 'crmLeadId' },
+        { header: 'Reward Status', dataKey: 'reward' }
       ], 'Reviewed_Submissions');
       setIsDownloadingReviewedPDF(false);
     }, 800);
@@ -414,66 +459,73 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
           {/* Left Column: Reviewer Profile Inside Banner */}
           <div className="lg:col-span-7 flex flex-col gap-3">
 
-            {/* Profile Role Indicator */}
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/30 text-rose-300 text-[10px] font-extrabold uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
-                REVIEWER PROFILE • EXECUTIVE REVIEW BOARD
-              </span>
+
+            {/* Profile Header — Welcome back + Name + Dropdown Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+              <div className="flex items-center gap-5">
+                <div className="w-[72px] h-[72px] rounded-xl bg-gradient-to-br from-rose-500 to-red-700 flex items-center justify-center text-white text-2xl font-extrabold shadow-lg shadow-rose-500/20 ring-2 ring-white/10 flex-shrink-0">
+                  {loggedInUser.name.charAt(0)}{loggedInUser.name.split(' ')[1]?.charAt(0) || ''}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm text-slate-300 font-semibold tracking-wide">Welcome back,</span>
+                  <h2 className="text-2xl md:text-3xl font-extrabold leading-tight tracking-tight">
+                    <span className="bg-gradient-to-r from-rose-300 via-rose-100 to-white bg-clip-text text-transparent">{loggedInUser.name.split(' (')[0]}.</span>
+                  </h2>
+                  <span className="text-xs text-rose-300 font-semibold mt-0.5">{ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Reviewer'} · {loggedInUser.businessUnit}</span>
+                </div>
+              </div>
+
+              {/* Dropdown Toggle Button */}
+              <button
+                onClick={() => setIsProfileExpanded(!isProfileExpanded)}
+                className="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/15 shadow-md cursor-pointer active:scale-95 shrink-0"
+              >
+                <User size={14} className="text-rose-300" />
+                <span>{isProfileExpanded ? 'Hide Employee Details' : 'View Employee Details'}</span>
+                {isProfileExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
             </div>
 
-            {/* Profile Header — Welcome back + Name */}
-            <div className="flex items-center gap-5 mb-2">
-              <div className="w-[72px] h-[72px] rounded-xl bg-gradient-to-br from-rose-500 to-red-700 flex items-center justify-center text-white text-2xl font-extrabold shadow-lg shadow-rose-500/20 ring-2 ring-white/10 flex-shrink-0">
-                {loggedInUser.name.charAt(0)}{loggedInUser.name.split(' ')[1]?.charAt(0) || ''}
+            {/* Reviewer Details Dropdown Grid (Appears on Toggle) */}
+            {isProfileExpanded && (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm bg-white/[0.04] border border-white/[0.08] rounded-xl p-5 animate-scale-up">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Employee ID</span>
+                  <span className="text-white font-bold font-mono text-[14px]">{loggedInUser.employeeId}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Role</span>
+                  <span className="text-white font-bold text-[13px]">{ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Delivery Head'}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Department</span>
+                  <span className="text-white font-bold text-[13px]">{loggedInUser.businessUnit || 'Delivery Operations'}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Corporate Email</span>
+                  <a href={`mailto:${loggedInUser.email}`} className="text-rose-300 font-bold hover:text-rose-200 transition-colors truncate text-[13px]">{loggedInUser.email}</a>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Job Role</span>
+                  <span className="text-white font-bold text-[13px]">{loggedInUser.jobRole || 'Not Specified'}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phone Number</span>
+                  <span className="text-white font-bold text-[13px]">{loggedInUser.phoneNumber || 'Not Specified'}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Access Level</span>
+                  <span className="text-emerald-400 font-extrabold text-[13px] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    Authorized Approver
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">SLA Target</span>
+                  <span className="text-slate-200 font-semibold text-[13px]">7 Working Days</span>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-sm text-slate-300 font-semibold tracking-wide">Welcome back,</span>
-                <h2 className="text-2xl md:text-3xl font-extrabold leading-tight tracking-tight">
-                  <span className="bg-gradient-to-r from-rose-300 via-rose-100 to-white bg-clip-text text-transparent">{loggedInUser.name.split(' (')[0]}.</span>
-                </h2>
-                <span className="text-xs text-rose-300 font-semibold mt-0.5">{ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Reviewer'} · {loggedInUser.businessUnit}</span>
-              </div>
-            </div>
-
-            {/* Reviewer Details Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Employee ID</span>
-                <span className="text-white font-bold font-mono text-[14px]">{loggedInUser.employeeId}</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Role</span>
-                <span className="text-white font-bold text-[13px]">{ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Delivery Head'}</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Department</span>
-                <span className="text-white font-bold text-[13px]">{loggedInUser.businessUnit || 'Delivery Operations'}</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Corporate Email</span>
-                <a href={`mailto:${loggedInUser.email}`} className="text-rose-300 font-bold hover:text-rose-200 transition-colors truncate text-[13px]">{loggedInUser.email}</a>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Job Role</span>
-                <span className="text-white font-bold text-[13px]">{loggedInUser.jobRole || 'Not Specified'}</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phone Number</span>
-                <span className="text-white font-bold text-[13px]">{loggedInUser.phoneNumber || 'Not Specified'}</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Access Level</span>
-                <span className="text-emerald-400 font-extrabold text-[13px] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  Authorized Approver
-                </span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">SLA Target</span>
-                <span className="text-slate-200 font-semibold text-[13px]">7 Working Days</span>
-              </div>
-            </div>
+            )}
 
             <div className="flex items-center gap-3 mt-1">
               <span className="text-xs text-slate-400 font-semibold">
@@ -483,10 +535,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
           </div>
 
           {/* Right Column: Glass Grid */}
-          <div className="lg:col-span-5 flex flex-col gap-4">
-            <div className="text-[11px] font-extrabold text-rose-300 uppercase tracking-widest px-1">
-              ✦ AUDIT OVERVIEW & METRICS
-            </div>
+          <div className="lg:col-span-5 flex flex-col justify-center gap-4">
 
             {/* Grid of 4 Glassmorphic Metrics */}
             <div className="grid grid-cols-2 gap-3">
@@ -740,15 +789,14 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                     <th className="px-3 py-3.5">Employee Name</th>
                     <th className="px-3 py-3.5">Client Name</th>
                     <th className="px-3 py-3.5">Opportunity Title</th>
-                    <th className="px-3 py-3.5">Live CRM Stage</th>
-                    <th className="px-3 py-3.5">Status & Recognition</th>
-                    <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Actions</th>
+                    <th className="px-3 py-3.5">Current CRM Stage</th>
+                    <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="font-semibold text-[13px]">
                   {sortedReviewed.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-16 text-gray-400 font-medium text-sm">
+                      <td colSpan={6} className="text-center py-16 text-gray-400 font-medium text-sm">
                         No reviewed items yet.
                       </td>
                     </tr>
@@ -760,7 +808,13 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                       return (
                         <tr
                           key={sub.intelligenceId}
-                          className={`transition-all duration-200 border-b border-gray-100/80 group relative ${
+                          onClick={() => {
+                            setSelectedSub(sub);
+                            setShowRejectForm(false);
+                            setShowClarifyForm(false);
+                            setIsProfileExpanded(false);
+                          }}
+                          className={`cursor-pointer transition-all duration-200 border-b border-gray-100/80 group relative ${
                             idx % 2 === 1 ? 'bg-[#F4F6FA]/80 hover:bg-[#EAEDF2]' : 'bg-white hover:bg-slate-50/60'
                           }`}
                         >
@@ -775,83 +829,61 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                           </td>
                           <td className="px-3 py-3.5 font-extrabold text-slate-900 text-[14px] whitespace-normal max-w-[140px] break-words">{sub.clientName}</td>
                           <td className="px-3 py-3.5 text-slate-600 font-medium text-[13px] whitespace-normal max-w-[180px] break-words">{sub.shortDesc}</td>
-                          <td className="px-3 py-3.5 text-slate-700 whitespace-nowrap">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
-                              sub.status === 'Deal Won' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                              sub.status === 'Negotiation' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                              sub.status === 'Proposal' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                              sub.status.startsWith('Lead') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                              sub.status === 'Validated' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
-                              'bg-slate-100 text-slate-600 border border-slate-200'
-                            }`}>
-                              {sub.crmLeadId ? `📈 ${sub.status}` : sub.status}
-                            </span>
-                          </td>
 
-                          {/* Status & Recognition (PURE STATUS ONLY) */}
+                          {/* Current Stage Column */}
                           <td className="px-3 py-3.5 whitespace-nowrap">
-                            <div className="flex flex-col gap-1 items-start">
+                            <div className="flex items-center gap-2">
                               {isRejected ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm cursor-help"
-                                  title={sub.reason}
-                                >
-                                  ❌ Rejected
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm">
+                                  ❌ Closed - Not Valid
                                 </span>
                               ) : isClarify ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
-                                  title={sub.reason}
-                                >
-                                  💬 Clarification
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
+                                  💬 Clarification Requested
                                 </span>
                               ) : sub.status === 'Deal Won' ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
                                   🎉 Deal Won
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
+                                  sub.status === 'Negotiation' ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' :
+                                  sub.status === 'Proposal' ? 'bg-purple-50 text-purple-700 border border-purple-200 shadow-sm' :
+                                  sub.status.startsWith('Lead') ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm' :
+                                  'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm'
+                                }`}>
                                   ✅ {sub.status}
                                 </span>
                               )}
 
-                              {/* Awarded Badge (If Granted) */}
-                              {sub.rewardTier && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200" title={sub.rewardTitle || sub.rewardTier}>
-                                  🏆 {sub.rewardTier} Granted
+                              {/* Reward Status (If Won) */}
+                              {sub.rewardTier ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200 shadow-sm">
+                                  🏆 {sub.rewardTier} Awarded
+                                </span>
+                              ) : sub.status === 'Deal Won' && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-sm animate-pulse">
+                                  🎁 Reward Ready
                                 </span>
                               )}
                             </div>
                           </td>
 
-                          {/* Actions Column (ALL ACTION BUTTONS HERE) */}
+                          {/* Explicit User-Friendly Action Button */}
                           <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-2">
-                              {sub.status === 'Deal Won' && !sub.rewardTier && (
-                                <button
-                                  onClick={() => {
-                                    setRewardSub(sub);
-                                    setSelectedRewardTier('Reward 1');
-                                    setRewardNotes('');
-                                  }}
-                                  className="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1 active:scale-95"
-                                >
-                                  <Gift size={12} />
-                                  <span>Initiate Reward</span>
-                                </button>
-                              )}
-                              
-                              <button 
-                                onClick={() => {
-                                  setSelectedSub(sub);
-                                  setShowRejectForm(false);
-                                  setShowClarifyForm(false);
-                                  setIsProfileExpanded(false);
-                                }}
-                                className="px-3 py-1.5 bg-brand-navy hover:bg-brand-navy/90 text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer shadow-sm inline-flex items-center gap-1.5 active:scale-95"
-                              >
-                                <Eye size={12} />
-                                <span>Track Lifecycle</span>
-                              </button>
-                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedSub(sub);
+                                setShowRejectForm(false);
+                                setShowClarifyForm(false);
+                                setIsProfileExpanded(false);
+                              }}
+                              className="px-3 py-1.5 bg-brand-navy hover:bg-[#121c4a] text-white font-bold text-[11px] rounded-lg transition-all shadow-sm inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
+                            >
+                              <Eye size={12} />
+                              <span>View Lifecycle</span>
+                            </button>
                           </td>
                         </tr>
                       );
@@ -931,19 +963,32 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
               
               {/* Lead Lifecycle Tracker Stepper (Visible for approved/reviewed leads) */}
               {selectedSub.status !== 'Opportunity Registered' && selectedSub.status !== 'Clarification Requested' && (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl text-white">
+                <div className="bg-[#091024] border border-slate-800 rounded-3xl p-6 shadow-2xl text-white">
+                  {/* Header Row */}
                   <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-300 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                      LIVE LEAD LIFECYCLE TRACKER
-                    </h3>
-                    <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                      Stage: {selectedSub.status}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
+                        <Target size={20} strokeWidth={2.5} />
+                      </div>
+                      <div className="flex flex-col">
+                        <h3 className="text-base font-extrabold text-white tracking-tight">
+                          Live Lead Lifecycle Tracker
+                        </h3>
+                        <p className="text-xs text-slate-400 font-medium">
+                          Track the progress of this opportunity
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Top Right Stage Pill */}
+                    <div className="px-4 py-1.5 rounded-full bg-[#081226] border border-amber-500/50 shadow-inner flex items-center gap-2">
+                      <span className="text-base">🏆</span>
+                      <span className="text-xs font-bold text-slate-300">Stage: <strong className="text-blue-400 font-extrabold">{selectedSub.status}</strong></span>
+                    </div>
                   </div>
 
-                  {/* Stepper Progress */}
-                  <div className="flex items-center justify-between w-full relative px-2 my-4 overflow-x-auto">
+                  {/* Stepper Progress Bar */}
+                  <div className="flex items-center justify-between w-full relative px-2 my-6">
                     {LIFECYCLE_STEPS.map((step, idx) => {
                       const status = getStepStatus(selectedSub, idx);
                       let circleMarkup;
@@ -962,33 +1007,46 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                         }
                       })();
 
-                      if (status === 'completed' || status === 'active') {
+                      const isDealWonStep = idx === 6 && selectedSub.status === 'Deal Won';
+
+                      if (isDealWonStep) {
+                        // Glowing Blue Trophy Node for Deal Won (Matches Screenshot 1)
                         circleMarkup = (
                           <div className="relative flex items-center justify-center z-10">
-                            {status === 'active' && <div className="absolute w-12 h-12 rounded-full bg-emerald-500/30 animate-pulse" />}
-                            <div className="relative w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/50">
-                              <StepIcon size={16} strokeWidth={2.5} />
+                            <div className="absolute w-12 h-12 rounded-full bg-blue-500/40 animate-pulse blur-sm" />
+                            <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.8)] ring-4 ring-blue-500/40 text-lg">
+                              🏆
+                            </div>
+                          </div>
+                        );
+                      } else if (status === 'completed' || status === 'active') {
+                        circleMarkup = (
+                          <div className="relative flex items-center justify-center z-10">
+                            {status === 'active' && <div className="absolute w-11 h-11 rounded-full bg-emerald-500/30 animate-pulse" />}
+                            <div className="relative w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/50">
+                              <StepIcon size={15} strokeWidth={2.5} />
                             </div>
                           </div>
                         );
                       } else if (status === 'failed') {
                         circleMarkup = (
                           <div className="relative flex items-center justify-center z-10">
-                            <div className="w-9 h-9 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/30 ring-2 ring-rose-400/50">
-                              <span className="text-sm font-bold">✕</span>
+                            <div className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/30 ring-2 ring-rose-400/50">
+                              <span className="text-xs font-bold">✕</span>
                             </div>
                           </div>
                         );
                       } else {
                         circleMarkup = (
-                          <div className="w-9 h-9 rounded-full border border-slate-700 bg-slate-800 text-slate-500 flex items-center justify-center z-10">
-                            <StepIcon size={16} strokeWidth={2} />
+                          <div className="w-8 h-8 rounded-full border border-slate-700 bg-slate-800 text-slate-500 flex items-center justify-center z-10">
+                            <StepIcon size={15} strokeWidth={2} />
                           </div>
                         );
                       }
 
                       const isLast = idx === LIFECYCLE_STEPS.length - 1;
                       const nextStatus = isLast ? null : getStepStatus(selectedSub, idx + 1);
+
                       let lineStyle = 'bg-slate-800';
                       if (status === 'completed' && nextStatus === 'completed') {
                         lineStyle = 'bg-emerald-500';
@@ -1000,52 +1058,134 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                         lineStyle = 'bg-amber-400 animate-pulse';
                       }
 
+                      // Generate clean step dates matching Screenshot 1
+                      const stepDate = (() => {
+                        if (!selectedSub.createdAt) return '';
+                        const baseDate = new Date(selectedSub.createdAt);
+                        baseDate.setDate(baseDate.getDate() + idx);
+                        return baseDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                      })();
+
                       return (
                         <React.Fragment key={idx}>
-                          <div className="flex flex-col items-center gap-2 relative w-9">
+                          <div className="flex flex-col items-center gap-1 relative flex-1 min-w-0">
                             {circleMarkup}
-                            <span className={`text-[9px] font-bold text-center w-20 absolute top-11 leading-tight ${
-                              (status === 'completed' || status === 'active') ? 'text-slate-200' : (status === 'failed' ? 'text-rose-400' : 'text-slate-500')
+                            <span className={`text-[11px] font-bold text-center leading-tight px-0.5 mt-1 ${
+                              isDealWonStep ? 'text-blue-400 font-black' :
+                              (status === 'completed' || status === 'active') ? 'text-slate-200 font-extrabold' : 
+                              (status === 'failed' ? 'text-rose-400' : 'text-slate-500')
                             }`}>
                               {status === 'failed' ? (step === 'Deal Won' ? 'Deal Lost' : step.includes('Accepted') ? 'Rejected' : 'Dropped') : step}
                             </span>
+                            <span className={`text-[10px] font-medium text-center ${isDealWonStep ? 'text-blue-400 font-bold' : 'text-slate-400'}`}>
+                              {stepDate}
+                            </span>
                           </div>
                           {!isLast && (
-                            <div className={`flex-1 h-[2px] -mt-5 mx-1 ${lineStyle}`} />
+                            <div className={`h-[2px] w-full self-start mt-4 mx-0.5 ${lineStyle}`} />
                           )}
                         </React.Fragment>
                       );
                     })}
                   </div>
 
-                  {/* If Deal Won, prompt to initiate reward! */}
+                  {/* Achievement Reward Card (Exact Match to Screenshot 1) */}
                   {selectedSub.status === 'Deal Won' && (
-                    <div className="mt-14 pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">🏆</span>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-black text-amber-400">Deal Successfully Won!</span>
-                          <span className="text-[11px] text-slate-300 font-medium">
-                            {selectedSub.rewardTier 
-                              ? `Reward Granted: ${selectedSub.rewardTitle || selectedSub.rewardTier}`
-                              : 'Select an achievement level to reward the submitter.'}
-                          </span>
-                        </div>
-                      </div>
+                    <div className="mt-6 pt-2">
+                      {selectedSub.rewardTier ? (
+                        /* REWARD GRANTED CARD (MINIMALIST & ULTRA-PREMIUM WITH HOVER REVEAL) */
+                        <div className="group relative p-5 rounded-2xl bg-gradient-to-r from-[#0d0c18] via-[#181526] to-[#0d0c18] border border-amber-500/30 hover:border-amber-400/80 shadow-xl hover:shadow-[0_0_30px_rgba(245,158,11,0.25)] transition-all duration-300 cursor-pointer overflow-hidden">
+                          
+                          {/* Ambient Glow */}
+                          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all duration-500 pointer-events-none" />
 
-                      {!selectedSub.rewardTier && (
-                        <button
-                          onClick={() => {
-                            setRewardSub(selectedSub);
-                            setSelectedRewardTier('Reward 1');
-                            setRewardNotes('');
-                            setSelectedSub(null);
-                          }}
-                          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                        >
-                          <Gift size={14} />
-                          <span>Initiate Reward</span>
-                        </button>
+                          {/* Default Visible Section (Minimalist Header) */}
+                          <div className="flex items-center justify-between gap-4 z-10 relative">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400/20 to-amber-600/20 border border-amber-400/40 text-3xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                                🏆
+                              </div>
+                              
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                                  <span>ACHIEVEMENT REWARD ISSUED</span>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                </span>
+                                
+                                <h4 className="text-base font-black text-white tracking-tight flex items-center gap-2 mt-0.5">
+                                  <span>🏅</span>
+                                  <span>
+                                    {selectedSub.rewardTier === 'Reward 1' ? 'Reward 1 — Bronze Impact Award' :
+                                     selectedSub.rewardTier === 'Reward 2' ? 'Reward 2 — Silver Excellence Award' :
+                                     selectedSub.rewardTier === 'Reward 3' ? 'Reward 3 — Gold Leadership Award' :
+                                     selectedSub.rewardTier}
+                                  </span>
+                                </h4>
+
+                                {/* Hover Prompt */}
+                                <span className="text-[10px] font-bold text-amber-300/70 group-hover:text-amber-400 transition-colors flex items-center gap-1 mt-0.5">
+                                  <span>✨ Hover for full award details</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Right Section: Green Reward Issued Badge */}
+                            <div className="shrink-0">
+                              <span className="px-3.5 py-1.5 rounded-lg bg-emerald-950/90 text-emerald-400 border border-emerald-500/40 text-xs font-extrabold flex items-center gap-2 shadow-md">
+                                <span className="w-4 h-4 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">✓</span>
+                                Reward Issued
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Hover Reveal Extra Content (Smoothly expands on hover) */}
+                          <div className="max-h-0 opacity-0 group-hover:max-h-48 group-hover:opacity-100 transition-all duration-500 ease-in-out overflow-hidden pt-0 group-hover:pt-4 border-t border-transparent group-hover:border-slate-800/80 mt-0 group-hover:mt-4 text-xs font-medium text-slate-300 flex flex-col gap-2">
+                            <div className="bg-slate-950/60 rounded-xl p-3.5 border border-slate-800/80 flex flex-col gap-1.5 shadow-inner">
+                              <p className="flex items-center gap-2 text-slate-200">
+                                <span className="text-slate-400 font-semibold">Package:</span>
+                                <span className="text-amber-300 font-bold">{selectedSub.rewardTitle || 'Silver Excellence Award (Performance Bonus)'}</span>
+                              </p>
+                              <p className="flex items-center gap-2 text-slate-300">
+                                <span className="text-slate-400 font-semibold">Awarded by:</span>
+                                <span className="text-slate-200 font-bold">{selectedSub.rewardGrantedBy || 'arun.kumar@nestdigital.com'}</span>
+                                <span className="text-slate-400 font-semibold">on</span>
+                                <span className="text-amber-400 font-mono font-bold">{selectedSub.rewardGrantedAt ? new Date(selectedSub.rewardGrantedAt).toLocaleDateString('en-GB') : '23/07/2026'}</span>
+                              </p>
+                              {selectedSub.rewardNotes && (
+                                <p className="italic text-slate-300 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-[11px] mt-1">
+                                  "{selectedSub.rewardNotes}"
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                        </div>
+                      ) : (
+                        /* UNREWARDED — SHOW INITIATE REWARD BUTTON */
+                        <div className="p-5 rounded-2xl bg-gradient-to-r from-[#12111d] via-[#1a1727] to-[#12111d] border border-amber-500/30 shadow-2xl flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <span className="text-3xl">🏆</span>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-black text-amber-400 uppercase tracking-wider">Deal Successfully Won!</span>
+                              <span className="text-xs text-slate-300 font-medium">
+                                Select an achievement level to reward the submitter.
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              setRewardSub(selectedSub);
+                              setSelectedRewardTier('Reward 1');
+                              setRewardNotes('');
+                              setSelectedSub(null);
+                            }}
+                            className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer active:scale-95 shrink-0"
+                          >
+                            <Gift size={15} />
+                            <span>Initiate Reward</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1204,46 +1344,47 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                 </div>
               )}
 
-              {/* Section 4 — Your Decision (White bg box) */}
-              <div className="border-t border-slate-100 pt-5 flex flex-col gap-4">
-                <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
-                  YOUR DECISION
-                </span>
+              {/* Section 4 — Decision Section */}
+              {selectedSub.status === 'Opportunity Registered' || selectedSub.status === 'Clarification Requested' ? (
+                <div className="border-t border-slate-100 pt-5 flex flex-col gap-4">
+                  <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
+                    YOUR DECISION
+                  </span>
 
-                {/* Sub-flows toggled view */}
-                {!showRejectForm && !showClarifyForm ? (
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button 
-                      onClick={() => handleValidate(selectedSub)}
-                      className="flex-1 py-3 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs border-none flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
-                    >
-                      <CheckCircle2 size={15} />
-                      Validate
-                    </button>
-                    
-                    <button 
-                      onClick={() => {
-                        setShowRejectForm(true);
-                        setShowClarifyForm(false);
-                      }}
-                      className="flex-1 py-3 px-4 rounded-lg bg-[#C0152A] hover:bg-[#a10e20] text-white font-bold text-xs border-none flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
-                    >
-                      <XCircle size={15} />
-                      Reject
-                    </button>
+                  {/* Sub-flows toggled view */}
+                  {!showRejectForm && !showClarifyForm ? (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button 
+                        onClick={() => handleValidate(selectedSub)}
+                        className="flex-1 py-3 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs border-none flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                      >
+                        <CheckCircle2 size={15} />
+                        Validate
+                      </button>
+                      
+                      <button 
+                        onClick={() => {
+                          setShowRejectForm(true);
+                          setShowClarifyForm(false);
+                        }}
+                        className="flex-1 py-3 px-4 rounded-lg bg-[#C0152A] hover:bg-[#a10e20] text-white font-bold text-xs border-none flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                      >
+                        <XCircle size={15} />
+                        Reject
+                      </button>
 
-                    <button 
-                      onClick={() => {
-                        setShowClarifyForm(true);
-                        setShowRejectForm(false);
-                      }}
-                      className="flex-1 py-3 px-4 rounded-lg border-2 border-brand-navy hover:bg-slate-50 text-brand-navy font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm bg-transparent"
-                    >
-                      <MessageSquare size={15} />
-                      Request Clarification
-                    </button>
-                  </div>
-                ) : null}
+                      <button 
+                        onClick={() => {
+                          setShowClarifyForm(true);
+                          setShowRejectForm(false);
+                        }}
+                        className="flex-1 py-3 px-4 rounded-lg border-2 border-brand-navy hover:bg-slate-50 text-brand-navy font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm bg-transparent"
+                      >
+                        <MessageSquare size={15} />
+                        Request Clarification
+                      </button>
+                    </div>
+                  ) : null}
 
                 {/* Rejection Sub-flow Form */}
                 {showRejectForm && (
@@ -1327,6 +1468,22 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                 )}
 
               </div>
+              ) : (
+                <div className="border-t border-slate-100 pt-5 flex flex-col gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
+                    REVIEW DECISION RECORD & PIPELINE STATUS
+                  </span>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-2 font-bold text-slate-700">
+                      <span>✅ Action Completed:</span>
+                      <span className="text-emerald-700 font-extrabold">{selectedSub.status === 'Closed - Not Valid' ? 'Rejected' : 'Validated'}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-semibold">
+                      Recorded on {new Date(selectedSub.updatedAt).toLocaleDateString('en-GB')}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

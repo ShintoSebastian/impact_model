@@ -186,6 +186,7 @@ function AppContent() {
       if (res.ok) {
         const updated = await res.json();
         setSubmissions(prev => prev.map(sub => sub.intelligenceId === id ? updated : sub));
+        setReviewSubmissions(prev => prev.map(sub => sub.intelligenceId === id ? updated : sub));
 
         // Refresh notifications
         const notifRes = await fetchWithAuth('http://localhost:5000/api/notifications');
