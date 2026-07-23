@@ -15,7 +15,6 @@ export interface Employee {
   phoneNumber?: string;
 }
 
-// TODO: Replace with API call
 export interface StatusHistoryEntry {
   status: string;
   changedBy: string;
@@ -48,7 +47,6 @@ export interface Submission {
   statusHistory: StatusHistoryEntry[];
 }
 
-// TODO: Replace with API call
 export interface EmailLog {
   id: string;
   recipient: string;

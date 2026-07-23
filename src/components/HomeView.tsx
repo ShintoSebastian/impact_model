@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Submission, Employee, EmailLog } from '../types.ts';
 import { ROLE_MAP } from '../types.ts';
-import { Database, RefreshCcw, ShieldCheck, Shield, Sparkles, Mail, PhoneCall, Clock, Download, Loader2, ClipboardList, Check, Target, FileText, Handshake, Trophy } from 'lucide-react';
+import { Database, RefreshCcw, ShieldCheck, Shield, Sparkles, Mail, PhoneCall, Clock, Download, Loader2, ClipboardList, Check, Target, FileText, Handshake, Trophy, ChevronDown, ChevronUp, User } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import cityBg from '../assets/city_bg.jpg';
 
@@ -232,123 +232,152 @@ export function HomeView({
 
   return (
     <>
-      {/* Welcome Card Banner (Matches Screenshot) */}
-      <div className="relative rounded-2xl shadow-2xl mb-6 overflow-hidden bg-[#0B112B]">
+      {/* Welcome Card Banner (Sleek Glassmorphic Design) */}
+      <div className="relative rounded-2xl shadow-2xl mb-6 overflow-hidden bg-[#070C1E] border border-slate-800/80">
         
-        {/* Top half: City Image */}
-        <div className="h-[220px] w-full relative">
-          <img src={cityBg} alt="City Skyline" className="w-full h-full object-cover object-center opacity-100" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B112B] to-transparent opacity-80" />
+        {/* Top half: City Image Background with Gradient Blend */}
+        <div className="h-[180px] w-full relative">
+          <img src={cityBg} alt="City Skyline" className="w-full h-full object-cover object-center opacity-75 brightness-90 contrast-125" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070C1E] via-[#070C1E]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1E]/90 via-transparent to-[#070C1E]/90" />
         </div>
 
-        {/* Content Container (Pushed up to overlap image) */}
-        <div className="relative z-10 px-8 pb-8 md:px-10 md:pb-10 -mt-14">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        {/* Content Container (Pushed up over image) */}
+        <div className="relative z-10 px-6 pb-6 md:px-8 md:pb-8 -mt-16">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* Left Column: Employee Profile */}
-            <div className="lg:col-span-7 flex flex-col gap-6">
+            {/* Left Column: Employee Profile Header & Sleek Dropdown */}
+            <div className="lg:col-span-7 flex flex-col gap-4">
               
-              {/* Header: Avatar + Name/Role */}
-              <div className="flex flex-row items-center gap-6">
-                <div className="w-[100px] h-[100px] rounded-2xl bg-[#3B82F6] text-white font-black text-4xl flex items-center justify-center relative flex-shrink-0 shadow-lg">
-                {loggedInUser.name.charAt(0)}{loggedInUser.name.split(' ')[1]?.charAt(0) || ''}
-                <div className="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-emerald-500 border-2 border-[#0B112B] rounded-full"></div>
+              {/* Profile Card Header: Avatar + User Info */}
+              <div className="flex flex-row items-center gap-5 bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 p-4 rounded-2xl shadow-xl">
+                <div className="w-[72px] h-[72px] rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white font-black text-2xl flex items-center justify-center relative flex-shrink-0 shadow-lg shadow-blue-500/20 border border-blue-400/30">
+                  {loggedInUser.name.charAt(0)}{loggedInUser.name.split(' ')[1]?.charAt(0) || ''}
+                  <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-[#070C1E] rounded-full shadow-sm"></div>
+                </div>
+                
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-xl md:text-2xl font-extrabold text-white tracking-tight truncate">
+                      {loggedInUser.name.split(' (')[0]}
+                    </h2>
+                    <span className="bg-blue-500/20 border border-blue-400/30 text-blue-300 font-mono text-[10px] font-bold px-2 py-0.5 rounded-full shadow-inner">
+                      {loggedInUser.employeeId}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 font-medium mt-1 truncate">
+                    <span className="text-blue-400 font-semibold">{loggedInUser.designation || ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Tech Lead'}</span>
+                    <span className="text-slate-500 mx-1.5">·</span>
+                    <span className="text-slate-400">{loggedInUser.businessUnit}</span>
+                  </p>
+                </div>
               </div>
+
+              {/* Sleek Profile Details Dropdown Toggle */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => setIsProfileExpanded(!isProfileExpanded)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-900/60 hover:bg-slate-800/90 border border-slate-800 text-slate-300 font-bold text-xs flex items-center justify-between transition-all cursor-pointer group shadow-md"
+                >
+                  <div className="flex items-center gap-2">
+                    <User size={14} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                    <span className="tracking-wide">Employee Profile & Hierarchy Details</span>
+                    <span className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                      {isProfileExpanded ? 'Collapse' : 'Expand Details'}
+                    </span>
+                  </div>
+                  {isProfileExpanded ? <ChevronUp size={16} className="text-blue-400" /> : <ChevronDown size={16} className="text-slate-400 group-hover:text-white" />}
+                </button>
+
+                {/* Dropdown Content Grid (Appears on Toggle) */}
+                {isProfileExpanded && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5 bg-slate-900/95 border border-slate-800 rounded-xl p-4 backdrop-blur-xl animate-fade-in shadow-2xl">
+                    <div className="flex flex-col gap-1 border-b border-slate-800/50 pb-2 md:border-b-0 md:pb-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Employee ID</span>
+                      <span className="text-white font-bold font-mono text-[12px]">{loggedInUser.employeeId}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 border-b border-slate-800/50 pb-2 md:border-b-0 md:pb-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Corporate Email</span>
+                      <a href={`mailto:${loggedInUser.email}`} className="text-blue-300 font-semibold hover:text-blue-200 transition-colors truncate text-[12px]">{loggedInUser.email}</a>
+                    </div>
+                    <div className="flex flex-col gap-1 border-b border-slate-800/50 pb-2 md:border-b-0 md:pb-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Job Role</span>
+                      <span className="text-slate-200 font-medium text-[12px]">{loggedInUser.jobRole || 'Not Specified'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 border-b border-slate-800/50 pb-2 md:border-b-0 md:pb-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phone Number</span>
+                      <span className="text-slate-200 font-medium text-[12px]">{loggedInUser.phoneNumber || 'Not Specified'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 border-b border-slate-800/50 pb-2 md:border-b-0 md:pb-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Reporting Manager</span>
+                      <span className="text-slate-200 font-medium text-[12px]">{loggedInUser.reportingManager}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 border-b border-slate-800/50 pb-2 md:border-b-0 md:pb-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Project Manager</span>
+                      <span className="text-slate-200 font-medium text-[12px]">{loggedInUser.projectManager || 'Kiran Joseph (kiran.j@nestdigital.com)'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 border-b border-slate-800/50 pb-2 md:border-b-0 md:pb-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">BU Head</span>
+                      <span className="text-slate-200 font-medium text-[12px]">{loggedInUser.buHead || 'Suresh Nair (suresh.n@nestdigital.com)'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 border-b border-slate-800/50 pb-2 md:border-b-0 md:pb-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">HR Business Partner</span>
+                      <span className="text-slate-200 font-medium text-[12px]">{loggedInUser.hrbp || 'Not Specified'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 md:col-span-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Sales Person</span>
+                      <span className="text-slate-200 font-medium text-[12px]">{loggedInUser.salesPerson || 'Jacob Varghese (jacob.varghese@nestdigital.com)'}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Actions & Stats Cards */}
+            <div className="lg:col-span-5 flex flex-col gap-4">
               
-              <div className="flex flex-col">
-                <h2 className="text-[28px] font-bold text-white tracking-tight leading-tight">
-                  {loggedInUser.name.split(' (')[0]}.
-                </h2>
-                <span className="text-[13px] text-blue-300 font-semibold mt-1">
-                  {loggedInUser.designation || ROLE_MAP[loggedInUser.email.toLowerCase()]?.designation || 'Tech Lead'} · {loggedInUser.businessUnit}
-                </span>
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => navigate('/submit')}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-red-600/20 active:scale-98"
+                >
+                  <FileText size={15} />
+                  <span>Submit New Lead</span>
+                </button>
+                <button 
+                  onClick={() => navigate('/outbox')}
+                  className="flex-1 py-3 px-4 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-98"
+                >
+                  <Mail size={15} className="text-blue-400" />
+                  <span>Outbox Logs</span>
+                </button>
               </div>
-            </div>
 
-            {/* Employee Details Grid */}
-            <div className="grid grid-cols-2 gap-x-8 gap-y-5 bg-transparent border border-slate-700/50 rounded-xl p-5">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Employee ID</span>
-                <span className="text-white font-bold font-mono text-[13px]">{loggedInUser.employeeId}</span>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Review Overdue</span>
+                  <span className="text-2xl font-black text-red-500 mt-1">{overdueReviewCount}</span>
+                </div>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Awaiting CRM Sync</span>
+                  <span className="text-2xl font-black text-blue-400 mt-1">{crmSyncPendingCount}</span>
+                </div>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Active Proposals</span>
+                  <span className="text-2xl font-black text-amber-400 mt-1">{activeProposalsCount}</span>
+                </div>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Win Ratio</span>
+                  <span className="text-2xl font-black text-emerald-400 mt-1">{winRatioText}</span>
+                </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Corporate Email</span>
-                <a href={`mailto:${loggedInUser.email}`} className="text-blue-300 font-bold hover:text-blue-200 transition-colors truncate text-[13px]">{loggedInUser.email}</a>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Job Role</span>
-                <span className="text-white font-semibold text-[13px]">{loggedInUser.jobRole || 'Not Specified'}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phone Number</span>
-                <span className="text-white font-semibold text-[13px]">{loggedInUser.phoneNumber || 'Not Specified'}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Reporting Manager</span>
-                <span className="text-white font-semibold text-[13px]">{loggedInUser.reportingManager}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Project Manager</span>
-                <span className="text-white font-semibold text-[13px]">{loggedInUser.projectManager || 'Kiran Joseph (kiran.j@nestdigital.com)'}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">BU Head</span>
-                <span className="text-white font-semibold text-[13px]">{loggedInUser.buHead || 'Suresh Nair (suresh.n@nestdigital.com)'}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">HR Business Partner</span>
-                <span className="text-white font-semibold text-[13px]">{loggedInUser.hrbp || 'Not Specified'}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Sales Person</span>
-                <span className="text-white font-semibold text-[13px]">{loggedInUser.salesPerson || 'Jacob Varghese (jacob.varghese@nestdigital.com)'}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Right Column: Actions & Stats */}
-          <div className="lg:col-span-5 flex flex-col gap-6 mt-2">
-            
-            {/* Action Buttons */}
-            <div className="flex gap-4">
-              <button 
-                onClick={() => navigate('/submit')}
-                className="flex-1 py-3.5 px-5 rounded-xl bg-[#DC2626] hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                📄 Submit New Lead
-              </button>
-              <button 
-                onClick={() => navigate('/outbox')}
-                className="flex-1 py-3.5 px-5 rounded-xl bg-[#1E293B] hover:bg-slate-700 border border-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                📧 Outbox Logs
-              </button>
             </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-transparent border border-slate-700/50 rounded-xl p-4 flex flex-col gap-2">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Review Overdue</span>
-                <span className="text-xl font-bold text-red-500">{overdueReviewCount}</span>
-              </div>
-              <div className="bg-transparent border border-slate-700/50 rounded-xl p-4 flex flex-col gap-2">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Awaiting CRM Sync</span>
-                <span className="text-xl font-bold text-blue-400">{crmSyncPendingCount}</span>
-              </div>
-              <div className="bg-transparent border border-slate-700/50 rounded-xl p-4 flex flex-col gap-2">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Active Proposals</span>
-                <span className="text-xl font-bold text-amber-400">{activeProposalsCount}</span>
-              </div>
-              <div className="bg-transparent border border-slate-700/50 rounded-xl p-4 flex flex-col gap-2">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Win Ratio</span>
-                <span className="text-xl font-bold text-emerald-400">{winRatioText}</span>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
-    </div>
 
       {/* Stats Cards Row (Matches Screenshot) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up animation-delay-200 mb-6">
