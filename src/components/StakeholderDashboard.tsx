@@ -4,10 +4,53 @@ import { triggerMailer, formatDateTime } from '../utils.ts';
 import { 
   Eye, CheckCircle2, XCircle, AlertTriangle, Clock, Building, Landmark, RefreshCcw, 
   User, Database, Mail, ArrowRight, Shield, MessageSquare, Search, Download, Loader2,
-  Award, Trophy, Star, Gift, Sparkles
+  Award, Trophy, Star, Gift, Sparkles, ClipboardList, Check, Target, FileText, Handshake
 } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { ROLE_MAP } from '../types.ts';
+
+// Steps for the Lead Lifecycle Tracker
+const LIFECYCLE_STEPS = [
+  "Opportunity Registered",
+  "Accepted",
+  "Lead Registered",
+  "Accepted ", // Space to ensure uniqueness
+  "Proposal",
+  "Negotiation",
+  "Deal Won"
+];
+
+// Helper to determine stepper status
+const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'active' | 'future' | 'failed' => {
+  const status = sub.status;
+  const isFailed = status === 'Closed - Not Valid' || status === 'Deal Lost' || status === 'Lead Dropped' || status === 'Lead Rejected';
+
+  let currentStageIndex = -1;
+  if (status === 'Clarification Requested') currentStageIndex = 0;
+  else if (status === 'Opportunity Registered') currentStageIndex = 0;
+  else if (status === 'Validated') currentStageIndex = 1;
+  else if (status === 'Closed - Not Valid') currentStageIndex = 1;
+  else if (status === 'Lead Registered') currentStageIndex = 2;
+  else if (status === 'Lead Accepted') currentStageIndex = 3;
+  else if (status === 'Lead Rejected') currentStageIndex = 3;
+  else if (status === 'Lead Dropped') currentStageIndex = 4;
+  else if (status === 'Proposal') currentStageIndex = 4;
+  else if (status === 'Negotiation') currentStageIndex = 5;
+  else if (status === 'Deal Lost') currentStageIndex = 6;
+  else if (status === 'Deal Won') currentStageIndex = 6;
+
+  if (stepIndex < currentStageIndex) {
+    return 'completed';
+  }
+
+  if (stepIndex === currentStageIndex) {
+    if (isFailed) return 'failed';
+    if (status === 'Deal Won') return 'completed';
+    return 'active';
+  }
+
+  return 'future';
+};
 
 interface StakeholderDashboardProps {
   submissions: Submission[];
@@ -243,8 +286,28 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
     return slaB - slaA; // Overdue items sorted to top
   });
 
+  const [reviewedStatusFilter, setReviewedStatusFilter] = useState('All');
+
   // Filter and sort Reviewed list
-  const sortedReviewed = [...reviewedSubmissions].sort((a, b) => {
+  const filteredReviewed = reviewedSubmissions.filter(sub => {
+    const query = searchQuery.toLowerCase().trim();
+    const matchesQuery = !query || 
+      sub.intelligenceId.toLowerCase().includes(query) ||
+      sub.employeeName.toLowerCase().includes(query) ||
+      sub.clientName.toLowerCase().includes(query) ||
+      sub.shortDesc.toLowerCase().includes(query) ||
+      sub.status.toLowerCase().includes(query);
+
+    if (!matchesQuery) return false;
+
+    if (reviewedStatusFilter === 'All') return true;
+    if (reviewedStatusFilter === 'Pipeline') return ['Validated', 'Lead Registered', 'Lead Accepted', 'Proposal', 'Negotiation'].includes(sub.status);
+    if (reviewedStatusFilter === 'Won') return sub.status === 'Deal Won';
+    if (reviewedStatusFilter === 'Closed') return ['Closed - Not Valid', 'Deal Lost', 'Lead Dropped', 'Lead Rejected'].includes(sub.status);
+    return true;
+  });
+
+  const sortedReviewed = [...filteredReviewed].sort((a, b) => {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
@@ -638,6 +701,17 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                 REVIEWED SUBMISSIONS
               </h2>
               <div className="flex items-center gap-2">
+                <select
+                  value={reviewedStatusFilter}
+                  onChange={(e) => setReviewedStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-400 cursor-pointer text-slate-700 font-bold"
+                >
+                  <option value="All">All Reviewed</option>
+                  <option value="Pipeline">In CRM Pipeline (Active)</option>
+                  <option value="Won">Deals Won 🎉</option>
+                  <option value="Closed">Closed / Terminal</option>
+                </select>
+
                 <button
                   onClick={handleDownloadReviewedExcel}
                   disabled={isDownloadingReviewedExcel}
@@ -666,9 +740,9 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                     <th className="px-3 py-3.5">Employee Name</th>
                     <th className="px-3 py-3.5">Client Name</th>
                     <th className="px-3 py-3.5">Opportunity Title</th>
-                    <th className="px-3 py-3.5">Submitted Date</th>
-                    <th className="px-3 py-3.5">Outcome</th>
-                    <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Reviewed On</th>
+                    <th className="px-3 py-3.5">Live CRM Stage</th>
+                    <th className="px-3 py-3.5">Outcome / Reward</th>
+                    <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Track & Actions</th>
                   </tr>
                 </thead>
                 <tbody className="font-semibold text-[13px]">
@@ -702,10 +776,16 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                           <td className="px-3 py-3.5 font-extrabold text-slate-900 text-[14px] whitespace-normal max-w-[140px] break-words">{sub.clientName}</td>
                           <td className="px-3 py-3.5 text-slate-600 font-medium text-[13px] whitespace-normal max-w-[180px] break-words">{sub.shortDesc}</td>
                           <td className="px-3 py-3.5 text-slate-700 whitespace-nowrap">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-bold text-slate-800 text-[13px]">{new Date(sub.createdAt).toLocaleDateString('en-GB')}</span>
-                              <span className="text-[11px] text-slate-500 font-semibold">{new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-                            </div>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
+                              sub.status === 'Deal Won' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                              sub.status === 'Negotiation' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                              sub.status === 'Proposal' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                              sub.status.startsWith('Lead') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                              sub.status === 'Validated' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                              'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}>
+                              {sub.crmLeadId ? `📈 ${sub.status}` : sub.status}
+                            </span>
                           </td>
                           <td className="px-3 py-3.5 whitespace-nowrap">
                             {isRejected ? (
@@ -755,10 +835,18 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                             )}
                           </td>
                           <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
-                            <div className="flex flex-col gap-0.5 items-end">
-                              <span className="font-bold text-slate-800 text-[13px]">{new Date(sub.updatedAt).toLocaleDateString('en-GB')}</span>
-                              <span className="text-[11px] text-slate-500 font-semibold">{new Date(sub.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-                            </div>
+                            <button 
+                              onClick={() => {
+                                setSelectedSub(sub);
+                                setShowRejectForm(false);
+                                setShowClarifyForm(false);
+                                setIsProfileExpanded(false);
+                              }}
+                              className="px-3 py-1.5 bg-brand-navy hover:bg-brand-navy/90 text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer shadow-sm inline-flex items-center gap-1.5 active:scale-95"
+                            >
+                              <Eye size={12} />
+                              <span>Track Lifecycle</span>
+                            </button>
                           </td>
                         </tr>
                       );
@@ -836,6 +924,129 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
             {/* Scrollable Body Container */}
             <div className="p-6 overflow-y-auto flex flex-col gap-5 max-h-[calc(90vh-140px)]">
               
+              {/* Lead Lifecycle Tracker Stepper (Visible for approved/reviewed leads) */}
+              {selectedSub.status !== 'Opportunity Registered' && selectedSub.status !== 'Clarification Requested' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl text-white">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-300 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                      LIVE LEAD LIFECYCLE TRACKER
+                    </h3>
+                    <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                      Stage: {selectedSub.status}
+                    </span>
+                  </div>
+
+                  {/* Stepper Progress */}
+                  <div className="flex items-center justify-between w-full relative px-2 my-4 overflow-x-auto">
+                    {LIFECYCLE_STEPS.map((step, idx) => {
+                      const status = getStepStatus(selectedSub, idx);
+                      let circleMarkup;
+
+                      const StepIcon = (() => {
+                        if (idx === 6 && (status === 'completed' || status === 'active')) return Check;
+                        switch (idx) {
+                          case 0: return Target;
+                          case 1: return Check;
+                          case 2: return ClipboardList;
+                          case 3: return Check;
+                          case 4: return FileText;
+                          case 5: return Handshake;
+                          case 6: return Trophy;
+                          default: return Check;
+                        }
+                      })();
+
+                      if (status === 'completed' || status === 'active') {
+                        circleMarkup = (
+                          <div className="relative flex items-center justify-center z-10">
+                            {status === 'active' && <div className="absolute w-12 h-12 rounded-full bg-emerald-500/30 animate-pulse" />}
+                            <div className="relative w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/50">
+                              <StepIcon size={16} strokeWidth={2.5} />
+                            </div>
+                          </div>
+                        );
+                      } else if (status === 'failed') {
+                        circleMarkup = (
+                          <div className="relative flex items-center justify-center z-10">
+                            <div className="w-9 h-9 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/30 ring-2 ring-rose-400/50">
+                              <span className="text-sm font-bold">✕</span>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        circleMarkup = (
+                          <div className="w-9 h-9 rounded-full border border-slate-700 bg-slate-800 text-slate-500 flex items-center justify-center z-10">
+                            <StepIcon size={16} strokeWidth={2} />
+                          </div>
+                        );
+                      }
+
+                      const isLast = idx === LIFECYCLE_STEPS.length - 1;
+                      const nextStatus = isLast ? null : getStepStatus(selectedSub, idx + 1);
+                      let lineStyle = 'bg-slate-800';
+                      if (status === 'completed' && nextStatus === 'completed') {
+                        lineStyle = 'bg-emerald-500';
+                      } else if (status === 'completed' && nextStatus === 'failed') {
+                        lineStyle = 'bg-rose-500';
+                      } else if (status === 'completed' && nextStatus === 'active') {
+                        lineStyle = 'bg-emerald-500';
+                      } else if (status === 'active' && nextStatus !== 'failed') {
+                        lineStyle = 'bg-amber-400 animate-pulse';
+                      }
+
+                      return (
+                        <React.Fragment key={idx}>
+                          <div className="flex flex-col items-center gap-2 relative w-9">
+                            {circleMarkup}
+                            <span className={`text-[9px] font-bold text-center w-20 absolute top-11 leading-tight ${
+                              (status === 'completed' || status === 'active') ? 'text-slate-200' : (status === 'failed' ? 'text-rose-400' : 'text-slate-500')
+                            }`}>
+                              {status === 'failed' ? (step === 'Deal Won' ? 'Deal Lost' : step.includes('Accepted') ? 'Rejected' : 'Dropped') : step}
+                            </span>
+                          </div>
+                          {!isLast && (
+                            <div className={`flex-1 h-[2px] -mt-5 mx-1 ${lineStyle}`} />
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  {/* If Deal Won, prompt to initiate reward! */}
+                  {selectedSub.status === 'Deal Won' && (
+                    <div className="mt-14 pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">🏆</span>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-amber-400">Deal Successfully Won!</span>
+                          <span className="text-[11px] text-slate-300 font-medium">
+                            {selectedSub.rewardTier 
+                              ? `Reward Granted: ${selectedSub.rewardTitle || selectedSub.rewardTier}`
+                              : 'Select an achievement level to reward the submitter.'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {!selectedSub.rewardTier && (
+                        <button
+                          onClick={() => {
+                            setRewardSub(selectedSub);
+                            setSelectedRewardTier('Reward 1');
+                            setRewardNotes('');
+                            setSelectedSub(null);
+                          }}
+                          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <Gift size={14} />
+                          <span>Initiate Reward</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Section 1 — Submission Details */}
               <div className="bg-[#F5F6FA] border border-slate-100 rounded-xl p-5 flex flex-col gap-4">
                 <span className="text-[10px] font-bold text-brand-navy tracking-wider uppercase block">
