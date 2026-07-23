@@ -741,8 +741,8 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                     <th className="px-3 py-3.5">Client Name</th>
                     <th className="px-3 py-3.5">Opportunity Title</th>
                     <th className="px-3 py-3.5">Live CRM Stage</th>
-                    <th className="px-3 py-3.5">Outcome / Reward</th>
-                    <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Track & Actions</th>
+                    <th className="px-3 py-3.5">Status & Recognition</th>
+                    <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="font-semibold text-[13px]">
@@ -787,66 +787,71 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                               {sub.crmLeadId ? `📈 ${sub.status}` : sub.status}
                             </span>
                           </td>
+
+                          {/* Status & Recognition (PURE STATUS ONLY) */}
                           <td className="px-3 py-3.5 whitespace-nowrap">
-                            {isRejected ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm cursor-help"
-                                title={sub.reason}
-                              >
-                                ❌ Rejected
-                                {sub.reason && (
-                                  <span className="ml-1 text-[9px] bg-slate-800 text-white rounded px-1.5 py-0.2 shrink-0 font-normal">
-                                    ⓘ reason
-                                  </span>
-                                )}
-                              </span>
-                            ) : isClarify ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
-                                title={sub.reason}
-                              >
-                                💬 Clarification
-                              </span>
-                            ) : sub.status === 'Deal Won' ? (
-                              <div className="flex flex-col gap-1 items-start">
+                            <div className="flex flex-col gap-1 items-start">
+                              {isRejected ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm cursor-help"
+                                  title={sub.reason}
+                                >
+                                  ❌ Rejected
+                                </span>
+                              ) : isClarify ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
+                                  title={sub.reason}
+                                >
+                                  💬 Clarification
+                                </span>
+                              ) : sub.status === 'Deal Won' ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
                                   🎉 Deal Won
                                 </span>
-                                {sub.rewardTier ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200" title={sub.rewardTitle || sub.rewardTier}>
-                                    🏆 {sub.rewardTier}
-                                  </span>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      setRewardSub(sub);
-                                      setSelectedRewardTier('Reward 1');
-                                      setRewardNotes('');
-                                    }}
-                                    className="px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-[10px] rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1 mt-0.5 active:scale-95"
-                                  >
-                                    <Gift size={11} />
-                                    <span>Initiate Reward</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
-                                ✅ {sub.status}
-                              </span>
-                            )}
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
+                                  ✅ {sub.status}
+                                </span>
+                              )}
+
+                              {/* Awarded Badge (If Granted) */}
+                              {sub.rewardTier && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200" title={sub.rewardTitle || sub.rewardTier}>
+                                  🏆 {sub.rewardTier} Granted
+                                </span>
+                              )}
+                            </div>
                           </td>
+
+                          {/* Actions Column (ALL ACTION BUTTONS HERE) */}
                           <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
-                            <button 
-                              onClick={() => {
-                                setSelectedSub(sub);
-                                setShowRejectForm(false);
-                                setShowClarifyForm(false);
-                                setIsProfileExpanded(false);
-                              }}
-                              className="px-3 py-1.5 bg-brand-navy hover:bg-brand-navy/90 text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer shadow-sm inline-flex items-center gap-1.5 active:scale-95"
-                            >
-                              <Eye size={12} />
-                              <span>Track Lifecycle</span>
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              {sub.status === 'Deal Won' && !sub.rewardTier && (
+                                <button
+                                  onClick={() => {
+                                    setRewardSub(sub);
+                                    setSelectedRewardTier('Reward 1');
+                                    setRewardNotes('');
+                                  }}
+                                  className="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1 active:scale-95"
+                                >
+                                  <Gift size={12} />
+                                  <span>Initiate Reward</span>
+                                </button>
+                              )}
+                              
+                              <button 
+                                onClick={() => {
+                                  setSelectedSub(sub);
+                                  setShowRejectForm(false);
+                                  setShowClarifyForm(false);
+                                  setIsProfileExpanded(false);
+                                }}
+                                className="px-3 py-1.5 bg-brand-navy hover:bg-brand-navy/90 text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer shadow-sm inline-flex items-center gap-1.5 active:scale-95"
+                              >
+                                <Eye size={12} />
+                                <span>Track Lifecycle</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
