@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Submission, Employee, EmailLog } from '../types.ts';
 import { ROLE_MAP } from '../types.ts';
-import { Database, RefreshCcw, ShieldCheck, Shield, Sparkles, Mail, PhoneCall, Clock, Download, Loader2, ClipboardList, Check, Target, FileText, Handshake, Trophy, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { Database, RefreshCcw, ShieldCheck, Shield, Sparkles, Mail, PhoneCall, Clock, Download, Loader2, ClipboardList, Check, Target, FileText, Handshake, Trophy, ChevronDown, ChevronUp, User, Briefcase, BarChart3 } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import cityBg from '../assets/city_bg.jpg';
 
@@ -354,24 +354,53 @@ export function HomeView({
                 </button>
               </div>
 
-              {/* Stats Grid */}
+              {/* Stats Grid (Matches User Image 2 with circular colored icon badges) */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Review Overdue</span>
-                  <span className="text-2xl font-black text-red-500 mt-1">{overdueReviewCount}</span>
+                
+                {/* Card 1: Review Overdue */}
+                <div className="bg-[#090F24]/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3.5 shadow-md hover:border-slate-700 transition-all group">
+                  <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/30 text-red-500 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform shadow-inner">
+                    <Clock size={19} />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[9px] uppercase font-extrabold tracking-wider text-slate-400 truncate">Review Overdue</span>
+                    <span className="text-2xl font-black text-red-500 leading-tight mt-0.5">{overdueReviewCount}</span>
+                  </div>
                 </div>
-                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Awaiting CRM Sync</span>
-                  <span className="text-2xl font-black text-blue-400 mt-1">{crmSyncPendingCount}</span>
+
+                {/* Card 2: Awaiting CRM Sync */}
+                <div className="bg-[#090F24]/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3.5 shadow-md hover:border-slate-700 transition-all group">
+                  <div className="w-11 h-11 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform shadow-inner">
+                    <RefreshCcw size={19} />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[9px] uppercase font-extrabold tracking-wider text-slate-400 truncate">Awaiting CRM Sync</span>
+                    <span className="text-2xl font-black text-blue-400 leading-tight mt-0.5">{crmSyncPendingCount}</span>
+                  </div>
                 </div>
-                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Active Proposals</span>
-                  <span className="text-2xl font-black text-amber-400 mt-1">{activeProposalsCount}</span>
+
+                {/* Card 3: Active Proposals */}
+                <div className="bg-[#090F24]/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3.5 shadow-md hover:border-slate-700 transition-all group">
+                  <div className="w-11 h-11 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform shadow-inner">
+                    <Briefcase size={19} />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[9px] uppercase font-extrabold tracking-wider text-slate-400 truncate">Active Proposals</span>
+                    <span className="text-2xl font-black text-amber-400 leading-tight mt-0.5">{activeProposalsCount}</span>
+                  </div>
                 </div>
-                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Win Ratio</span>
-                  <span className="text-2xl font-black text-emerald-400 mt-1">{winRatioText}</span>
+
+                {/* Card 4: Win Ratio */}
+                <div className="bg-[#090F24]/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3.5 shadow-md hover:border-slate-700 transition-all group">
+                  <div className="w-11 h-11 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform shadow-inner">
+                    <Target size={19} />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[9px] uppercase font-extrabold tracking-wider text-slate-400 truncate">Win Ratio</span>
+                    <span className="text-2xl font-black text-emerald-400 leading-tight mt-0.5">{winRatioText}</span>
+                  </div>
                 </div>
+
               </div>
 
             </div>
