@@ -199,7 +199,7 @@ export function DashboardLayout({
               <div className={`w-7 h-7 rounded-full text-white flex items-center justify-center font-black text-[11px] ${
                 currentUserRole === 'reviewer' ? 'bg-rose-600' : 'bg-[#DC2626]'
               }`}>
-                {loggedInUser.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                {loggedInUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
               </div>
               <div className="hidden lg:flex flex-col leading-tight">
                 <div className="flex items-center gap-1">
@@ -265,29 +265,30 @@ export function DashboardLayout({
               {loggedInUser?.role === 'reviewer' ? (
                 // Reviewer / Manager Help Content
                 <>
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-2">
-                    <span className="text-[10px] font-bold text-brand-navy tracking-wider uppercase block">📋 Reviewer Guide Checklist</span>
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col gap-2">
+                    <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block">📋 Reviewer Guide Checklist</span>
                     <ul className="list-disc pl-4 flex flex-col gap-1.5 font-medium text-slate-600">
-                      <li><strong>Pending Submissions:</strong> View all new submissions requiring validation on the <strong>Review Board</strong>.</li>
-                      <li><strong>Review Actions:</strong> Validate, Reject, or Request Clarification directly from the Opportunity details modal.</li>
-                      <li><strong>Mandatory Auditing:</strong> A comment or reason is strictly required when requesting info or closing/rejecting a submission.</li>
+                      <li><strong>Review Submissions:</strong> Access assigned opportunity leads requiring validation on the <strong>Review Board</strong>.</li>
+                      <li><strong>Validate & Push to CRM:</strong> Clicking <strong>Validate & Approve</strong> approves the lead and automatically pushes it to the live CRM API (port 8089) with a generated <code>crmOpportunityId</code>.</li>
+                      <li><strong>Request Clarification:</strong> Send a query back to the submitter if more info is needed before approval.</li>
+                      <li><strong>Mandatory Comments:</strong> Rejection or closure reasons are mandatory when closing a lead.</li>
                     </ul>
                   </div>
 
                   <div className="flex flex-col gap-2.5">
-                    <span className="text-[10px] font-bold text-brand-navy tracking-wider uppercase block border-b border-slate-50 pb-1">⚙️ Action Workflows</span>
+                    <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block border-b border-slate-100 pb-1">⚙️ Reviewer Action Workflows</span>
                     <div className="flex flex-col gap-3 pl-1">
                       <div>
-                        <strong className="text-brand-navy">Validate Lead:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">Approving a lead immediately auto-provisions a synced profile in the CRM Pipeline.</p>
+                        <strong className="text-brand-navy font-bold">Validate & Approve:</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Approves the submission and syncs it directly to Dynamics 365 CRM, creating the CRM Lead Reference ID.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy">Clarification:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">Prompts the employee to respond. Changes status to "More Info Needed".</p>
+                        <strong className="text-brand-navy font-bold">Request Clarification:</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Sends a query notification email to the submitter to provide additional details.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy">Reject / Close:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">Closes the lead immediately. Automatically emails the submitter and stakeholders.</p>
+                        <strong className="text-brand-navy font-bold">Reject / Close:</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Closes the lead immediately and logs an email alert to the submitter and all stakeholders.</p>
                       </div>
                     </div>
                   </div>
@@ -295,41 +296,46 @@ export function DashboardLayout({
               ) : (
                 // Employee / Submitter Help Content
                 <>
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-2">
-                    <span className="text-[10px] font-bold text-brand-navy tracking-wider uppercase block">🚀 Employee Guide Checklist</span>
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col gap-2">
+                    <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block">🚀 Submitter Guide Checklist</span>
                     <ul className="list-disc pl-4 flex flex-col gap-1.5 font-medium text-slate-600">
-                      <li><strong>Submit a Lead:</strong> Click "+ New Lead" or "+ New Submission" to open the form. Fill out the client's name and details.</li>
-                      <li><strong>Track Progress:</strong> Click any lead in your opportunity list. The <strong>Lead Lifecycle Tracker</strong> stepper will load to show exactly where it is.</li>
-                      <li><strong>Address Requests:</strong> If a manager changes status to <em>Clarification Requested</em>, open the row and reply to their query.</li>
+                      <li><strong>Submit a Lead:</strong> Click <strong>"+ Submit Lead"</strong> to register an opportunity with client details and project scope.</li>
+                      <li><strong>Track Progress:</strong> View your opportunity card to monitor the <strong>7-Stage Lead Lifecycle Stepper</strong> in real-time.</li>
+                      <li><strong>Outbox Logs:</strong> Check the <strong>Outbox Logs</strong> tab to see all automated email alerts sent to managers and stakeholders.</li>
+                      <li><strong>Clarifications:</strong> If a manager requests information, open your opportunity row and submit your response.</li>
                     </ul>
                   </div>
 
                   <div className="flex flex-col gap-2.5">
-                    <span className="text-[10px] font-bold text-brand-navy tracking-wider uppercase block border-b border-slate-50 pb-1">📈 Stepper Stages Explained</span>
-                    <div className="flex flex-col gap-3 pl-1">
+                    <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block border-b border-slate-100 pb-1">📈 7-Stage Lead Lifecycle Stepper</span>
+                    <div className="flex flex-col gap-2.5 pl-1">
                       <div>
-                        <strong className="text-brand-navy">1. Lead Registered:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">Your lead has been captured in the system.</p>
+                        <strong className="text-brand-navy font-bold">1. Opportunity Registered (10%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity submitted on portal by employee.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy">2. Accepted:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">Your manager is currently auditing the details.</p>
+                        <strong className="text-brand-navy font-bold">2. Validated (25%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Approved by Reviewer on the Review Board.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy">3. Opportunity Registered:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">Approved by the BU Head and synced to the CRM.</p>
+                        <strong className="text-brand-navy font-bold">3. Lead Registered (40%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Pushed to CRM API & assigned a CRM Reference ID.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy">4. Proposal:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">A formal request/proposal has been sent to the client.</p>
+                        <strong className="text-brand-navy font-bold">4. Lead Accepted (55%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Accepted by the Sales team in the CRM.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy">5. Negotiation:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">Commercials and contract terms are being finalized.</p>
+                        <strong className="text-brand-navy font-bold">5. Proposal (70%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Formal proposal submitted to the client.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy">6. Converted Won:</strong> 
-                        <p className="text-[11px] text-slate-400 mt-0.5">The deal is successfully closed and conversion complete!</p>
+                        <strong className="text-brand-navy font-bold">6. Negotiation (85%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Commercial proposal & contract terms under negotiation.</p>
+                      </div>
+                      <div>
+                        <strong className="text-brand-navy font-bold">7. Deal Won (100% 🏆):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity successfully closed & deal won!</p>
                       </div>
                     </div>
                   </div>
@@ -337,10 +343,10 @@ export function DashboardLayout({
               )}
 
               {/* SLA Policies */}
-              <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 flex flex-col gap-1.5 text-amber-800">
-                <span className="text-[10px] font-bold tracking-wider uppercase block">⚠️ SLA compliance policy</span>
+              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex flex-col gap-1.5 text-amber-900">
+                <span className="text-[10px] font-extrabold tracking-wider uppercase block">⚠️ SLA Compliance Policy</span>
                 <p className="text-[11px] leading-normal font-medium">
-                  Reviewers have exactly <strong>7 working days</strong> from submission to validate your lead. Any item exceeding this shows a <span className="text-brand-red font-bold">⚠️ Overdue</span> badge to notify stakeholders.
+                  Reviewers have <strong>2 working days</strong> from submission to acknowledge and validate your lead. Any item exceeding this shows a <span className="text-brand-red font-bold">⚠️ Overdue</span> SLA warning badge.
                 </p>
               </div>
 

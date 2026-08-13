@@ -150,11 +150,23 @@ function AppContent() {
         const savedSub = await res.json();
         setSubmissions(prev => [savedSub, ...prev]);
 
-        // Refresh notifications
-        const notifRes = await fetchWithAuth('http://localhost:5000/api/notifications');
+        // Refresh notifications, review submissions, and review counts
+        const [notifRes, reviewSubRes, reviewCountRes] = await Promise.all([
+          fetchWithAuth('http://localhost:5000/api/notifications'),
+          fetchWithAuth('http://localhost:5000/api/submissions?mode=review'),
+          fetchWithAuth('http://localhost:5000/api/submissions/review-count')
+        ]);
         if (notifRes.ok) {
           const notifs = await notifRes.json();
           setNotifications(notifs);
+        }
+        if (reviewSubRes.ok) {
+          const revSubs = await reviewSubRes.json();
+          setReviewSubmissions(revSubs);
+        }
+        if (reviewCountRes.ok) {
+          const data = await reviewCountRes.json();
+          setReviewCount(data.count);
         }
         return true;
       }

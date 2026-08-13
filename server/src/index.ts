@@ -193,6 +193,154 @@ app.get('/api/test-corporate-api/:email', async (req, res) => {
   }
 });
 
+// ----------------------------------------------------
+// DIAGNOSTIC ENDPOINT FOR CRM API (No Auth Required)
+// Usage: GET http://localhost:5000/api/test-crm-api
+// ----------------------------------------------------
+app.get('/api/test-crm-api', async (req, res) => {
+  const crmUrl = process.env.CRM_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities';
+  
+  const testPayload = {
+    impactIntelligenceId: `IM-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-DIAG`,
+    clientName: 'Diagnostic Health Systems',
+    opportunityTitle: 'CRM API Diagnostic Connection Check',
+    opportunityDescription: 'Testing CRM API integration and payload verification from server diagnostic endpoint.',
+    clientContact: {
+      provided: true,
+      email: 'diagnostic.contact@nestdigital.com',
+      phone: '+1 (555) 999-0000'
+    },
+    sourceDetails: {
+      submittedByEmployeeId: 'ND-10042',
+      submittedByEmployeeName: 'Shinto Sebastian',
+      employeeBusinessUnit: 'Digital Transformation Unit (DTU)'
+    },
+    stakeholderMapping: {
+      assignedSalesPerson: 'Jacob Varghese (jacob.varghese@nestdigital.com)',
+      businessUnitHead: 'Suresh Nair (suresh.n@nestdigital.com)',
+      projectManager: 'Kiran Joseph (kiran.j@nestdigital.com)'
+    },
+    submittedAt: new Date().toISOString(),
+    approvedAt: new Date().toISOString()
+  };
+
+  console.log(`\n======================================================`);
+  console.log(`========== DIAGNOSTIC: Testing CRM API (Port 8089) ==========`);
+  console.log(`Target CRM API URL: ${crmUrl}`);
+  console.log(`Request Payload Sent:\n`, JSON.stringify(testPayload, null, 2));
+  console.log(`======================================================`);
+
+  try {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    
+    const response = await fetch(crmUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(testPayload),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    const rawText = await response.text();
+    console.log(`HTTP Status Code: ${response.status} ${response.statusText}`);
+    console.log(`Raw CRM Response: ${rawText}`);
+    
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(rawText);
+      console.log(`Parsed Response Data:`, JSON.stringify(parsed, null, 2));
+      const returnedId = parsed.crmOpportunityId || parsed.crmLeadId;
+      if (returnedId) {
+        console.log(`\n🎉 SUCCESS! CRM Opportunity ID Created: "${returnedId}"`);
+      }
+    } catch {
+      parsed = 'Could not parse response as JSON';
+    }
+    console.log(`================ END CRM DIAGNOSTIC ==================\n`);
+
+    res.json({
+      success: response.ok || response.status === 201,
+      status: response.status,
+      statusText: response.statusText,
+      crmUrl,
+      payloadSent: testPayload,
+      crmOpportunityId: parsed?.crmOpportunityId || parsed?.crmLeadId || null,
+      rawResponse: rawText,
+      parsedResponse: parsed
+    });
+  } catch (err: any) {
+    console.log(`CRM DIAGNOSTIC ERROR: ${err.message}`);
+    console.log(`================ END CRM DIAGNOSTIC ==================\n`);
+    
+    res.json({
+      success: false,
+      error: err.message,
+      crmUrl,
+      hint: 'Check if port 8089 is reachable from this server network'
+    });
+  }
+});
+
+// ----------------------------------------------------
+// DIAGNOSTIC ENDPOINT FOR CRM STATUS API (No Auth Required)
+// Usage: GET http://localhost:5000/api/test-crm-status-api
+// ----------------------------------------------------
+app.get('/api/test-crm-status-api', async (req, res) => {
+  const statusApiUrl = process.env.CRM_STATUS_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities/status-changes';
+  const sinceParam = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const queryUrl = `${statusApiUrl}?since=${encodeURIComponent(sinceParam)}`;
+
+  console.log(`\n======================================================`);
+  console.log(`========== DIAGNOSTIC: Testing CRM Status API ==========`);
+  console.log(`Target URL: ${queryUrl}`);
+  console.log(`======================================================`);
+
+  try {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    
+    const response = await fetch(queryUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    const rawText = await response.text();
+    console.log(`HTTP Status Code: ${response.status} ${response.statusText}`);
+    console.log(`Raw Response: ${rawText.substring(0, 2000)}`);
+
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      parsed = 'Could not parse response as JSON';
+    }
+
+    console.log(`================ END STATUS DIAGNOSTIC ===============\n`);
+
+    res.json({
+      success: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      queryUrl,
+      sinceParam,
+      rawResponse: rawText.substring(0, 2000),
+      parsedResponse: parsed
+    });
+  } catch (err: any) {
+    console.log(`STATUS DIAGNOSTIC ERROR: ${err.message}`);
+    console.log(`================ END STATUS DIAGNOSTIC ===============\n`);
+
+    res.json({
+      success: false,
+      error: err.message,
+      queryUrl,
+      hint: 'Check if port 8089 status endpoint is reachable from this server network'
+    });
+  }
+});
+
 // Authentication Middleware
 const authenticateToken = (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
@@ -354,55 +502,29 @@ app.post('/api/auth/login', async (req, res) => {
       }
     }
 
-    // STEP 2: If corporate API didn't return data (or save failed), fall back to local DB
+    // STEP 2: If corporate API didn't return data (or API is offline), check local system DB
     if (!employee) {
-      employee = await prisma.employee.findUnique({
-        where: { email: normalizedEmail }
+      employee = await prisma.employee.findFirst({
+        where: {
+          OR: [
+            { email: normalizedEmail },
+            { email: { startsWith: normalizedInput + '@' } },
+            { employeeId: loginInput }
+          ]
+        }
       });
       if (employee) {
-        console.log(`[Login] 📂 Using existing local DB record for: ${employee.name}`);
+        console.log(`[Login] 📂 Using verified local DB record for: ${employee.name} (${employee.email})`);
       }
     }
 
-    // STEP 3: If still no employee, provision from ROLE_MAP or generic profile
+    // STEP 3: STRICT SECURITY ENFORCEMENT
+    // If employee is NOT found in Corporate HRMS API AND NOT found in system DB: DENY ACCESS!
     if (!employee) {
-      const mapping = ROLE_MAP[normalizedEmail];
-      if (mapping) {
-        employee = await prisma.employee.create({
-          data: {
-            employeeId: mapping.role === 'reviewer' ? 'ND-29999' : 'ND-19999',
-            name: normalizedEmail.split('@')[0].split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-            email: normalizedEmail,
-            businessUnit: 'Digital Transformation Unit (DTU)',
-            reportingManager: 'Arun Kumar (arun.kumar@nestdigital.com)',
-            projectManager: 'Kiran Joseph (kiran.j@nestdigital.com)',
-            buHead: 'Suresh Nair (suresh.n@nestdigital.com)',
-            hrbp: 'Deepa Menon (deepa.m@nestdigital.com)',
-            salesPerson: 'Jacob Varghese (jacob.varghese@nestdigital.com)',
-            role: mapping.role,
-            designation: mapping.designation
-          }
-        });
-        console.log(`[Login] 🔧 Provisioned employee from ROLE_MAP: ${employee.name}`);
-      } else {
-        // Generic employee provisioning
-        employee = await prisma.employee.create({
-          data: {
-            employeeId: `ND-${Math.floor(10000 + Math.random() * 90000)}`,
-            name: normalizedEmail.split('@')[0].split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-            email: normalizedEmail,
-            businessUnit: 'Digital Transformation Unit (DTU)',
-            reportingManager: 'Arun Kumar (arun.kumar@nestdigital.com)',
-            projectManager: 'Kiran Joseph (kiran.j@nestdigital.com)',
-            buHead: 'Suresh Nair (suresh.n@nestdigital.com)',
-            hrbp: 'Deepa Menon (deepa.m@nestdigital.com)',
-            salesPerson: 'Jacob Varghese (jacob.varghese@nestdigital.com)',
-            role: 'employee',
-            designation: 'Software Engineer'
-          }
-        });
-        console.log(`[Login] 🔧 Provisioned generic employee: ${employee.name}`);
-      }
+      console.warn(`[Login Security Alert] ⛔ Access Denied: Unauthorized login attempt for "${loginInput}". User not found in HRMS directory or system DB.`);
+      return res.status(401).json({
+        error: 'Access Denied: You are not authorized to log into the IMPACT Portal. Your account was not found in the HRMS directory or system database.'
+      });
     }
 
     const token = jwt.sign(
@@ -453,24 +575,40 @@ app.get('/api/employees', authenticateToken, async (req: any, res) => {
 // ----------------------------------------------------
 
 // GET /api/submissions/review-count
-// Returns the count of submissions where the logged-in user is a named stakeholder.
-// Used by the frontend to enable/disable the "Review Board" toggle button.
+// Returns the count of submissions where the logged-in user is a named stakeholder or reviewer.
 app.get('/api/submissions/review-count', authenticateToken, async (req: any, res) => {
-  const userEmail = req.user.email;
+  const userEmail = req.user.email || '';
+  const userRole = req.user.role || '';
 
   try {
-    const count = await prisma.submission.count({
-      where: {
+    let whereClause: any = {};
+    if (userRole === 'reviewer' || userRole === 'admin' || userEmail.includes('arun.kumar')) {
+      whereClause = {}; // Reviewers/admins see all submissions to review
+    } else {
+      const username = userEmail.split('@')[0];
+      const nameParts = username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+      whereClause = {
         OR: [
           { reportingManager: { contains: userEmail } },
+          { reportingManager: { contains: username } },
+          { reportingManager: { contains: nameParts } },
           { projectManager: { contains: userEmail } },
+          { projectManager: { contains: username } },
+          { projectManager: { contains: nameParts } },
           { buHead: { contains: userEmail } },
+          { buHead: { contains: username } },
+          { buHead: { contains: nameParts } },
           { hrbp: { contains: userEmail } },
+          { hrbp: { contains: username } },
+          { hrbp: { contains: nameParts } },
           { salesPerson: { contains: userEmail } },
+          { salesPerson: { contains: username } },
+          { salesPerson: { contains: nameParts } },
         ]
-      }
-    });
+      };
+    }
 
+    const count = await prisma.submission.count({ where: whereClause });
     res.json({ count });
   } catch (error) {
     console.error('Review count error:', error);
@@ -479,11 +617,12 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
 });
 
 // GET /api/submissions
-// Supports ?mode=review to fetch submissions assigned to the user as a stakeholder.
+// Supports ?mode=review to fetch submissions assigned to the user as a stakeholder or reviewer.
 // Default behavior: returns the user's own submissions by employeeId.
 app.get('/api/submissions', authenticateToken, async (req: any, res) => {
   const { employeeId, mode } = req.query;
-  const userEmail = req.user.email;
+  const userEmail = req.user.email || '';
+  const userRole = req.user.role || '';
 
   try {
     let whereClause: any = {};
@@ -492,16 +631,32 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
       // Explicit employeeId filter (used by employee portal to see own submissions)
       whereClause = { employeeId: String(employeeId) };
     } else if (mode === 'review') {
-      // Review mode: show submissions where the user is a named stakeholder
-      whereClause = {
-        OR: [
-          { reportingManager: { contains: userEmail } },
-          { projectManager: { contains: userEmail } },
-          { buHead: { contains: userEmail } },
-          { hrbp: { contains: userEmail } },
-          { salesPerson: { contains: userEmail } },
-        ]
-      };
+      // Review mode: show all for reviewers/admins or submissions where user is stakeholder
+      if (userRole === 'reviewer' || userRole === 'admin' || userEmail.includes('arun.kumar')) {
+        whereClause = {};
+      } else {
+        const username = userEmail.split('@')[0];
+        const nameParts = username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+        whereClause = {
+          OR: [
+            { reportingManager: { contains: userEmail } },
+            { reportingManager: { contains: username } },
+            { reportingManager: { contains: nameParts } },
+            { projectManager: { contains: userEmail } },
+            { projectManager: { contains: username } },
+            { projectManager: { contains: nameParts } },
+            { buHead: { contains: userEmail } },
+            { buHead: { contains: username } },
+            { buHead: { contains: nameParts } },
+            { hrbp: { contains: userEmail } },
+            { hrbp: { contains: username } },
+            { hrbp: { contains: nameParts } },
+            { salesPerson: { contains: userEmail } },
+            { salesPerson: { contains: username } },
+            { salesPerson: { contains: nameParts } },
+          ]
+        };
+      }
     } else {
       // Default: show the user's own submissions
       whereClause = { employeeId: req.user.employeeId };
@@ -624,6 +779,241 @@ async function logEmailsForStatusChange(submission: any, oldStatus: string, newS
       type: 'stakeholder'
     }
   });
+}
+
+// ----------------------------------------------------
+// REAL-TIME CRM API INTEGRATION (PORT 8089)
+// Endpoint: POST https://hrapps.nestdigital.com:8089/api/leads/opportunities
+// Automatically creates a live CRM lead when a submission is validated.
+// Returns crmOpportunityId upon HTTP 201 Created.
+// ----------------------------------------------------
+async function pushLeadToCrm(submission: any, employee: any): Promise<string | null> {
+  const crmUrl = process.env.CRM_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities';
+  
+  const crmPayload = {
+    impactIntelligenceId: submission.intelligenceId,
+    clientName: submission.clientName,
+    opportunityTitle: submission.shortDesc,
+    opportunityDescription: submission.detailedDesc,
+    clientContact: {
+      provided: !!submission.hasContact,
+      email: submission.contactEmail || null,
+      phone: submission.contactPhone || null
+    },
+    sourceDetails: {
+      submittedByEmployeeId: submission.employeeId,
+      submittedByEmployeeName: employee?.name || 'Unknown Submitter',
+      employeeBusinessUnit: employee?.businessUnit || 'Not Specified'
+    },
+    stakeholderMapping: {
+      assignedSalesPerson: submission.salesPerson || 'Not Specified',
+      businessUnitHead: submission.buHead || 'Not Specified',
+      projectManager: submission.projectManager || 'Not Specified'
+    },
+    submittedAt: submission.createdAt ? new Date(submission.createdAt).toISOString() : new Date().toISOString(),
+    approvedAt: new Date().toISOString()
+  };
+
+  try {
+    console.log(`\n======================================================`);
+    console.log(`[CRM Integration API Call] 🚀 Pushing Lead ${submission.intelligenceId}`);
+    console.log(`CRM Endpoint URL: ${crmUrl}`);
+    console.log(`Payload Sent:\n`, JSON.stringify(crmPayload, null, 2));
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    
+    const response = await fetch(crmUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(crmPayload),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    console.log(`CRM Response Status: ${response.status} ${response.statusText}`);
+
+    if (response.ok || response.status === 201) {
+      const data: any = await response.json();
+      console.log(`CRM Response Body:\n`, JSON.stringify(data, null, 2));
+      const returnedId = data.crmOpportunityId || data.crmLeadId || null;
+      console.log(`🎉 SUCCESS! CRM Lead Created for ${submission.intelligenceId} — crmOpportunityId: "${returnedId}"`);
+      console.log(`======================================================\n`);
+      return returnedId;
+    } else {
+      const errText = await response.text();
+      console.warn(`⚠️ HTTP ${response.status} Error from CRM API: ${errText.substring(0, 300)}`);
+      console.log(`======================================================\n`);
+      return null;
+    }
+  } catch (err: any) {
+    console.warn(`[CRM Integration] ⚠️ Could not reach CRM API: ${err.message}`);
+    return null;
+  }
+}
+
+// ----------------------------------------------------
+// CRM STATUS MAPPER
+// Maps CRM Opportunity Status strings to IMPACT Model statuses
+// ----------------------------------------------------
+function mapCrmStatusToImpactStatus(crmStatus: string): string | null {
+  if (!crmStatus) return null;
+  const status = crmStatus.trim();
+
+  // Stage 4: Lead Accepted
+  if (['ValueProposition', 'RFPReceived', 'InProgress', 'Value Proposition', 'RFP Received', 'In Progress', 'Accepted'].includes(status)) {
+    return 'Lead Accepted';
+  }
+
+  // Stage 5: Proposal
+  if (['ProposalPreparation', 'ProposalPriceQuote', 'Proposal Preparation', 'Proposal Submitted'].includes(status)) {
+    return 'Proposal';
+  }
+
+  // Stage 6: Negotiation
+  if (['Negotiation', 'NegotiationReview', 'FirmawaitingPO', 'Commercial Proposal Phase', 'Firm Awaiting PO', 'Queries'].includes(status)) {
+    return 'Negotiation';
+  }
+
+  // Stage 7: Deal Won
+  if (['ClosedWon', 'Closed Won'].includes(status)) {
+    return 'Deal Won';
+  }
+
+  // Closed / Dropped / Lost
+  if (['ClosedLost', 'Closed Lost'].includes(status)) {
+    return 'Deal Lost';
+  }
+  if (['Dropped'].includes(status)) {
+    return 'Lead Dropped';
+  }
+
+  // On Hold / Clarification
+  if (['OnHold', 'On Hold'].includes(status)) {
+    return 'Clarification Requested';
+  }
+
+  return null;
+}
+
+// Global variable tracking last successful status poll timestamp
+let lastCrmPollTimestamp: string = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+// ----------------------------------------------------
+// AUTOMATED BACKGROUND CRM STATUS POLLING SERVICE
+// Periodically calls GET /api/leads/opportunities/status-changes?since=TIMESTAMP
+// ----------------------------------------------------
+async function pollCrmStatusUpdates() {
+  const statusApiUrl = process.env.CRM_STATUS_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities/status-changes';
+
+  try {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    // Always use a 30-day lookback window so no CRM updates are ever missed
+    const lookbackTimestamp = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const queryUrl = `${statusApiUrl}?since=${encodeURIComponent(lookbackTimestamp)}`;
+    console.log(`\n[CRM Background Poller] 🔄 Polling status updates since 30 days ago (${lookbackTimestamp})...`);
+    
+    const response = await fetch(queryUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      console.warn(`[CRM Background Poller] ⚠️ HTTP ${response.status} from status API`);
+      return;
+    }
+
+    const data: any = await response.json();
+    if (data && data.success && Array.isArray(data.data)) {
+      const records = data.data;
+      console.log(`[CRM Background Poller] 📊 Received ${records.length} updated opportunity records from CRM`);
+
+      for (const record of records) {
+        const crmOppId = record.crmOpportunityId || record.crmLeadId;
+        const crmStatus = record.currentStatus;
+        if (!crmOppId || !crmStatus) continue;
+
+        const impactStatus = mapCrmStatusToImpactStatus(crmStatus);
+        if (!impactStatus) continue;
+
+        // Find matching submission in database by crmLeadId
+        const existingSub = await prisma.submission.findFirst({
+          where: {
+            OR: [
+              { crmLeadId: crmOppId },
+              { intelligenceId: crmOppId }
+            ]
+          }
+        });
+
+        if (existingSub && existingSub.status !== impactStatus) {
+          console.log(`[CRM Background Poller] ✨ Updating ${existingSub.intelligenceId}: "${existingSub.status}" -> "${impactStatus}" (CRM ID: ${crmOppId})`);
+
+          // Update status in SQLite database
+          const updatedSub = await prisma.submission.update({
+            where: { id: existingSub.id },
+            data: {
+              status: impactStatus,
+              reason: record.remarks || undefined,
+              statusHistory: {
+                create: {
+                  status: impactStatus,
+                  changedBy: 'CRM Automated Sync Service',
+                  comment: record.remarks || `Synced from CRM (${crmStatus})`
+                }
+              }
+            }
+          });
+
+          // Fetch submitter employee (or fallback if employee record not found)
+          let emp = await prisma.employee.findUnique({ where: { employeeId: updatedSub.employeeId } });
+          if (!emp) {
+            emp = {
+              id: 'fallback-emp',
+              employeeId: updatedSub.employeeId,
+              name: 'Submitter',
+              email: 'employee@nestdigital.com',
+              businessUnit: 'Digital Transformation Unit',
+              reportingManager: updatedSub.reportingManager,
+              projectManager: updatedSub.projectManager,
+              buHead: updatedSub.buHead,
+              hrbp: updatedSub.hrbp,
+              salesPerson: updatedSub.salesPerson,
+              role: 'employee',
+              designation: 'Senior Consultant',
+              jobRole: 'Consultant',
+              phoneNumber: '+91 9998887776',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+          }
+
+          // Trigger email alerts and in-app notifications
+          await logEmailsForStatusChange(updatedSub, existingSub.status, impactStatus, record.remarks || null, emp);
+            
+            const stakeholderFields = [
+              updatedSub.reportingManager,
+              updatedSub.projectManager,
+              updatedSub.buHead,
+              updatedSub.hrbp,
+              updatedSub.salesPerson
+            ];
+            const recipientEmails = extractEmails(stakeholderFields);
+            const allRecipients = Array.from(new Set([emp.email, ...recipientEmails]));
+            const msg = `${updatedSub.intelligenceId} moved to ${impactStatus} stage via CRM Sync`;
+
+            await Promise.all(allRecipients.map(email =>
+              prisma.notification.create({
+                data: { message: msg, recipientEmail: email }
+              })
+            ));
+          }
+        }
+      }
+  } catch (err: any) {
+    console.warn(`[CRM Background Poller] ⚠️ Error during polling: ${err.message}`);
+  }
 }
 // POST /api/submissions
 app.post('/api/submissions', authenticateToken, async (req: any, res) => {
@@ -796,6 +1186,19 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
 
       // Auto-trigger corporate and stakeholder email logging
       await logEmailsForStatusChange(updated, existing.status, status, reason || null, emp);
+
+      // Auto-push lead to live CRM API (port 8089) when validated
+      if (status === 'Validated' && (!updated.crmLeadId || updated.crmLeadId.startsWith('CRM-LEAD-'))) {
+        const generatedCrmId = await pushLeadToCrm(updated, emp);
+        if (generatedCrmId) {
+          const finalSub = await prisma.submission.update({
+            where: { intelligenceId: id },
+            data: { crmLeadId: generatedCrmId },
+            include: { statusHistory: { orderBy: { timestamp: 'asc' } } }
+          });
+          return res.json({ ...finalSub, employeeName: emp.name });
+        }
+      }
     }
 
     res.json({
@@ -1118,4 +1521,8 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
+  
+  // Start automated CRM status poller immediately on server start and every 5 minutes (300,000 ms)
+  pollCrmStatusUpdates();
+  setInterval(pollCrmStatusUpdates, 5 * 60 * 1000);
 });

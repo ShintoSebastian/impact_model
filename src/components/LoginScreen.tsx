@@ -75,6 +75,12 @@ export function LoginScreen() {
               )}
             </div>
 
+            {/* User Friendly Login Tip */}
+            <div className="bg-slate-100/80 border border-slate-200/60 rounded-lg p-3 text-[11px] text-slate-600 mb-6 flex flex-col gap-1">
+              <span className="font-bold text-brand-navy">💡 Corporate SSO Login Demo:</span>
+              <span>Enter your corporate username (e.g. <strong className="text-slate-800 font-mono">alex.morgan</strong>, <strong className="text-slate-800 font-mono">sarah.jenkins</strong>, or <strong className="text-slate-800 font-mono">michael.ross</strong>) to sign in.</span>
+            </div>
+
             <div className="flex flex-col gap-4 mt-auto">
               <button 
                 type="submit" 
