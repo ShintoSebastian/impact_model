@@ -1,4 +1,7 @@
-import type { Submission, EmailLog } from './mockData.ts';
+import type { Submission, EmailLog } from './types.ts';
+
+// Dynamic API Base URL from environment or default
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
 // Generates unique intelligence IDs: IM-YYYYMMDD-XXXX
 export function generateIntelligenceId(existingSubmissions: Submission[]): string {
@@ -70,7 +73,7 @@ Submission Details:
 - Status: Under Review
 
 Required SLA Action:
-Our delivery and sales teams will review your submission. Acknowledgment and initial assessment will be completed within 2 working days.
+Our delivery and sales teams will review your submission. Acknowledgment and initial assessment will be completed within 7 working days.
 
 Best regards,
 IMPACT Portal Administration`,

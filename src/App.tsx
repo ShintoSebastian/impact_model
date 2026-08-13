@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { INITIAL_SUBMISSIONS, INITIAL_NOTIFICATIONS, INITIAL_EMAIL_LOGS, getRoleByEmail } from './mockData.ts';
-import type { Submission, EmailLog, Employee } from './mockData.ts';
+import type { Submission, EmailLog, Employee } from './types.ts';
 
 // Context
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
@@ -12,9 +11,9 @@ import { DashboardLayout } from './components/DashboardLayout.tsx';
 import { HomeView } from './components/HomeView.tsx';
 import { EmployeePortal } from './components/EmployeePortal.tsx';
 import { StakeholderDashboard } from './components/StakeholderDashboard.tsx';
-import { CrmSimulator } from './components/CrmSimulator.tsx';
 import { EmailSimulator } from './components/EmailSimulator.tsx';
 import { DbViewer } from './components/DbViewer.tsx';
+import { API_BASE_URL } from './utils.ts';
 
 // Re-export useAuth for any component that imported it from App.tsx
 export { useAuth } from './context/AuthContext.tsx';
@@ -35,50 +34,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Route guard for employees only
-function EmployeeRoute({ children }: { children: React.ReactNode }) {
-  const { loggedInUser } = useAuth();
-  const location = useLocation();
-
-  if (!loggedInUser) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  const role = getRoleByEmail(loggedInUser.email);
-  if (role !== 'employee') {
-    return <Navigate to="/reviewer" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-// Route guard for reviewers only
-function ReviewerRoute({ children }: { children: React.ReactNode }) {
-  const { loggedInUser } = useAuth();
-  const location = useLocation();
-
-  if (!loggedInUser) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  const role = getRoleByEmail(loggedInUser.email);
-  if (role !== 'reviewer') {
-    return <Navigate to="/home" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-// Component to handle dynamic redirect from root `/` based on role
+// Component to handle redirect from root `/` — all users go to /home
 function RootRedirect() {
   const { loggedInUser } = useAuth();
   if (!loggedInUser) {
     return <Navigate to="/login" replace />;
-  }
-
-  const role = getRoleByEmail(loggedInUser.email);
-  if (role === 'reviewer') {
-    return <Navigate to="/reviewer" replace />;
   }
   return <Navigate to="/home" replace />;
 }
@@ -100,51 +60,122 @@ export default function App() {
 // APP CONTENT — State Management & Route Tree
 // ----------------------------------------------------
 function AppContent() {
-  const [submissions, setSubmissions] = useState<Submission[]>(() => {
-    const saved = localStorage.getItem('impact_submissions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
-  });
-
-  const [emailLogs, setEmailLogs] = useState<EmailLog[]>(() => {
-    const saved = localStorage.getItem('impact_email_logs');
-    return saved ? JSON.parse(saved) : INITIAL_EMAIL_LOGS;
-  });
-
-  const [notifications, setNotifications] = useState<{ id: string; message: string; timestamp: string; read: boolean }[]>(() => {
-    const saved = localStorage.getItem('impact_notifications');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
-  });
-
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [reviewSubmissions, setReviewSubmissions] = useState<Submission[]>([]);
+  const [reviewCount, setReviewCount] = useState<number>(0);
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
+  const [notifications, setNotifications] = useState<{ id: string; message: string; timestamp: string; read: boolean }[]>([]);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   const { loggedInUser, handleLogout } = useAuth();
   const navigate = useNavigate();
 
-  // Sync to local storage
-  useEffect(() => {
-    localStorage.setItem('impact_submissions', JSON.stringify(submissions));
-  }, [submissions]);
+  // Helper for authorized fetches
+  const fetchWithAuth = async (url: string, options: any = {}) => {
+    const token = sessionStorage.getItem('impact_token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...options.headers,
+    };
+    try {
+      const response = await fetch(url, { ...options, headers });
+      if (response.status === 401 || response.status === 403) {
+        handleLogout();
+        throw new Error('Session expired');
+      }
+      return response;
+    } catch (error) {
+      console.error(`fetchWithAuth error on ${url}:`, error);
+      throw error;
+    }
+  };
 
+  // Load initial data from SQLite Express Backend
   useEffect(() => {
-    localStorage.setItem('impact_email_logs', JSON.stringify(emailLogs));
-  }, [emailLogs]);
+    if (!loggedInUser) {
+      setSubmissions([]);
+      setReviewSubmissions([]);
+      setReviewCount(0);
+      setEmailLogs([]);
+      setNotifications([]);
+      return;
+    }
 
-  useEffect(() => {
-    localStorage.setItem('impact_notifications', JSON.stringify(notifications));
-  }, [notifications]);
+    const loadBackendData = async () => {
+      try {
+        const [subRes, reviewSubRes, reviewCountRes, notifRes, emailRes] = await Promise.all([
+          fetchWithAuth(`${API_BASE_URL}/api/submissions`),
+          fetchWithAuth(`${API_BASE_URL}/api/submissions?mode=review`),
+          fetchWithAuth(`${API_BASE_URL}/api/submissions/review-count`),
+          fetchWithAuth(`${API_BASE_URL}/api/notifications`),
+          fetchWithAuth(`${API_BASE_URL}/api/email-logs`)
+        ]);
 
-  const addSubmission = (sub: Submission) => {
-    setSubmissions(prev => [sub, ...prev]);
-    setNotifications(prev => [
-      {
-        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-        message: `New submission ${sub.intelligenceId} registered`,
-        timestamp: new Date().toISOString(),
-        read: false
-      },
-      ...prev
-    ]);
+        if (subRes.ok) {
+          const subs = await subRes.json();
+          setSubmissions(subs);
+        }
+        if (reviewSubRes.ok) {
+          const revSubs = await reviewSubRes.json();
+          setReviewSubmissions(revSubs);
+        }
+        if (reviewCountRes.ok) {
+          const data = await reviewCountRes.json();
+          setReviewCount(data.count);
+        }
+        if (notifRes.ok) {
+          const notifs = await notifRes.json();
+          setNotifications(notifs);
+        }
+        if (emailRes.ok) {
+          const emails = await emailRes.json();
+          setEmailLogs(emails);
+        }
+      } catch (err) {
+        console.error('Error fetching data from server:', err);
+      }
+    };
+
+    loadBackendData();
+  }, [loggedInUser]);
+
+  const addSubmission = async (sub: Submission): Promise<boolean> => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/submissions`, {
+        method: 'POST',
+        body: JSON.stringify(sub)
+      });
+      if (res.ok) {
+        const savedSub = await res.json();
+        setSubmissions(prev => [savedSub, ...prev]);
+
+        // Refresh notifications, review submissions, and review counts
+        const [notifRes, reviewSubRes, reviewCountRes] = await Promise.all([
+          fetchWithAuth(`${API_BASE_URL}/api/notifications`),
+          fetchWithAuth(`${API_BASE_URL}/api/submissions?mode=review`),
+          fetchWithAuth(`${API_BASE_URL}/api/submissions/review-count`)
+        ]);
+        if (notifRes.ok) {
+          const notifs = await notifRes.json();
+          setNotifications(notifs);
+        }
+        if (reviewSubRes.ok) {
+          const revSubs = await reviewSubRes.json();
+          setReviewSubmissions(revSubs);
+        }
+        if (reviewCountRes.ok) {
+          const data = await reviewCountRes.json();
+          setReviewCount(data.count);
+        }
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('addSubmission error:', err);
+      return false;
+    }
   };
 
   const addNotification = (message: string) => {
@@ -159,68 +190,62 @@ function AppContent() {
     ]);
   };
 
-  const updateSubmission = (id: string, updatedFields: Partial<Submission>, changedBy?: string) => {
-    setSubmissions(prev => prev.map(sub => {
-      if (sub.intelligenceId === id) {
-        const now = new Date().toISOString();
-        // Append to statusHistory if status changed
-        let newHistory = sub.statusHistory || [];
-        if (updatedFields.status && updatedFields.status !== sub.status) {
-          newHistory = [...newHistory, {
-            status: updatedFields.status,
-            changedBy: changedBy || loggedInUser?.name || 'System',
-            timestamp: now,
-            comment: updatedFields.reason || undefined
-          }];
+  const updateSubmission = async (id: string, updatedFields: Partial<Submission>, changedBy?: string) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/submissions/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ...updatedFields, changedBy })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSubmissions(prev => prev.map(sub => sub.intelligenceId === id ? updated : sub));
+        setReviewSubmissions(prev => prev.map(sub => sub.intelligenceId === id ? updated : sub));
+
+        // Refresh notifications
+        const notifRes = await fetchWithAuth(`${API_BASE_URL}/api/notifications`);
+        if (notifRes.ok) {
+          const notifs = await notifRes.json();
+          setNotifications(notifs);
         }
-        const merged = { ...sub, ...updatedFields, updatedAt: now, statusHistory: newHistory } as Submission;
-        if (updatedFields.status && updatedFields.status !== sub.status) {
-          let msg = `${id} status changed to ${updatedFields.status}`;
-          if (updatedFields.status === 'Validated') {
-            msg = `${id} has been Validated`;
-          } else if (['Opportunity Registered', 'Proposal', 'Negotiation', 'Closed - Converted'].includes(updatedFields.status)) {
-            const stepName = updatedFields.status === 'Closed - Converted' ? 'Converted Won' : updatedFields.status;
-            msg = `${id} moved to ${stepName} stage`;
-          }
-          setNotifications(prev => [
-            {
-              id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-              message: msg,
-              timestamp: now,
-              read: false
-            },
-            ...prev
-          ]);
-        }
-        return merged;
       }
-      return sub;
-    }));
+    } catch (err) {
+      console.error('updateSubmission error:', err);
+    }
   };
 
-  const logEmails = (newEmails: EmailLog[]) => {
-    setEmailLogs(prev => [...prev, ...newEmails]);
+  const logEmails = async (newEmails: EmailLog[]) => {
+    try {
+      for (const email of newEmails) {
+        await fetchWithAuth(`${API_BASE_URL}/api/email-logs`, {
+          method: 'POST',
+          body: JSON.stringify(email)
+        });
+      }
+      
+      const emailRes = await fetchWithAuth(`${API_BASE_URL}/api/email-logs`);
+      if (emailRes.ok) {
+        const data = await emailRes.json();
+        setEmailLogs(data);
+      }
+    } catch (err) {
+      console.error('logEmails error:', err);
+    }
   };
 
   const resetDb = () => {
-    localStorage.removeItem('impact_submissions');
-    localStorage.removeItem('impact_email_logs');
-    localStorage.removeItem('impact_notifications');
-    setSubmissions(INITIAL_SUBMISSIONS);
+    sessionStorage.removeItem('impact_token');
+    sessionStorage.removeItem('impact_user');
+    setSubmissions([]);
     setEmailLogs([]);
-    setNotifications(INITIAL_NOTIFICATIONS);
+    setNotifications([]);
     setSelectedSubId(null);
     setShowModal(false);
-    const role = loggedInUser ? getRoleByEmail(loggedInUser.email) : 'employee';
-    navigate(role === 'reviewer' ? '/reviewer' : '/home');
+    navigate('/login');
   };
 
   const getRole = (user: Employee) => {
-    const role = getRoleByEmail(user.email);
-    if (role === 'reviewer') return 'reviewer';
-    if (user.employeeId === 'ND-99999') return 'System Auditor';
-    if (user.employeeId.startsWith('ND-2') || user.employeeId.startsWith('ND-3')) return 'reviewer';
-    return 'employee';
+    // Role is now provided by the backend API
+    return (user as any).role || 'employee';
   };
 
   const currentUserRole = loggedInUser ? getRole(loggedInUser) : 'Submitter (Employee)';
@@ -244,6 +269,7 @@ function AppContent() {
               loggedInUser={loggedInUser} 
               currentUserRole={currentUserRole}
               handleLogout={handleLogout}
+              reviewCount={reviewCount}
             />
           </ProtectedRoute>
         }
@@ -252,64 +278,50 @@ function AppContent() {
         <Route 
           path="home" 
           element={
-            <EmployeeRoute>
-              <HomeView 
-                submissions={submissions}
-                selectedSubId={selectedSubId}
-                setSelectedSubId={setSelectedSubId}
-                showModal={showModal}
-                setShowModal={setShowModal}
-                loggedInUser={loggedInUser!}
-                currentUserRole={currentUserRole}
-                notifications={notifications}
-                markAllAsRead={markAllAsRead}
-                resetDb={resetDb}
-                navigate={navigate}
-                updateSubmission={updateSubmission}
-                logEmails={logEmails}
-                addNotification={addNotification}
-              />
-            </EmployeeRoute>
+            <HomeView 
+              submissions={submissions}
+              selectedSubId={selectedSubId}
+              setSelectedSubId={setSelectedSubId}
+              showModal={showModal}
+              setShowModal={setShowModal}
+              loggedInUser={loggedInUser!}
+              currentUserRole={currentUserRole}
+              notifications={notifications}
+              markAllAsRead={markAllAsRead}
+              resetDb={resetDb}
+              navigate={navigate}
+              updateSubmission={updateSubmission}
+              logEmails={logEmails}
+              addNotification={addNotification}
+            />
           } 
         />
         <Route 
           path="submit" 
           element={
-            <EmployeeRoute>
-              <EmployeePortal 
-                submissions={submissions}
-                addSubmission={addSubmission}
-                logEmails={logEmails}
-                loggedInUser={loggedInUser!}
-                navigate={navigate}
-              />
-            </EmployeeRoute>
+            <EmployeePortal 
+              submissions={submissions}
+              addSubmission={addSubmission}
+              logEmails={logEmails}
+              loggedInUser={loggedInUser!}
+              navigate={navigate}
+            />
           } 
         />
         <Route path="outbox" element={<EmailSimulator emailLogs={emailLogs} />} />
         <Route 
           path="reviewer" 
           element={
-            <ReviewerRoute>
+            <ProtectedRoute>
               <StakeholderDashboard 
-                submissions={submissions}
+                submissions={reviewSubmissions}
                 updateSubmission={updateSubmission}
                 logEmails={logEmails}
                 currentUserRole={currentUserRole}
                 loggedInUser={loggedInUser!}
                 addNotification={addNotification}
               />
-            </ReviewerRoute>
-          } 
-        />
-        <Route 
-          path="crm" 
-          element={
-            <CrmSimulator 
-              submissions={submissions}
-              updateSubmission={updateSubmission}
-              logEmails={logEmails}
-            />
+            </ProtectedRoute>
           } 
         />
         <Route path="db" element={<DbViewer submissions={submissions} resetDb={resetDb} />} />

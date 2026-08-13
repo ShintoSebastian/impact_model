@@ -1,29 +1,22 @@
 import React, { useState, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Employee } from '../mockData.ts';
-import { MOCK_EMPLOYEES, getRoleByEmail, ROLE_MAP } from '../mockData.ts';
+import type { Employee } from '../types.ts';
+import { API_BASE_URL } from '../utils.ts';
 
 // Auth Context Types
-export interface AuthContextType {
+
+interface AuthContextType {
   loggedInUser: Employee | null;
-  loginStep: 'email' | 'otp';
-  setLoginStep: (step: 'email' | 'otp') => void;
-  loginOtp: string;
-  setLoginOtp: (val: string) => void;
-  otpError: string;
-  setOtpError: (val: string) => void;
-  tempTargetUser: Employee | null;
-  setTempTargetUser: (user: Employee | null) => void;
   isConnecting: boolean;
   setIsConnecting: (val: boolean) => void;
   connectingMsg: string;
   setConnectingMsg: (msg: string) => void;
   showSandbox: boolean;
   setShowSandbox: (val: boolean) => void;
-  executeSsoFlow: (user: Employee) => void;
+  executeSsoFlow: (username: string) => void;
   handleLogout: () => void;
-  loginEmail: string;
-  setLoginEmail: (email: string) => void;
+  loginUsername: string;
+  setLoginUsername: (username: string) => void;
   loginError: string;
   setLoginError: (err: string) => void;
 }
@@ -38,52 +31,75 @@ export function useAuth() {
 
 // AuthProvider wraps all authentication contexts
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [loggedInUser, setLoggedInUser] = useState<Employee | null>(null);
-  const [loginStep, setLoginStep] = useState<'email' | 'otp'>('email');
-  const [loginOtp, setLoginOtp] = useState('');
-  const [otpError, setOtpError] = useState('');
-  const [tempTargetUser, setTempTargetUser] = useState<Employee | null>(null);
+  const [loggedInUser, setLoggedInUser] = useState<Employee | null>(() => {
+    const saved = sessionStorage.getItem('impact_user');
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectingMsg, setConnectingMsg] = useState('');
   const [showSandbox, setShowSandbox] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginUsername, setLoginUsername] = useState('');
   const [loginError, setLoginError] = useState('');
 
   const navigate = useNavigate();
 
-  const executeSsoFlow = (user: Employee) => {
+  const executeSsoFlow = async (username: string) => {
     setIsConnecting(true);
     setConnectingMsg('Authenticating with Microsoft Entra ID...');
-    setTimeout(() => {
-      setConnectingMsg('Verifying HRMS mapping...');
-      setTimeout(() => {
-        setConnectingMsg('Provisioning secure session...');
-        setTimeout(() => {
-          setLoggedInUser(user);
-          setIsConnecting(false);
-          setLoginStep('email');
-          setLoginOtp('');
-          setConnectingMsg('');
-          const role = getRoleByEmail(user.email);
-          navigate(role === 'reviewer' ? '/reviewer' : '/home');
-        }, 600);
-      }, 800);
-    }, 600);
+    
+    // Simulate SSO loading screen delays for premium UX
+    await new Promise(resolve => setTimeout(resolve, 600));
+    setConnectingMsg('Verifying HRMS mapping...');
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setConnectingMsg('Provisioning secure session...');
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Authentication failed');
+      }
+
+      const data = await res.json();
+      sessionStorage.setItem('impact_token', data.token);
+      sessionStorage.setItem('impact_user', JSON.stringify(data.user));
+
+      setLoggedInUser(data.user);
+      setIsConnecting(false);
+      setConnectingMsg('');
+      setLoginError('');
+
+      navigate('/home');
+    } catch (err: any) {
+      console.error('SSO Flow Error:', err);
+      setIsConnecting(false);
+      setConnectingMsg('');
+      setLoginError(err.message || 'Failed to authenticate with database backend. Verify server is running.');
+    }
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem('impact_token');
+    sessionStorage.removeItem('impact_user');
     setLoggedInUser(null);
-    setLoginStep('email');
-    setLoginOtp('');
-    setTempTargetUser(null);
     navigate('/login');
   };
 
   return (
     <AuthContext.Provider value={{
-      loggedInUser, loginStep, setLoginStep, loginOtp, setLoginOtp, otpError, setOtpError,
-      tempTargetUser, setTempTargetUser, isConnecting, setIsConnecting, connectingMsg, setConnectingMsg,
-      showSandbox, setShowSandbox, executeSsoFlow, handleLogout, loginEmail, setLoginEmail, loginError, setLoginError
+      loggedInUser, isConnecting, setIsConnecting, connectingMsg, setConnectingMsg,
+      showSandbox, setShowSandbox, executeSsoFlow, handleLogout, loginUsername, setLoginUsername, loginError, setLoginError
     }}>
       {children}
     </AuthContext.Provider>
