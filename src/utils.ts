@@ -1,5 +1,8 @@
 import type { Submission, EmailLog } from './types.ts';
 
+// Dynamic API Base URL from environment or default
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+
 // Generates unique intelligence IDs: IM-YYYYMMDD-XXXX
 export function generateIntelligenceId(existingSubmissions: Submission[]): string {
   const now = new Date();

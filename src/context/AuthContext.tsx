@@ -1,9 +1,11 @@
 import React, { useState, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Employee } from '../types.ts';
+import { API_BASE_URL } from '../utils.ts';
 
 // Auth Context Types
-export interface AuthContextType {
+
+interface AuthContextType {
   loggedInUser: Employee | null;
   isConnecting: boolean;
   setIsConnecting: (val: boolean) => void;
@@ -58,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await new Promise(resolve => setTimeout(resolve, 600));
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username })

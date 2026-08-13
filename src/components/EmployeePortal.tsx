@@ -106,84 +106,93 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto w-full">
+    <div className="max-w-3xl mx-auto w-full font-sans">
+      
       {/* Page Header */}
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-brand-navy tracking-tight">Capture Opportunity</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Submit client lead intelligence to activate the stakeholder review workflow.
+          <h1 className="text-2xl font-extrabold text-brand-navy tracking-tight">Submit New Lead</h1>
+          <p className="text-xs text-slate-500 font-medium">
+            Enter client lead intelligence to initiate SLA validation and stakeholder review workflow.
           </p>
         </div>
+
         <button 
           onClick={() => navigate('/home')}
-          className="flex items-center gap-1.5 text-xs font-bold text-brand-navy hover:underline bg-transparent border-none cursor-pointer transition-all"
+          className="self-start sm:self-center flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-brand-navy bg-white hover:bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl shadow-sm cursor-pointer transition-all"
         >
           <ArrowLeft size={14} />
-          Back to Dashboard
+          <span>Back to Dashboard</span>
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col gap-6">
+      <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 flex flex-col gap-6 relative overflow-hidden">
+        
         {errors.submit && (
-          <div className="bg-red-50 text-red-700 p-4 rounded-lg text-sm font-bold border border-red-200">
-            {errors.submit}
+          <div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm font-bold border border-red-200 flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{errors.submit}</span>
           </div>
         )}
         
         {/* Read-Only HRMS Profile Dropdown Card */}
-        <div className="bg-slate-50 border border-slate-200/90 rounded-xl overflow-hidden shadow-sm transition-all">
+        <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs transition-all">
           <button
             type="button"
             onClick={() => setIsProfileExpanded(!isProfileExpanded)}
-            className="w-full p-4 flex items-center justify-between bg-slate-100/80 hover:bg-slate-100 text-brand-navy font-bold text-xs transition-colors cursor-pointer"
+            className="w-full p-4 flex items-center justify-between bg-slate-100/70 hover:bg-slate-100 text-brand-navy font-bold text-xs transition-colors cursor-pointer"
           >
-            <div className="flex items-center gap-2 text-[10px] font-extrabold tracking-wider uppercase text-slate-700">
-              <Shield size={16} className="text-brand-navy" />
-              <span>HRMS PROFILE SYNC (READ-ONLY)</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-brand-navy text-white flex items-center justify-center font-bold text-xs">
+                <Shield size={14} />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-[10px] font-extrabold tracking-wider uppercase text-slate-800">HRMS Profile Sync (Read-Only)</span>
+                <span className="text-[11px] text-slate-500 font-medium">{loggedInUser.name} • {loggedInUser.employeeId} ({loggedInUser.businessUnit})</span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] bg-slate-200/80 text-slate-600 px-2 py-0.5 rounded-full font-mono font-bold">
-                {isProfileExpanded ? 'Collapse' : 'Expand Details'}
+              <span className="text-[10px] bg-slate-200/80 text-slate-600 px-2.5 py-1 rounded-lg font-bold">
+                {isProfileExpanded ? 'Collapse' : 'Expand Profile'}
               </span>
               {isProfileExpanded ? <ChevronUp size={16} className="text-slate-600" /> : <ChevronDown size={16} className="text-slate-600" />}
             </div>
           </button>
 
           {isProfileExpanded && (
-            <div className="p-5 border-t border-slate-200/60 bg-slate-50/50 animate-fade-in">
+            <div className="p-5 border-t border-slate-200/60 bg-white/50 animate-fadeIn">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Employee Name</span>
-                  <strong className="text-slate-700 font-extrabold">{loggedInUser.name}</strong>
+                  <strong className="text-slate-800 font-extrabold">{loggedInUser.name}</strong>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Employee ID</span>
-                  <strong className="text-slate-700 font-extrabold">{loggedInUser.employeeId}</strong>
+                  <strong className="text-slate-800 font-extrabold">{loggedInUser.employeeId}</strong>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Business Unit</span>
-                  <strong className="text-slate-700 font-extrabold">{loggedInUser.businessUnit}</strong>
+                  <strong className="text-slate-800 font-extrabold">{loggedInUser.businessUnit}</strong>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Reporting Manager</span>
-                  <strong className="text-slate-700 font-extrabold">{loggedInUser.reportingManager || 'Not Specified'}</strong>
+                  <strong className="text-slate-800 font-extrabold">{loggedInUser.reportingManager || 'Not Specified'}</strong>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Business Unit Head</span>
-                  <strong className="text-slate-700 font-extrabold">{loggedInUser.buHead || 'Not Specified'}</strong>
+                  <strong className="text-slate-800 font-extrabold">{loggedInUser.buHead || 'Not Specified'}</strong>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Project Manager</span>
-                  <strong className="text-slate-700 font-extrabold">{loggedInUser.projectManager || 'Not Specified'}</strong>
+                  <strong className="text-slate-800 font-extrabold">{loggedInUser.projectManager || 'Not Specified'}</strong>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">HR Partner</span>
-                  <strong className="text-slate-700 font-extrabold">{loggedInUser.hrbp || 'Not Specified'}</strong>
+                  <strong className="text-slate-800 font-extrabold">{loggedInUser.hrbp || 'Not Specified'}</strong>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Sales Person Assigned</span>
-                  <strong className="text-slate-700 font-extrabold">{loggedInUser.salesPerson || 'Not Specified'}</strong>
+                  <strong className="text-slate-800 font-extrabold">{loggedInUser.salesPerson || 'Not Specified'}</strong>
                 </div>
               </div>
             </div>
@@ -193,15 +202,15 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
         {/* Client Name Input */}
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-between items-center">
-            <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Client / Account Name *</label>
+            <label className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider">Client / Account Name *</label>
             <span className="text-[10px] text-slate-400 font-medium">Company or Client name</span>
           </div>
           <input 
             type="text" 
-            className={`w-full px-3.5 py-2.5 rounded-lg border text-xs transition-all placeholder:text-slate-400 focus:outline-none focus:ring-1 ${
+            className={`w-full px-4 py-3 rounded-xl border text-xs transition-all placeholder:text-slate-400 font-medium focus:outline-none focus:ring-2 ${
               errors.clientName 
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/20'
+                : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/15 bg-slate-50/30 focus:bg-white'
             }`}
             placeholder="e.g. Apex Retail Corp, Horizon Mutual Bank" 
             value={clientName}
@@ -211,18 +220,18 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
           {errors.clientName && <span className="text-[10px] text-red-600 font-bold mt-0.5">⚠️ {errors.clientName}</span>}
         </div>
 
-        {/* Opportunity Title Input */}
+        {/* Lead Title Input */}
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-between items-center">
-            <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Opportunity Title *</label>
+            <label className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider">Lead Title *</label>
             <span className="text-[10px] text-slate-400 font-medium">Short 1-line summary</span>
           </div>
           <input 
             type="text" 
-            className={`w-full px-3.5 py-2.5 rounded-lg border text-xs transition-all placeholder:text-slate-400 focus:outline-none focus:ring-1 ${
+            className={`w-full px-4 py-3 rounded-xl border text-xs transition-all placeholder:text-slate-400 font-medium focus:outline-none focus:ring-2 ${
               errors.shortDesc 
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/20'
+                : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/15 bg-slate-50/30 focus:bg-white'
             }`}
             placeholder="e.g. Cloud Migration & Application Modernization for Retail Division" 
             value={shortDesc}
@@ -232,20 +241,20 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
           {errors.shortDesc && <span className="text-[10px] text-red-600 font-bold mt-0.5">⚠️ {errors.shortDesc}</span>}
         </div>
 
-        {/* Opportunity Details textarea */}
+        {/* Lead Details textarea */}
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-between items-center">
-            <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Opportunity Details & Background *</label>
+            <label className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider">Lead Details *</label>
             <span className="text-[10px] text-slate-400 font-medium">Detailed context</span>
           </div>
           <textarea 
             rows={4} 
-            className={`w-full px-3.5 py-2.5 rounded-lg border text-xs transition-all placeholder:text-slate-400 font-sans resize-vertical focus:outline-none focus:ring-1 ${
+            className={`w-full px-4 py-3 rounded-xl border text-xs transition-all placeholder:text-slate-400 font-sans resize-vertical focus:outline-none focus:ring-2 ${
               errors.detailedDesc 
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/20'
+                : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/15 bg-slate-50/30 focus:bg-white'
             }`}
-            placeholder="Describe the opportunity context, tech requirements, potential deal size, or project timeline..." 
+            placeholder="Describe the lead context, tech requirements, potential deal size, or project timeline..." 
             value={detailedDesc}
             onChange={(e) => setDetailedDesc(e.target.value)}
           />
@@ -255,34 +264,37 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
 
         {/* Contact Details Toggle */}
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <label className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider">
             Do you have direct contact details for this lead?
           </label>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <button 
               type="button" 
               onClick={() => setHasContact(true)}
-              className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs border text-center transition-all cursor-pointer ${
+              className={`py-3 px-4 rounded-xl font-bold text-xs border text-center transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 hasContact === true 
-                  ? 'border-brand-navy bg-brand-navy text-white shadow-sm' 
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'border-brand-navy bg-brand-navy text-white shadow-md' 
+                  : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
               }`}
             >
-              Yes
+              <span>✓</span>
+              <span>Yes, I have contact info</span>
             </button>
             <button 
               type="button" 
               onClick={() => {
                 setHasContact(false);
                 setContactPhone('');
+                setContactEmail('');
               }}
-              className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs border text-center transition-all cursor-pointer ${
+              className={`py-3 px-4 rounded-xl font-bold text-xs border text-center transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 hasContact === false 
-                  ? 'border-brand-navy bg-brand-navy text-white shadow-sm' 
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'border-brand-navy bg-brand-navy text-white shadow-md' 
+                  : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
               }`}
             >
-              No
+              <span>✕</span>
+              <span>No contact info yet</span>
             </button>
           </div>
           {errors.hasContact && <span className="text-[10px] text-red-600 font-bold mt-1">⚠️ {errors.hasContact}</span>}
@@ -294,16 +306,16 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
             
             {/* Phone Number Field */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                 Client Contact Phone Number
               </label>
               <div className="relative">
                 <input 
                   type="text" 
-                  className={`w-full pl-10 pr-3.5 py-2.5 rounded-lg border text-xs transition-all focus:outline-none focus:ring-1 ${
+                  className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border text-xs transition-all focus:outline-none focus:ring-2 ${
                     errors.contactPhone 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                      : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/20'
+                      : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/15'
                   }`}
                   placeholder="+91 XXXXX XXXXX" 
                   value={contactPhone}
@@ -316,16 +328,16 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
 
             {/* Email Address Field */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                 Client Contact Email Address
               </label>
               <div className="relative">
                 <input 
                   type="text" 
-                  className={`w-full pl-10 pr-3.5 py-2.5 rounded-lg border text-xs transition-all focus:outline-none focus:ring-1 ${
+                  className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border text-xs transition-all focus:outline-none focus:ring-2 ${
                     errors.contactEmail 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                      : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/20'
+                      : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/15'
                   }`}
                   placeholder="client.contact@domain.com" 
                   value={contactEmail}
@@ -340,18 +352,18 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
         )}
 
         {/* Bottom Bar */}
-        <div className="flex flex-wrap gap-4 items-center justify-between border-t border-slate-100 pt-5">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold">
-            <Sparkles size={14} className="text-brand-navy" />
-            <span>✦ Policy note: Acknowledgment within 7 working days.</span>
+        <div className="flex flex-wrap gap-4 items-center justify-between border-t border-slate-100 pt-5 mt-2">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <Sparkles size={14} className="text-brand-navy shrink-0" />
+            <span>SLA Target: Acknowledgment & Reviewer Validation within 2 working days.</span>
           </div>
 
           <button 
             type="submit" 
-            className="bg-brand-red hover:bg-[#a10e20] text-white border-none font-bold text-xs px-6 py-3 rounded-lg flex items-center gap-2 cursor-pointer transition-all shadow-sm"
+            className="bg-brand-red hover:bg-[#a10e20] text-white border-none font-black text-xs px-7 py-3.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
           >
-            <Send size={13} />
-            Submit Opportunity
+            <Send size={14} />
+            <span>Submit Lead for Review</span>
           </button>
         </div>
 
@@ -441,7 +453,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
               </div>
               <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
                 <span className="text-slate-400 font-bold uppercase text-[10px]">Current Stage:</span>
-                <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">Stage 1: Opportunity Registered (10%)</span>
+                <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">Stage 1: Lead Registered (10%)</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-400 font-bold uppercase text-[10px]">SLA Target:</span>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Submission, EmailLog, Employee } from '../types.ts';
-import { triggerMailer, formatDateTime } from '../utils.ts';
+import { triggerMailer, formatDateTime, API_BASE_URL } from '../utils.ts';
 import { 
   Eye, CheckCircle2, XCircle, AlertTriangle, Clock, Building, Landmark, RefreshCcw, 
   User, Database, Mail, ArrowRight, Shield, MessageSquare, Search, Download, Loader2,
@@ -11,9 +11,9 @@ import { ROLE_MAP } from '../types.ts';
 
 // Steps for the Lead Lifecycle Tracker
 const LIFECYCLE_STEPS = [
-  "Opportunity Registered",
-  "Accepted",
   "Lead Registered",
+  "Accepted",
+  "Lead Registered in CRM",
   "Accepted ", // Space to ensure uniqueness
   "Proposal",
   "Negotiation",
@@ -100,7 +100,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 
     try {
       const token = sessionStorage.getItem('impact_token');
-      const res = await fetch(`http://localhost:5000/api/submissions/${rewardSub.intelligenceId}/reward`, {
+      const res = await fetch(`${API_BASE_URL}/api/submissions/${rewardSub.intelligenceId}/reward`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -198,7 +198,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         { header: 'Impact ID', dataKey: 'intelligenceId' },
         { header: 'Employee', dataKey: 'employeeName' },
         { header: 'Client Name', dataKey: 'clientName' },
-        { header: 'Opportunity Title', dataKey: 'shortDesc' },
+        { header: 'Lead Title', dataKey: 'shortDesc' },
         { header: 'Submitted Date', dataKey: 'createdAt' }
       ], 'Pending_Reviews');
       setIsDownloadingPendingPDF(false);
@@ -242,7 +242,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         { header: 'Impact ID', dataKey: 'intelligenceId' },
         { header: 'Employee', dataKey: 'employeeName' },
         { header: 'Client', dataKey: 'clientName' },
-        { header: 'Opportunity Title', dataKey: 'shortDesc' },
+        { header: 'Lead Title', dataKey: 'shortDesc' },
         { header: 'Current CRM Stage', dataKey: 'status' },
         { header: 'CRM Lead ID', dataKey: 'crmLeadId' },
         { header: 'Reward Status', dataKey: 'reward' }
@@ -770,7 +770,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                     <th className="px-3.5 py-3.5 rounded-tl-xl">Impact ID</th>
                     <th className="px-3 py-3.5">Employee Name</th>
                     <th className="px-3 py-3.5">Client Name</th>
-                    <th className="px-3 py-3.5">Opportunity Title</th>
+                    <th className="px-3 py-3.5">Lead Title</th>
                     <th className="px-3 py-3.5">Submitted Date</th>
                     <th className="px-3 py-3.5">Review Timeline</th>
                     <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Action</th>
@@ -895,7 +895,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                     <th className="px-3.5 py-3.5 rounded-tl-xl">Impact ID</th>
                     <th className="px-3 py-3.5">Employee Name</th>
                     <th className="px-3 py-3.5">Client Name</th>
-                    <th className="px-3 py-3.5">Opportunity Title</th>
+                    <th className="px-3 py-3.5">Lead Title</th>
                     <th className="px-3 py-3.5">Current CRM Stage</th>
                     <th className="px-3.5 py-3.5 rounded-tr-xl text-right">Action</th>
                   </tr>
@@ -1328,7 +1328,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                   </div>
 
                   <div className="flex flex-col gap-1 md:col-span-2">
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Opportunity Title</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Lead Title</span>
                     <p className="text-xs text-slate-600 font-semibold italic">"{selectedSub.shortDesc}"</p>
                   </div>
 

@@ -7,9 +7,9 @@ import cityBg from '../assets/city_bg.jpg';
 
 // Steps for the Lead Lifecycle Tracker
 const LIFECYCLE_STEPS = [
-  "Opportunity Registered",
-  "Accepted",
   "Lead Registered",
+  "Accepted",
+  "Lead Registered in CRM",
   "Accepted ", // Space to ensure uniqueness if needed
   "Proposal",
   "Negotiation",
@@ -53,7 +53,7 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
 const isOverdue = (createdAtStr: string, status: string): boolean => {
   if (status !== 'Opportunity Registered') return false;
   const createdDate = new Date(createdAtStr);
-  const currentDate = new Date("2026-07-01T12:19:57+05:30"); // Base baseline time
+  const currentDate = new Date(); // Real-time dynamic current date
 
   let count = 0;
   const tempDate = new Date(createdDate.getTime());
@@ -642,7 +642,7 @@ export function HomeView({
                 value={selectedSubId || ''}
                 onChange={(e) => setSelectedSubId(e.target.value)}
               >
-                <option value="" disabled>Select an opportunity to track...</option>
+                <option value="" disabled>Select a lead to track...</option>
                 {mySubmissions.map(sub => (
                   <option key={sub.intelligenceId} value={sub.intelligenceId}>
                     {sub.intelligenceId} — {sub.clientName}
@@ -833,7 +833,7 @@ export function HomeView({
           })()
         ) : (
           <div className="text-center py-12 text-slate-400 text-xs font-bold border border-dashed border-gray-200 rounded-xl bg-slate-50/50">
-            Select an opportunity from the dropdown above to view its lifecycle.
+            Select a lead from the dropdown above to view its lifecycle.
           </div>
         )}
       </div>
@@ -846,7 +846,7 @@ export function HomeView({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <h3 className="text-sm font-extrabold text-brand-navy tracking-widest uppercase flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-              OPPORTUNITY REQUESTS
+              LEAD REQUESTS
             </h3>
 
             <div className="flex items-center gap-3">
@@ -906,7 +906,7 @@ export function HomeView({
               <tr className="bg-brand-red text-white font-extrabold uppercase tracking-wider text-[11px] whitespace-nowrap">
                 <th className="px-3.5 py-3.5 rounded-tl-xl">Impact ID</th>
                 <th className="px-3 py-3.5">Client Name</th>
-                <th className="px-3 py-3.5">Opportunity Title</th>
+                <th className="px-3 py-3.5">Lead Title</th>
                 <th className="px-3 py-3.5">Status</th>
                 <th className="px-3 py-3.5">Sales System Sync</th>
                 <th className="px-3 py-3.5">Submitted Date</th>
@@ -1099,7 +1099,7 @@ export function HomeView({
             {/* Sticky Header */}
             <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
               <div>
-                <h2 className="text-lg font-extrabold text-brand-navy tracking-tight">Opportunity Request Details</h2>
+                <h2 className="text-lg font-extrabold text-brand-navy tracking-tight">Lead Request Details</h2>
                 <p className="text-xs text-slate-400 mt-0.5 font-semibold">
                   {currentSelectedSub.intelligenceId} — {currentSelectedSub.clientName}
                 </p>
@@ -1123,7 +1123,7 @@ export function HomeView({
                 if (isUnderReview) {
                   if (isSubOverdue) {
                     const createdDate = new Date(currentSelectedSub.createdAt);
-                    const currentDate = new Date("2026-07-01T12:19:57+05:30");
+                    const currentDate = new Date();
                     const diffTime = Math.max(0, currentDate.getTime() - createdDate.getTime());
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                     return (
@@ -1170,7 +1170,7 @@ export function HomeView({
                   </div>
 
                   <div className="flex flex-col gap-1 md:col-span-2">
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Opportunity Title</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Lead Title</span>
                     <p className="text-xs text-slate-600 font-semibold italic">"{currentSelectedSub.shortDesc}"</p>
                   </div>
 

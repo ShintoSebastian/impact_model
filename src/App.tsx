@@ -13,6 +13,7 @@ import { EmployeePortal } from './components/EmployeePortal.tsx';
 import { StakeholderDashboard } from './components/StakeholderDashboard.tsx';
 import { EmailSimulator } from './components/EmailSimulator.tsx';
 import { DbViewer } from './components/DbViewer.tsx';
+import { API_BASE_URL } from './utils.ts';
 
 // Re-export useAuth for any component that imported it from App.tsx
 export { useAuth } from './context/AuthContext.tsx';
@@ -105,11 +106,11 @@ function AppContent() {
     const loadBackendData = async () => {
       try {
         const [subRes, reviewSubRes, reviewCountRes, notifRes, emailRes] = await Promise.all([
-          fetchWithAuth('http://localhost:5000/api/submissions'),
-          fetchWithAuth('http://localhost:5000/api/submissions?mode=review'),
-          fetchWithAuth('http://localhost:5000/api/submissions/review-count'),
-          fetchWithAuth('http://localhost:5000/api/notifications'),
-          fetchWithAuth('http://localhost:5000/api/email-logs')
+          fetchWithAuth(`${API_BASE_URL}/api/submissions`),
+          fetchWithAuth(`${API_BASE_URL}/api/submissions?mode=review`),
+          fetchWithAuth(`${API_BASE_URL}/api/submissions/review-count`),
+          fetchWithAuth(`${API_BASE_URL}/api/notifications`),
+          fetchWithAuth(`${API_BASE_URL}/api/email-logs`)
         ]);
 
         if (subRes.ok) {
@@ -133,7 +134,7 @@ function AppContent() {
           setEmailLogs(emails);
         }
       } catch (err) {
-        console.error('Failed to retrieve data from database server:', err);
+        console.error('Error fetching data from server:', err);
       }
     };
 
@@ -142,7 +143,7 @@ function AppContent() {
 
   const addSubmission = async (sub: Submission): Promise<boolean> => {
     try {
-      const res = await fetchWithAuth('http://localhost:5000/api/submissions', {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/submissions`, {
         method: 'POST',
         body: JSON.stringify(sub)
       });
@@ -152,9 +153,9 @@ function AppContent() {
 
         // Refresh notifications, review submissions, and review counts
         const [notifRes, reviewSubRes, reviewCountRes] = await Promise.all([
-          fetchWithAuth('http://localhost:5000/api/notifications'),
-          fetchWithAuth('http://localhost:5000/api/submissions?mode=review'),
-          fetchWithAuth('http://localhost:5000/api/submissions/review-count')
+          fetchWithAuth(`${API_BASE_URL}/api/notifications`),
+          fetchWithAuth(`${API_BASE_URL}/api/submissions?mode=review`),
+          fetchWithAuth(`${API_BASE_URL}/api/submissions/review-count`)
         ]);
         if (notifRes.ok) {
           const notifs = await notifRes.json();
@@ -191,7 +192,7 @@ function AppContent() {
 
   const updateSubmission = async (id: string, updatedFields: Partial<Submission>, changedBy?: string) => {
     try {
-      const res = await fetchWithAuth(`http://localhost:5000/api/submissions/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/submissions/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ ...updatedFields, changedBy })
       });
@@ -201,7 +202,7 @@ function AppContent() {
         setReviewSubmissions(prev => prev.map(sub => sub.intelligenceId === id ? updated : sub));
 
         // Refresh notifications
-        const notifRes = await fetchWithAuth('http://localhost:5000/api/notifications');
+        const notifRes = await fetchWithAuth(`${API_BASE_URL}/api/notifications`);
         if (notifRes.ok) {
           const notifs = await notifRes.json();
           setNotifications(notifs);
@@ -215,13 +216,13 @@ function AppContent() {
   const logEmails = async (newEmails: EmailLog[]) => {
     try {
       for (const email of newEmails) {
-        await fetchWithAuth('http://localhost:5000/api/email-logs', {
+        await fetchWithAuth(`${API_BASE_URL}/api/email-logs`, {
           method: 'POST',
           body: JSON.stringify(email)
         });
       }
       
-      const emailRes = await fetchWithAuth('http://localhost:5000/api/email-logs');
+      const emailRes = await fetchWithAuth(`${API_BASE_URL}/api/email-logs`);
       if (emailRes.ok) {
         const data = await emailRes.json();
         setEmailLogs(data);

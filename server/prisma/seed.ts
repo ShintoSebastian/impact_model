@@ -4,68 +4,6 @@ const prisma = new PrismaClient();
 
 const MOCK_EMPLOYEES = [
   {
-    employeeId: "ND-10042",
-    name: "Shinto Sebastian",
-    email: "shinto.s@nestdigital.com",
-    businessUnit: "Digital Transformation Unit (DTU)",
-    reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-    projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
-    designation: "Tech Lead",
-    role: "employee"
-  },
-  {
-    employeeId: "ND-10085",
-    name: "Elena Rostova",
-    email: "elena.r@nestdigital.com",
-    businessUnit: "AI & Cognitive Computing",
-    reportingManager: "Sarah Chen (sarah.c@nestdigital.com)",
-    projectManager: "Alex Wong (alex.w@nestdigital.com)",
-    buHead: "David Miller (david.m@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
-    role: "employee"
-  },
-  {
-    employeeId: "ND-10112",
-    name: "John Doe",
-    email: "john.doe@nestdigital.com",
-    businessUnit: "IoT & Embedded Systems",
-    reportingManager: "Robert Frost (robert.f@nestdigital.com)",
-    projectManager: "Alice Smith (alice.s@nestdigital.com)",
-    buHead: "David Miller (david.m@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
-    role: "employee"
-  },
-  {
-    employeeId: "ND-10254",
-    name: "Maya Iyer",
-    email: "maya.i@nestdigital.com",
-    businessUnit: "Cloud Engineering Services",
-    reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-    projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
-    role: "employee"
-  },
-  {
-    employeeId: "ND-10088",
-    name: "Nest Employee",
-    email: "employees@nestdigital.com",
-    businessUnit: "Digital Transformation Unit (DTU)",
-    reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-    projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
-    designation: "Senior Consultant",
-    role: "employee"
-  },
-  {
     employeeId: "ND-20001",
     name: "Arun Kumar (Delivery Head)",
     email: "arun.kumar@nestdigital.com",

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Submission, Employee } from '../types.ts';
 import { Database, Users, ListFilter, RotateCcw } from 'lucide-react';
+import { API_BASE_URL } from '../utils.ts';
 
 interface DbViewerProps {
   submissions: Submission[];
@@ -14,7 +15,7 @@ export const DbViewer: React.FC<DbViewerProps> = ({ submissions, resetDb }) => {
     const fetchEmployees = async () => {
       const token = sessionStorage.getItem('impact_token');
       try {
-        const res = await fetch('http://localhost:5000/api/employees', {
+        const res = await fetch(`${API_BASE_URL}/api/employees`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

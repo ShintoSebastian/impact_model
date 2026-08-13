@@ -502,28 +502,12 @@ app.post('/api/auth/login', async (req, res) => {
       }
     }
 
-    // STEP 2: If corporate API didn't return data (or API is offline), check local system DB
+    // STEP 2: Strict HRMS API Security Check
+    // If corporate API is configured and returned no data (user not found in HRMS), DENY ACCESS IMMEDIATELY!
     if (!employee) {
-      employee = await prisma.employee.findFirst({
-        where: {
-          OR: [
-            { email: normalizedEmail },
-            { email: { startsWith: normalizedInput + '@' } },
-            { employeeId: loginInput }
-          ]
-        }
-      });
-      if (employee) {
-        console.log(`[Login] 📂 Using verified local DB record for: ${employee.name} (${employee.email})`);
-      }
-    }
-
-    // STEP 3: STRICT SECURITY ENFORCEMENT
-    // If employee is NOT found in Corporate HRMS API AND NOT found in system DB: DENY ACCESS!
-    if (!employee) {
-      console.warn(`[Login Security Alert] ⛔ Access Denied: Unauthorized login attempt for "${loginInput}". User not found in HRMS directory or system DB.`);
+      console.warn(`[Login Security Alert] ⛔ Access Denied: Unauthorized login attempt for "${loginInput}". Employee not found in corporate HRMS directory.`);
       return res.status(401).json({
-        error: 'Access Denied: You are not authorized to log into the IMPACT Portal. Your account was not found in the HRMS directory or system database.'
+        error: `Access Denied: Account "${loginInput}" is not registered in the Corporate HRMS directory.`
       });
     }
 
