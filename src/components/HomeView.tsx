@@ -23,8 +23,7 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
 
   // Map current status to the stepper index (0-6)
   let currentStageIndex = -1;
-  if (status === 'Clarification Requested') currentStageIndex = 0; // maintain stage 0 as active
-  else if (status === 'Opportunity Registered') currentStageIndex = 0;
+  if (status === 'Opportunity Registered' || status === 'Clarification Requested' || status === 'Under Review') currentStageIndex = 0;
   else if (status === 'Closed - Not Valid') currentStageIndex = 1; // Failed at "Accepted" (Review)
   else if (status === 'Validated') currentStageIndex = 2; // Reviewer validated & registered as lead
   else if (status === 'Lead Registered') currentStageIndex = 2;
@@ -656,13 +655,13 @@ export function HomeView({
               {(() => {
                 const sub = mySubmissions.find(s => s.intelligenceId === selectedSubId);
                 if (!sub) return '0%';
-                if (sub.status.startsWith('Closed')) return '100% Complete';
+                if (sub.status.startsWith('Closed') || sub.status === 'Deal Lost' || sub.status === 'Lead Dropped' || sub.status === 'Lead Rejected') return '100% Complete';
                 if (sub.status === 'Negotiation') return '85% Complete';
                 if (sub.status === 'Proposal') return '70% Complete';
                 if (sub.status === 'Lead Accepted') return '55% Complete';
                 if (sub.status === 'Lead Registered') return '40% Complete';
                 if (sub.status === 'Validated') return '25% Complete';
-                if (sub.status === 'Opportunity Registered') return '10% Complete';
+                if (sub.status === 'Opportunity Registered' || sub.status === 'Clarification Requested' || sub.status === 'Under Review') return '10% Complete';
                 return '0% Complete';
               })()}
             </span>
@@ -1329,7 +1328,13 @@ export function HomeView({
               {/* SECTION 5 — Clarification / Rejection / Review Info Section */}
               {(() => {
                 const status = currentSelectedSub.status as string;
-                const reviewerName = currentSelectedSub.reportingManager || "Reviewer";
+                let reviewerName = currentSelectedSub.reportingManager || "Reviewer";
+                if (currentSelectedSub.statusHistory && currentSelectedSub.statusHistory.length > 0) {
+                  const matchingHistory = [...currentSelectedSub.statusHistory].reverse().find(h => h.status === status);
+                  if (matchingHistory && matchingHistory.changedBy && matchingHistory.changedBy !== 'System') {
+                    reviewerName = matchingHistory.changedBy;
+                  }
+                }
                 const updateDate = currentSelectedSub.updatedAt ? new Date(currentSelectedSub.updatedAt).toLocaleDateString([], { day: 'numeric', month: 'numeric', year: 'numeric' }) : 'N/A';
 
                 if (status === 'Clarification Requested' || status === 'More Info Needed') {
@@ -1344,8 +1349,26 @@ export function HomeView({
                         </span>
                       </div>
 
-                      <div className="text-xs text-slate-700 italic bg-white p-3 rounded-lg border border-yellow-200/65 leading-relaxed">
-                        Message from <span className="font-bold text-slate-800">{reviewerName}</span>: "{currentSelectedSub.reason || 'Please provide more details regarding client contacts and budget.'}"
+                      <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                        {currentSelectedSub.statusHistory && currentSelectedSub.statusHistory.filter(h => h.status === 'Clarification Requested' || h.status === 'Under Review').length > 0 ? (
+                          currentSelectedSub.statusHistory
+                            .filter(h => h.status === 'Clarification Requested' || h.status === 'Under Review')
+                            .map((h, i) => (
+                              <div key={i} className={`text-xs italic bg-white p-2.5 rounded-lg border leading-relaxed ${h.status === 'Clarification Requested' ? 'text-slate-700 border-yellow-200/65' : 'text-brand-navy border-blue-200/65'}`}>
+                                <div className="font-bold text-[9px] uppercase mb-1 flex justify-between items-center not-italic">
+                                  <span className={h.status === 'Clarification Requested' ? 'text-yellow-700' : 'text-blue-700'}>
+                                    {h.status === 'Clarification Requested' ? `Reviewer (${h.changedBy})` : `You (${h.changedBy})`}
+                                  </span>
+                                  <span className="text-slate-400 font-mono text-[9px] lowercase">{new Date(h.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                </div>
+                                "{h.comment || (h.status === 'Clarification Requested' ? currentSelectedSub.reason : currentSelectedSub.clarificationResponse || 'Response recorded.')}"
+                              </div>
+                            ))
+                        ) : (
+                          <div className="text-xs text-slate-700 italic bg-white p-3 rounded-lg border border-yellow-200/65 leading-relaxed">
+                            Message from <span className="font-bold text-slate-800">{reviewerName}</span>: "{currentSelectedSub.reason || 'Please provide more details regarding client contacts and budget.'}"
+                          </div>
+                        )}
                       </div>
 
                       <form onSubmit={(e) => { e.preventDefault(); handleSendReply(currentSelectedSub); }} className="flex flex-col gap-3">
@@ -1484,9 +1507,9 @@ export function HomeView({
                           <span className="text-slate-400 font-semibold text-[11px]">
                             by {hist.changedBy} ({role})
                           </span>
-                          {hist.comment && (
-                            <div className="mt-1 bg-white p-2.5 rounded border border-slate-200/40 text-[10.5px] text-slate-500 italic max-w-md">
-                              "{hist.comment}"
+                          {(hist.comment || (hist.status === 'Under Review' && currentSelectedSub.clarificationResponse)) && (
+                            <div className="mt-1 bg-white p-2.5 rounded border border-slate-200/40 text-[10.5px] text-slate-500 italic max-w-md whitespace-pre-wrap">
+                              "{hist.comment || currentSelectedSub.clarificationResponse}"
                             </div>
                           )}
                         </div>

@@ -1124,7 +1124,7 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
           create: {
             status,
             changedBy,
-            comment: reason || undefined,
+            comment: reason || clarificationResponse || undefined,
             ...(providedDate && { timestamp: providedDate })
           }
         } : undefined

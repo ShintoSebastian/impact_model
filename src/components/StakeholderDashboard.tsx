@@ -26,8 +26,7 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   const isFailed = status === 'Closed - Not Valid' || status === 'Deal Lost' || status === 'Lead Dropped' || status === 'Lead Rejected';
 
   let currentStageIndex = -1;
-  if (status === 'Clarification Requested') currentStageIndex = 0;
-  else if (status === 'Opportunity Registered') currentStageIndex = 0;
+  if (status === 'Opportunity Registered' || status === 'Clarification Requested' || status === 'Under Review') currentStageIndex = 0;
   else if (status === 'Closed - Not Valid') currentStageIndex = 1;
   else if (status === 'Validated') currentStageIndex = 2; // Reviewer validated & registered as lead
   else if (status === 'Lead Registered') currentStageIndex = 2;
@@ -307,8 +306,8 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   };
 
   // Dynamic Metrics calculations
-  const pendingSubmissions = submissions.filter(s => s.status === 'Opportunity Registered' || s.status === 'Clarification Requested');
-  const reviewedSubmissions = submissions.filter(s => s.status !== 'Opportunity Registered' && s.status !== 'Clarification Requested');
+  const pendingSubmissions = submissions.filter(s => s.status === 'Opportunity Registered' || s.status === 'Clarification Requested' || s.status === 'Under Review');
+  const reviewedSubmissions = submissions.filter(s => s.status !== 'Opportunity Registered' && s.status !== 'Clarification Requested' && s.status !== 'Under Review');
 
   const pendingCount = pendingSubmissions.length;
   const validatedCount = reviewedSubmissions.filter(s => s.status === 'Validated' || s.status.startsWith('Lead') || s.status === 'Opportunity Registered' || s.status === 'Proposal' || s.status === 'Negotiation' || s.status === 'Deal Won').length;
@@ -1363,31 +1362,53 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
               </div>
 
               {/* Clarification Thread (Visible if there was a clarification) */}
-              {(selectedSub.reason || selectedSub.clarificationResponse) && (
+              {(selectedSub.reason || selectedSub.clarificationResponse || (selectedSub.statusHistory && selectedSub.statusHistory.filter(h => h.status === 'Clarification Requested' || h.status === 'Under Review').length > 0)) && (
                 <div className="bg-blue-50/20 border border-blue-200 rounded-xl p-4 flex flex-col gap-3">
                   <h4 className="text-[10px] font-bold text-brand-navy tracking-wider uppercase border-b border-blue-100 pb-2">
                     💬 Clarification Thread
                   </h4>
-                  {selectedSub.reason && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Your Request</span>
-                      <p className="text-xs text-slate-700 italic bg-white p-2.5 rounded-lg border border-blue-100">
-                        "{selectedSub.reason}"
-                      </p>
-                    </div>
-                  )}
-                  {selectedSub.clarificationResponse ? (
-                    <div className="flex flex-col gap-1 mt-1">
-                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Employee Response</span>
-                      <p className="text-xs text-brand-navy font-semibold bg-white p-2.5 rounded-lg border border-blue-100 whitespace-pre-wrap">
-                        {selectedSub.clarificationResponse}
-                      </p>
-                    </div>
-                  ) : selectedSub.status === 'Clarification Requested' ? (
-                    <div className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg border border-amber-100 text-center">
-                      ⏳ Waiting for employee to respond...
-                    </div>
-                  ) : null}
+                  <div className="flex flex-col gap-3 max-h-64 overflow-y-auto pr-1">
+                    {selectedSub.statusHistory && selectedSub.statusHistory.filter(h => h.status === 'Clarification Requested' || h.status === 'Under Review').length > 0 ? (
+                      selectedSub.statusHistory
+                        .filter(h => h.status === 'Clarification Requested' || h.status === 'Under Review')
+                        .map((h, i) => (
+                          <div key={i} className="flex flex-col gap-1">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex justify-between">
+                              <span>{h.status === 'Clarification Requested' ? `Your Request (${h.changedBy})` : `Employee Response (${h.changedBy})`}</span>
+                              <span className="font-mono lowercase">{new Date(h.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            </span>
+                            <p className={`text-xs p-2.5 rounded-lg border ${h.status === 'Clarification Requested' ? 'text-slate-700 italic bg-white border-blue-100' : 'text-brand-navy font-semibold bg-white border-blue-200/65 whitespace-pre-wrap'}`}>
+                              "{h.comment || (h.status === 'Clarification Requested' ? selectedSub.reason : selectedSub.clarificationResponse)}"
+                            </p>
+                          </div>
+                        ))
+                    ) : (
+                      <>
+                        {selectedSub.reason && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Your Request</span>
+                            <p className="text-xs text-slate-700 italic bg-white p-2.5 rounded-lg border border-blue-100">
+                              "{selectedSub.reason}"
+                            </p>
+                          </div>
+                        )}
+                        {selectedSub.clarificationResponse && (
+                          <div className="flex flex-col gap-1 mt-1">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Employee Response</span>
+                            <p className="text-xs text-brand-navy font-semibold bg-white p-2.5 rounded-lg border border-blue-100 whitespace-pre-wrap">
+                              {selectedSub.clarificationResponse}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {selectedSub.status === 'Clarification Requested' && (
+                      <div className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg border border-amber-100 text-center mt-2">
+                        ⏳ Waiting for employee to respond...
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1448,7 +1469,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
               )}
 
               {/* Section 4 — Decision Section */}
-              {selectedSub.status === 'Opportunity Registered' || selectedSub.status === 'Clarification Requested' ? (
+              {selectedSub.status === 'Opportunity Registered' || selectedSub.status === 'Clarification Requested' || selectedSub.status === 'Under Review' ? (
                 <div className="border-t border-slate-100 pt-5 flex flex-col gap-4">
                   <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
                     YOUR DECISION
