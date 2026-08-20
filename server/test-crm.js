@@ -2,7 +2,7 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 async function testCrmWebhook() {
-  const url = 'http://localhost:5000/api/crm/webhook';
+  const url = 'http://localhost:7000/api/crm/webhook';
   
   // Test advancing lead IM-20260804-001 to Proposal
   const webhookPayload = {
