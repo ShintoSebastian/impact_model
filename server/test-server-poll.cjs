@@ -7,7 +7,7 @@ async function triggerServerPoll() {
   console.log(`========================================\n`);
 
   try {
-    const res = await fetch('http://localhost:5000/api/test-crm-status-api');
+    const res = await fetch('http://localhost:7000/api/test-crm-status-api');
     console.log(`HTTP Status: ${res.status} ${res.statusText}`);
     const data = await res.json();
     console.log(`Response success: ${data.success}`);

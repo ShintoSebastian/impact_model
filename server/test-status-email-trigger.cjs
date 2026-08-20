@@ -15,9 +15,9 @@ async function testEmailTriggerOnStatusChange() {
   });
   console.log(`Reset IM-20260810-001 status back to "Lead Registered" for test...`);
 
-  // 2. Trigger server-side poller by calling http://localhost:5000/api/test-crm-status-api
+  // 2. Trigger server-side poller by calling http://localhost:7000/api/test-crm-status-api
   console.log(`Calling server polling endpoint...`);
-  const res = await fetch('http://localhost:5000/api/test-crm-status-api');
+  const res = await fetch('http://localhost:7000/api/test-crm-status-api');
   console.log(`Server endpoint status: ${res.status}`);
 
   // Wait 1 second for async email logging to finish

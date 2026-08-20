@@ -9,7 +9,7 @@ dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 7000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
 const CORPORATE_API_URL = process.env.CORPORATE_API_URL || '';
 
@@ -122,7 +122,7 @@ const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
 
 // ----------------------------------------------------
 // DIAGNOSTIC ENDPOINT (No Auth Required — for debugging corporate API)
-// Usage: GET http://localhost:5000/api/test-corporate-api/jayasankar.j@nestgroup.net
+// Usage: GET http://localhost:7000/api/test-corporate-api/jayasankar.j@nestgroup.net
 // ----------------------------------------------------
 app.get('/api/test-corporate-api/:email', async (req, res) => {
   const email = req.params.email;
@@ -195,7 +195,7 @@ app.get('/api/test-corporate-api/:email', async (req, res) => {
 
 // ----------------------------------------------------
 // DIAGNOSTIC ENDPOINT FOR CRM API (No Auth Required)
-// Usage: GET http://localhost:5000/api/test-crm-api
+// Usage: GET http://localhost:7000/api/test-crm-api
 // ----------------------------------------------------
 app.get('/api/test-crm-api', async (req, res) => {
   const crmUrl = process.env.CRM_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities';
@@ -285,7 +285,7 @@ app.get('/api/test-crm-api', async (req, res) => {
 
 // ----------------------------------------------------
 // DIAGNOSTIC ENDPOINT FOR CRM STATUS API (No Auth Required)
-// Usage: GET http://localhost:5000/api/test-crm-status-api
+// Usage: GET http://localhost:7000/api/test-crm-status-api
 // ----------------------------------------------------
 app.get('/api/test-crm-status-api', async (req, res) => {
   const statusApiUrl = process.env.CRM_STATUS_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities/status-changes';
