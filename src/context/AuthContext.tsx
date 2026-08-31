@@ -13,10 +13,12 @@ interface AuthContextType {
   setConnectingMsg: (msg: string) => void;
   showSandbox: boolean;
   setShowSandbox: (val: boolean) => void;
-  executeSsoFlow: (username: string) => void;
+  executeSsoFlow: (username: string, password?: string) => void;
   handleLogout: () => void;
   loginUsername: string;
   setLoginUsername: (username: string) => void;
+  loginPassword: string;
+  setLoginPassword: (password: string) => void;
   loginError: string;
   setLoginError: (err: string) => void;
 }
@@ -44,26 +46,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [connectingMsg, setConnectingMsg] = useState('');
   const [showSandbox, setShowSandbox] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
   const navigate = useNavigate();
 
-  const executeSsoFlow = async (username: string) => {
+  const executeLogin = async (username: string, password?: string) => {
     setIsConnecting(true);
-    setConnectingMsg('Authenticating with Microsoft Entra ID...');
+    setConnectingMsg('Authenticating...');
     
-    // Simulate SSO loading screen delays for premium UX
-    await new Promise(resolve => setTimeout(resolve, 600));
-    setConnectingMsg('Verifying HRMS mapping...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setConnectingMsg('Provisioning secure session...');
-    await new Promise(resolve => setTimeout(resolve, 600));
-
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
+        body: JSON.stringify({ username, password })
       });
       
       if (!res.ok) {
@@ -99,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       loggedInUser, isConnecting, setIsConnecting, connectingMsg, setConnectingMsg,
-      showSandbox, setShowSandbox, executeSsoFlow, handleLogout, loginUsername, setLoginUsername, loginError, setLoginError
+      showSandbox, setShowSandbox, executeSsoFlow: executeLogin, handleLogout, loginUsername, setLoginUsername, loginPassword, setLoginPassword, loginError, setLoginError
     }}>
       {children}
     </AuthContext.Provider>

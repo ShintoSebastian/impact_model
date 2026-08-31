@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import https from 'https';
+import { authenticate } from 'ldap-authentication';
 
 dotenv.config();
 
@@ -396,16 +397,65 @@ async function generateIntelligenceId(): Promise<string> {
 }
 
 // ----------------------------------------------------
+// LDAP AUTHENTICATION
+// ----------------------------------------------------
+async function authLdap(username: string, userPassword?: string) {
+  if (!userPassword) return false;
+  
+  let cleanUsername = username;
+  let bindDn = username;
+
+  if (username.includes('\\')) {
+    cleanUsername = username.split('\\')[1];
+  } else if (username.includes('@')) {
+    cleanUsername = username.split('@')[0];
+  } else {
+    // If just "username" is typed, try formatting as userPrincipalName
+    bindDn = `${username}@nestgroup.net`;
+  }
+
+  try {
+    let options = {
+      ldapOpts: {
+        url: 'ldap://10.15.0.25:389',
+      },
+      adminDn: bindDn,
+      adminPassword: userPassword,
+      userPassword: userPassword,
+      userSearchBase: 'DC=chn,DC=nestgroup,DC=net',
+      usernameAttribute: 'sAMAccountName',
+      username: cleanUsername,
+    };
+
+    let user = await authenticate(options);
+    return { success: true };
+  } catch (err: any) {
+    console.warn(`[LDAP Auth] Failed for user ${username}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// ----------------------------------------------------
 // AUTH ENDPOINTS
 // ----------------------------------------------------
 
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
-  const { email, username } = req.body;
+  const { email, username, password } = req.body;
   
   const loginInput = username || email;
   if (!loginInput) {
     return res.status(400).json({ error: 'Username is required' });
+  }
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required' });
+  }
+
+  // Perform LDAP Authentication First
+  const ldapResult = await authLdap(loginInput, password);
+  
+  if (!ldapResult.success) {
+    return res.status(401).json({ error: `LDAP Error: ${ldapResult.error || 'Invalid credentials'}` });
   }
 
   const normalizedInput = loginInput.toLowerCase().trim();
