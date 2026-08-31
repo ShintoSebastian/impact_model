@@ -346,7 +346,7 @@ export function DashboardLayout({
               <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex flex-col gap-1.5 text-amber-900">
                 <span className="text-[10px] font-extrabold tracking-wider uppercase block">⚠️ SLA Compliance Policy</span>
                 <p className="text-[11px] leading-normal font-medium">
-                  Reviewers have <strong>2 working days</strong> from submission to acknowledge and validate your lead. Any item exceeding this shows a <span className="text-brand-red font-bold">⚠️ Overdue</span> SLA warning badge.
+                  Reviewers have <strong>7 working days</strong> from submission to acknowledge and validate your lead. Any item exceeding this shows a <span className="text-brand-red font-bold">⚠️ Overdue</span> SLA warning badge.
                 </p>
               </div>
 

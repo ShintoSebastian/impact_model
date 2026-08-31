@@ -354,8 +354,8 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
         {/* Bottom Bar */}
         <div className="flex flex-wrap gap-4 items-center justify-between border-t border-slate-100 pt-5 mt-2">
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-            <Sparkles size={14} className="text-brand-navy shrink-0" />
-            <span>SLA Target: Acknowledgment & Reviewer Validation within 2 working days.</span>
+
+            <span>SLA Target: Acknowledgment & Reviewer Validation within 7 working days.</span>
           </div>
 
           <button 
@@ -457,7 +457,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-400 font-bold uppercase text-[10px]">SLA Target:</span>
-                <span className="font-bold text-amber-700">2 Working Days for Validation</span>
+                <span className="font-bold text-amber-700">7 Working Days for Validation</span>
               </div>
             </div>
 
