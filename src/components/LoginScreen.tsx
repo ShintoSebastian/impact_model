@@ -10,6 +10,7 @@ export function LoginScreen() {
   const {
     isConnecting, connectingMsg,
     executeSsoFlow, loginUsername, setLoginUsername,
+    loginPassword, setLoginPassword,
     loginError, setLoginError
   } = useAuth();
 
@@ -21,9 +22,13 @@ export function LoginScreen() {
       setLoginError('Please enter your corporate username.');
       return;
     }
+    if (!loginPassword) {
+      setLoginError('Please enter your password.');
+      return;
+    }
 
     setLoginError('');
-    executeSsoFlow(username);
+    executeSsoFlow(username, loginPassword);
   };
 
   return (
@@ -58,7 +63,7 @@ export function LoginScreen() {
         ) : (
           <form onSubmit={handleLogin} className="flex flex-col flex-grow">
             <h3 className="text-lg font-extrabold text-slate-800 mb-1">Sign in</h3>
-            <p className="text-slate-400 text-xs mb-5 font-semibold">Verify identity via SSO</p>
+            <p className="text-slate-400 text-xs mb-5 font-semibold">Verify identity via Corporate Directory</p>
 
             <div className="flex flex-col gap-1.5 mb-6">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Username</label>
@@ -75,6 +80,18 @@ export function LoginScreen() {
               )}
             </div>
 
+            <div className="flex flex-col gap-1.5 mb-6">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Password</label>
+              <input
+                type="password"
+                className="w-full border-b border-slate-300 focus:border-brand-navy outline-none py-2 text-xs transition-all bg-transparent"
+                placeholder="••••••••"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+              />
+            </div>
+
             <div className="flex flex-col gap-4 mt-auto">
               <button 
                 type="submit" 
@@ -89,7 +106,7 @@ export function LoginScreen() {
 
         {/* Footer */}
         <div className="text-center text-[10px] text-slate-400 font-semibold mt-6 pt-3 border-t border-slate-50">
-          🔒 Secured by Microsoft Entra ID Single Sign-On
+          🔒 Secured by Corporate Active Directory
         </div>
 
       </div>
