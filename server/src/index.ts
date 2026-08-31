@@ -400,7 +400,9 @@ async function generateIntelligenceId(): Promise<string> {
 // LDAP AUTHENTICATION
 // ----------------------------------------------------
 async function authLdap(username: string, userPassword?: string) {
-  if (!userPassword) return false;
+  if (!userPassword) {
+    return { success: false, error: 'Password is required' };
+  }
   
   let cleanUsername = username;
   let bindDn = username;
