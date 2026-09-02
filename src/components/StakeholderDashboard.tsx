@@ -1162,10 +1162,36 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                       }
 
                       const stepDate = (() => {
-                        if (!selectedSub.createdAt) return '';
-                        const baseDate = new Date(selectedSub.createdAt);
-                        baseDate.setDate(baseDate.getDate() + idx);
-                        return baseDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                        const status = getStepStatus(selectedSub, idx);
+                        if (status === 'future') return '';
+                        
+                        if (idx === 0 && selectedSub.createdAt) {
+                          return new Date(selectedSub.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                        }
+                        
+                        if (selectedSub.statusHistory && selectedSub.statusHistory.length > 0) {
+                          const historyEntry = selectedSub.statusHistory.find(h => {
+                            let stageIdx = -1;
+                            const hs = h.status;
+                            if (hs === 'Closed - Not Valid') stageIdx = 1;
+                            else if (hs === 'Validated' || hs === 'Lead Registered') stageIdx = 2;
+                            else if (hs === 'Lead Accepted' || hs === 'Lead Rejected') stageIdx = 3;
+                            else if (hs === 'Proposal' || hs === 'Lead Dropped') stageIdx = 4;
+                            else if (hs === 'Negotiation') stageIdx = 5;
+                            else if (hs === 'Deal Won' || hs === 'Deal Lost') stageIdx = 6;
+                            
+                            return stageIdx >= idx;
+                          });
+                          
+                          if (historyEntry && historyEntry.timestamp) {
+                            return new Date(historyEntry.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                          }
+                        }
+                        
+                        if (selectedSub.updatedAt) {
+                           return new Date(selectedSub.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                        }
+                        return '';
                       })();
 
                       return (
