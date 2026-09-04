@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Submission, Employee, EmailLog } from '../types.ts';
 import { ROLE_MAP } from '../types.ts';
-import { Database, RefreshCcw, ShieldCheck, Shield, Sparkles, Mail, PhoneCall, Clock, Download, Loader2, ClipboardList, Check, Target, FileText, Handshake, Trophy, ChevronDown, ChevronUp, User, Briefcase, BarChart3, Users, UserCheck, Contact } from 'lucide-react';
+import { Database, RefreshCcw, ShieldCheck, Shield, Sparkles, Mail, PhoneCall, Clock, Download, Loader2, ClipboardList, Check, Target, FileText, Handshake, Trophy, ChevronDown, ChevronUp, User, Briefcase, BarChart3, Users, UserCheck, Contact, Globe } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import cityBg from '../assets/city_bg.jpg';
 
@@ -133,6 +133,10 @@ export function HomeView({
       const formattedData = mySubmissions.map(sub => ({
         'Impact ID': sub.intelligenceId,
         'Client Name': sub.clientName,
+        'Contact Person': sub.contactPerson || 'N/A',
+        'Company Website': sub.companyWebsite || 'N/A',
+        'Contact Phone': sub.contactPhone || 'N/A',
+        'Contact Email': sub.contactEmail || 'N/A',
         'Opportunity Title': sub.shortDesc,
         'Detailed Description': sub.detailedDesc,
         'Current CRM Stage': sub.status,
@@ -151,6 +155,10 @@ export function HomeView({
       const formattedData = mySubmissions.map(sub => ({
         intelligenceId: sub.intelligenceId,
         clientName: sub.clientName,
+        contactPerson: sub.contactPerson || 'N/A',
+        companyWebsite: sub.companyWebsite || 'N/A',
+        contactPhone: sub.contactPhone || 'N/A',
+        contactEmail: sub.contactEmail || 'N/A',
         shortDesc: sub.shortDesc,
         status: sub.status,
         crmLeadId: sub.crmLeadId || 'N/A',
@@ -159,6 +167,10 @@ export function HomeView({
       exportToPDF(formattedData, [
         { header: 'Impact ID', dataKey: 'intelligenceId' },
         { header: 'Client Name', dataKey: 'clientName' },
+        { header: 'Contact Person', dataKey: 'contactPerson' },
+        { header: 'Website', dataKey: 'companyWebsite' },
+        { header: 'Phone', dataKey: 'contactPhone' },
+        { header: 'Email', dataKey: 'contactEmail' },
         { header: 'Opportunity Title', dataKey: 'shortDesc' },
         { header: 'Current CRM Stage', dataKey: 'status' },
         { header: 'CRM Lead ID', dataKey: 'crmLeadId' },
@@ -274,7 +286,7 @@ export function HomeView({
   const convertedTotal = rawMySubmissions.filter(s => s.status === 'Deal Won').length;
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const currentSelectedSub = mySubmissions.find(s => s.intelligenceId === selectedSubId) || null;
+  const currentSelectedSub = mySubmissions.find(s => s.intelligenceId === selectedSubId) || submissions.find(s => s.intelligenceId === selectedSubId) || null;
 
   const reportingMgr = parseManagerInfo(loggedInUser.reportingManager);
   const projectMgr = parseManagerInfo(loggedInUser.projectManager);
@@ -1184,16 +1196,41 @@ export function HomeView({
                   <div className="flex flex-col gap-1 md:col-span-2">
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Contact Details</span>
                     {currentSelectedSub.hasContact ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-white border border-slate-200/40 p-3 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 bg-white border border-slate-200/40 p-3 rounded-lg">
+                        {currentSelectedSub.contactPerson && (
+                          <div className="flex items-center gap-2">
+                            <User size={14} className="text-slate-400 shrink-0" />
+                            <div className="flex flex-col">
+                              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Contact Person</span>
+                              <span className="text-slate-700 font-bold text-xs">{currentSelectedSub.contactPerson}</span>
+                            </div>
+                          </div>
+                        )}
+                        {currentSelectedSub.companyWebsite && (
+                          <div className="flex items-center gap-2">
+                            <Globe size={14} className="text-slate-400 shrink-0" />
+                            <div className="flex flex-col">
+                              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Company Website</span>
+                              <a 
+                                href={currentSelectedSub.companyWebsite.startsWith('http') ? currentSelectedSub.companyWebsite : `https://${currentSelectedSub.companyWebsite}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 hover:underline font-bold text-xs truncate max-w-[180px]"
+                              >
+                                {currentSelectedSub.companyWebsite}
+                              </a>
+                            </div>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
-                          <PhoneCall size={14} className="text-slate-400" />
+                          <PhoneCall size={14} className="text-slate-400 shrink-0" />
                           <div className="flex flex-col">
                             <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Phone</span>
                             <span className="text-slate-700 font-mono font-bold">{currentSelectedSub.contactPhone || 'N/A'}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Mail size={14} className="text-slate-400" />
+                          <Mail size={14} className="text-slate-400 shrink-0" />
                           <div className="flex flex-col">
                             <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Email</span>
                             <span className="text-slate-700 font-mono font-bold">{currentSelectedSub.contactEmail || 'N/A'}</span>

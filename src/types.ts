@@ -30,6 +30,8 @@ export interface Submission {
   shortDesc: string;
   detailedDesc: string;
   hasContact: boolean;
+  contactPerson?: string;
+  companyWebsite?: string;
   contactPhone?: string;
   contactEmail?: string;
   clientName: string;
@@ -55,10 +57,14 @@ export interface Submission {
 export interface EmailLog {
   id: string;
   recipient: string;
+  cc?: string;
   subject: string;
   body: string;
   timestamp: string;
-  type: 'employee' | 'stakeholder';
+  type: string;
+  impactId?: string;
+  status?: string;
+  errorMessage?: string;
 }
 
 

@@ -19,7 +19,7 @@ export const exportToPDF = (data: any[], columns: { header: string, dataKey: str
     head: [columns.map(col => col.header)],
     body: rows,
     theme: 'grid',
-    styles: { fontSize: 8 },
+    styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak' },
     headStyles: { fillColor: [10, 17, 40] } // Brand navy
   });
   

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { EmailLog } from '../types.ts';
 import { Mail, User, Clock, Search, Filter, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -7,6 +8,7 @@ interface EmailSimulatorProps {
 }
 
 export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,21 +52,85 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
   const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
 
-  // Determines badge style based on email subject
-  const getBadgeStyle = (subject: string) => {
-    if (subject.includes('Validated') || subject.includes('Approved')) {
+  // Determines badge style based on email type or subject
+  const getBadgeStyle = (log: EmailLog) => {
+    if (log.type === 'Reviewer Mailer' || log.subject.includes('Action Required: Review Opportunity')) {
+      return { label: 'Reviewer Mailer', bg: 'bg-indigo-500/10 text-indigo-600 border-indigo-200', icon: ShieldCheck };
+    }
+    if (log.type === 'Submitter Mailer' || log.subject.includes('[IMPACT] Opportunity Update')) {
+      return { label: 'Submitter Mailer', bg: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', icon: CheckCircle2 };
+    }
+    if (log.subject.includes('Validated') || log.subject.includes('Approved')) {
       return { label: 'Validated & CRM Synced', bg: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', icon: ShieldCheck };
     }
-    if (subject.includes('Progress') || subject.includes('Moved')) {
+    if (log.subject.includes('Progress') || log.subject.includes('Moved')) {
       return { label: 'CRM Stage Progression', bg: 'bg-blue-500/10 text-blue-600 border-blue-200', icon: ArrowRight };
     }
-    if (subject.includes('Closed') || subject.includes('Rejected')) {
+    if (log.subject.includes('Closed') || log.subject.includes('Rejected')) {
       return { label: 'Lead Closed', bg: 'bg-rose-500/10 text-rose-600 border-rose-200', icon: AlertCircle };
     }
-    if (subject.includes('Clarification') || subject.includes('Needed')) {
+    if (log.subject.includes('Clarification') || log.subject.includes('Needed')) {
       return { label: 'Clarification Needed', bg: 'bg-amber-500/10 text-amber-600 border-amber-200', icon: AlertCircle };
     }
-    return { label: 'Submission Receipt', bg: 'bg-slate-500/10 text-slate-600 border-slate-200', icon: CheckCircle2 };
+    return { label: log.type || 'Notification', bg: 'bg-slate-500/10 text-slate-600 border-slate-200', icon: CheckCircle2 };
+  };
+
+  // Determines delivery status badge styling
+  const getDeliveryBadge = (status?: string) => {
+    const s = (status || '').toUpperCase();
+    if (s === 'SENT_TO_SMTP') {
+      return { label: 'Sent to SMTP Relay', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle2 };
+    }
+    if (s === 'DELIVERED') {
+      return { label: 'Delivered', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle2 };
+    }
+    if (s === 'FAILED') {
+      return { label: 'Relay Failed', bg: 'bg-rose-100 text-rose-800 border-rose-200', icon: AlertCircle };
+    }
+    if (s.includes('SIMULATED')) {
+      return { label: 'Queued (Simulated)', bg: 'bg-sky-100 text-sky-800 border-sky-200', icon: Clock };
+    }
+    if (s === 'QUEUED') {
+      return { label: 'Queued', bg: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock };
+    }
+    return { label: status || 'Queued', bg: 'bg-slate-100 text-slate-700 border-slate-200', icon: Clock };
+  };
+
+  // Helper to render text with clickable URLs that open the exact lead
+  const renderBodyWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        let relativePath: string | null = null;
+        let targetHref = part;
+
+        try {
+          const parsed = new URL(part);
+          if (parsed.pathname.startsWith('/status/') || parsed.pathname.startsWith('/review/')) {
+            relativePath = parsed.pathname;
+            targetHref = `${window.location.origin}${parsed.pathname}`;
+          }
+        } catch {}
+
+        return (
+          <a
+            key={index}
+            href={targetHref}
+            onClick={(e) => {
+              if (relativePath) {
+                e.preventDefault();
+                navigate(relativePath);
+              }
+            }}
+            className="text-blue-600 hover:text-blue-800 underline font-semibold break-all cursor-pointer inline-flex items-center gap-1"
+          >
+            <span>{targetHref}</span>
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   return (
@@ -86,7 +152,7 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
           <input 
             type="text"
             className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-brand-navy placeholder:text-slate-400 font-medium"
-            placeholder="Search by recipient email, subject, or Intelligence ID..."
+            placeholder="Search by recipient email, CC, subject, or Impact ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -100,6 +166,8 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
             onChange={(e) => setFilterType(e.target.value)}
           >
             <option value="All">All Email Types</option>
+            <option value="Reviewer Mailer">Reviewer Mailer</option>
+            <option value="Submitter Mailer">Submitter Mailer</option>
             <option value="Lead Submitted">Submission Receipts</option>
             <option value="Validated">Validated & Approved</option>
             <option value="Status Changed">CRM Stage Updates</option>
@@ -144,8 +212,11 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
             </div>
           ) : (
             paginatedLogs.map(log => {
-              const badge = getBadgeStyle(log.subject);
+              const badge = getBadgeStyle(log);
+              const delivery = getDeliveryBadge(log.status);
               const BadgeIcon = badge.icon;
+              const DeliveryIcon = delivery.icon;
+              const impactId = log.impactId || (log.subject.match(/IM-\d+-\d+/)?.[0]);
 
               return (
                 <div 
@@ -159,6 +230,11 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                         <BadgeIcon size={12} />
                         {badge.label}
                       </span>
+                      {impactId && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 font-mono">
+                          {impactId}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -167,17 +243,27 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                         <span>{new Date(log.timestamp).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                       </div>
                       
-                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                        <CheckCircle2 size={11} /> Delivered
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border flex items-center gap-1 ${delivery.bg}`}>
+                        <DeliveryIcon size={11} /> {delivery.label}
                       </span>
                     </div>
                   </div>
 
-                  {/* Recipient Row */}
-                  <div className="flex items-center gap-2 text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200/80">
-                    <User size={14} className="text-slate-400 flex-shrink-0" />
-                    <span className="font-bold text-slate-500">To:</span>
-                    <span className="font-extrabold text-slate-800 break-all">{log.recipient}</span>
+                  {/* Recipient & CC Rows */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200/80">
+                      <User size={14} className="text-slate-400 flex-shrink-0" />
+                      <span className="font-bold text-slate-500 w-8">To:</span>
+                      <span className="font-extrabold text-slate-800 break-all">{log.recipient}</span>
+                    </div>
+
+                    {log.cc && (
+                      <div className="flex items-center gap-2 text-xs text-slate-600 bg-white/80 p-2.5 rounded-lg border border-slate-200/60">
+                        <User size={14} className="text-slate-400 flex-shrink-0" />
+                        <span className="font-bold text-slate-500 w-8">CC:</span>
+                        <span className="font-medium text-slate-600 break-all">{log.cc}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Subject Line */}
@@ -185,9 +271,20 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                     {log.subject}
                   </div>
 
+                  {/* SMTP Error Notice if Failed */}
+                  {log.errorMessage && (
+                    <div className="flex items-start gap-2.5 text-xs bg-rose-50 border border-rose-200 rounded-lg p-3 text-rose-800">
+                      <AlertCircle size={15} className="text-rose-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-[11px] text-rose-900 uppercase tracking-wide">SMTP Relay Diagnostic Notice:</span>
+                        <span className="text-xs font-mono text-rose-700 break-all">{log.errorMessage}</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Email Body Card */}
                   <div className="bg-white border border-slate-200/80 rounded-xl p-4 text-xs text-slate-700 font-medium whitespace-pre-wrap leading-relaxed shadow-inner">
-                    {log.body}
+                    {renderBodyWithLinks(log.body)}
                   </div>
                 </div>
               );

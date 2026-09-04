@@ -76,7 +76,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setConnectingMsg('');
       setLoginError('');
 
-      navigate('/home');
+      // Check if user was trying to access a deep link before redirecting to login
+      const pendingRedirect = sessionStorage.getItem('impact_redirect_after_login');
+      if (pendingRedirect) {
+        sessionStorage.removeItem('impact_redirect_after_login');
+        navigate(pendingRedirect);
+      } else {
+        navigate('/home');
+      }
     } catch (err: any) {
       console.error('SSO Flow Error:', err);
       setIsConnecting(false);

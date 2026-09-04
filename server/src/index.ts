@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import https from 'https';
+import nodemailer from 'nodemailer';
 import { authenticate } from 'ldap-authentication';
 
 dotenv.config();
@@ -749,97 +750,718 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
   }
 });
 // ----------------------------------------------------
-// EMAIL TRIGGER & NOTIFICATION AUTOMATION HELPERS
+// PRODUCTION-HARDENED SMTP & NOTIFICATION AUTOMATION
+// Approved Corporate Relay: 10.45.0.12:25 (Unauthenticated internal corporate relay)
+// Approved Sender: peopleexperience@nestgroup.net / NeST People Experience Team
+// Target Production Base URL: http://10.15.0.191:8081
 // ----------------------------------------------------
-function extractEmails(fieldValues: string[]): string[] {
-  const emails: string[] = [];
-  fieldValues.forEach(val => {
-    if (!val || val === 'None' || val === 'Not Specified') return;
-    // Extract email from within parenthesis if it matches "Name (email@domain.com)"
-    const match = val.match(/\(([^)]+)\)/);
-    if (match && match[1]) {
-      emails.push(match[1].trim());
-    } else if (val.includes('@')) {
-      emails.push(val.trim());
+const SMTP_HOST = process.env.SMTP_HOST || '10.45.0.12';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '25', 10);
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
+const SENDER_EMAIL = process.env.SMTP_FROM || process.env.SMTP_SENDER_EMAIL || 'peopleexperience@nestgroup.net';
+const SENDER_NAME = process.env.SMTP_FROM_NAME || process.env.SMTP_SENDER_NAME || 'NeST People Experience Team';
+const DEFAULT_REVIEWER_EMAIL = process.env.DEFAULT_REVIEWER_EMAIL || 'peopleexperience@nestgroup.net';
+const EMAIL_SEND_ENABLED = process.env.EMAIL_SEND_ENABLED === 'true';
+const IMPACT_BASE_URL = (process.env.IMPACT_BASE_URL || 'http://10.15.0.191:8081').replace(/\/+$/, '');
+
+console.log(`[SMTP Config] Relay: ${SMTP_HOST}:${SMTP_PORT}, From: "${SENDER_NAME}" <${SENDER_EMAIL}>, Live Send Enabled: ${EMAIL_SEND_ENABLED}, Base URL: ${IMPACT_BASE_URL}`);
+
+// Centralized Nodemailer Transporter for corporate unauthenticated relay on port 25
+const smtpTransporter = nodemailer.createTransport({
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_SECURE,
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000
+});
+
+// Non-blocking transporter connection verification on startup
+if (EMAIL_SEND_ENABLED) {
+  smtpTransporter.verify((error) => {
+    if (error) {
+      console.warn(`[SMTP Health Check] ⚠️ SMTP relay verification failed (${SMTP_HOST}:${SMTP_PORT}): ${error.message}`);
+    } else {
+      console.log(`[SMTP Health Check] ✅ SMTP relay is reachable and ready at ${SMTP_HOST}:${SMTP_PORT}`);
     }
   });
-  return emails;
+} else {
+  console.log(`[SMTP Health Check] ℹ️ Live email dispatch is disabled (EMAIL_SEND_ENABLED=false). Notifications are recorded in Outbox as 'QUEUED (SIMULATED)'.`);
 }
 
-async function logEmailsForNewSubmission(submission: any, employee: any) {
-  const now = new Date();
-  
-  // 1. Acknowledgment Confirmation Email to Submitter (Employee)
-  await prisma.emailLog.create({
-    data: {
-      recipient: employee.email,
-      subject: `[IMPACT Confirmation] Opportunity Submission Received - ${submission.intelligenceId}`,
-      body: `Hi ${employee.name},\n\nWe have received your opportunity submission.\n\nDetails:\n- Intelligence ID: ${submission.intelligenceId}\n- Submitted On: ${now.toLocaleString()}\n- Client/Account: ${submission.clientName}\n- Short Description: ${submission.shortDesc}\n\nRequired Action: Acknowledgment within 2 working days.\n\nBest regards,\nIMPACT Portal Support`,
-      type: 'employee'
+// Deep link base URL resolver: prioritizes IMPACT_BASE_URL, with request origin fallback
+function resolveBaseUrl(req?: any): string {
+  if (process.env.IMPACT_BASE_URL && process.env.IMPACT_BASE_URL.trim()) {
+    return process.env.IMPACT_BASE_URL.trim().replace(/\/+$/, '');
+  }
+  if (req) {
+    const origin = req.get('origin') || (req.get('referer') ? new URL(req.get('referer')).origin : null);
+    if (origin) return origin.replace(/\/+$/, '');
+    const host = req.get('host');
+    if (host) {
+      return `${req.protocol}://${host}`.replace('7000', '5174').replace(/\/+$/, '');
+    }
+  }
+  return IMPACT_BASE_URL;
+}
+
+// Calculate SLA review due date: exactly 7 working days (skipping Saturday and Sunday)
+function calculateReviewDueDate(startDate: Date = new Date(), workingDays: number = 7): string {
+  const current = new Date(startDate);
+  let added = 0;
+  while (added < workingDays) {
+    current.setDate(current.getDate() + 1);
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) { // 0 = Sunday, 6 = Saturday
+      added++;
+    }
+  }
+  return current.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// Strict email format validation and extraction regex
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+function sanitizeEmail(val?: string | null): string | null {
+  if (!val || typeof val !== 'string') return null;
+  const trimmed = val.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none' || trimmed.toLowerCase() === 'not specified') return null;
+
+  // Extract from format "Name (email@domain.com)"
+  const match = trimmed.match(/\(([^)]+)\)/);
+  if (match && match[1]) {
+    const candidate = match[1].trim().toLowerCase();
+    return EMAIL_REGEX.test(candidate) ? candidate : null;
+  }
+
+  // Direct email match
+  const directMatch = trimmed.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (directMatch) {
+    const candidate = directMatch[0].trim().toLowerCase();
+    return EMAIL_REGEX.test(candidate) ? candidate : null;
+  }
+
+  return null;
+}
+
+function extractEmails(fieldValues: (string | null | undefined)[]): string[] {
+  const validEmails: string[] = [];
+  fieldValues.forEach(val => {
+    const cleaned = sanitizeEmail(val);
+    if (cleaned && !validEmails.includes(cleaned)) {
+      validEmails.push(cleaned);
+    }
+  });
+  return validEmails;
+}
+
+function extractSingleEmail(fieldValue?: string | null): string | null {
+  return sanitizeEmail(fieldValue);
+}
+
+// Resolve clean, deduplicated TO and CC recipient sets with zero overlap
+function resolveRecipients(
+  toCandidates: (string | null | undefined)[],
+  ccCandidates: (string | null | undefined)[],
+  defaultToEmail: string = DEFAULT_REVIEWER_EMAIL
+): { toList: string[]; ccList: string[] } {
+  const toSet = new Set<string>();
+  toCandidates.forEach(cand => {
+    const cleaned = sanitizeEmail(cand);
+    if (cleaned) toSet.add(cleaned);
+  });
+
+  if (toSet.size === 0 && defaultToEmail) {
+    const cleanedDefault = sanitizeEmail(defaultToEmail);
+    if (cleanedDefault) toSet.add(cleanedDefault);
+  }
+
+  const toList = Array.from(toSet);
+
+  const ccSet = new Set<string>();
+  ccCandidates.forEach(cand => {
+    const cleaned = sanitizeEmail(cand);
+    // Guarantee zero overlap between TO and CC
+    if (cleaned && !toSet.has(cleaned)) {
+      ccSet.add(cleaned);
     }
   });
 
-  // 2. Notification Email to all configured stakeholders
-  const stakeholderFields = [
-    submission.reportingManager,
-    submission.projectManager,
-    submission.buHead,
-    submission.hrbp,
-    submission.salesPerson
-  ];
-  
-  const recipientEmails = extractEmails(stakeholderFields);
-  if (recipientEmails.length > 0) {
-    await prisma.emailLog.create({
+  const ccList = Array.from(ccSet);
+  return { toList, ccList };
+}
+
+// Outlook / Microsoft 365 friendly Multi-Part HTML + Text builder for Reviewer Mailer
+function buildReviewerEmailContent(params: {
+  salutation: string;
+  submitterName: string;
+  empId: string;
+  bu: string;
+  impactId: string;
+  clientName: string;
+  leadTitle: string;
+  submissionDate: string;
+  reviewDueDate: string;
+  reviewLink: string;
+}): { html: string; text: string } {
+  const { salutation, submitterName, empId, bu, impactId, clientName, leadTitle, submissionDate, reviewDueDate, reviewLink } = params;
+
+  const text = `Dear ${salutation},
+
+A new opportunity has been submitted by ${submitterName}. Please use the link below to assess the opportunity, record your decision, and track its current status.
+
+Opportunity Details:
+• Impact ID: ${impactId}
+• Client: ${clientName}
+• Opportunity: ${leadTitle}
+• Submitted by: ${submitterName}, ${empId}, ${bu}
+• Submitted on: ${submissionDate}
+• Review due date: ${reviewDueDate}
+
+Review and update:
+${reviewLink}
+
+Regards,
+NeST People Experience Team`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Action Required: Review Opportunity</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px; border-bottom: 3px solid #008080;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <span style="display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #14b8a6; margin-bottom: 6px;">IMPACT Model Portal</span>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">Action Required: Review Opportunity</h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${salutation}</strong>,</p>
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                A new business opportunity has been submitted by <strong>${submitterName}</strong>. Please assess this submission, record your decision, and assign BU follow-up before the SLA review due date.
+              </p>
+
+              <!-- Opportunity Summary Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 28px;">
+                <tr>
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Opportunity Summary</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 16px 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="font-size: 13px; line-height: 1.5;">
+                      <tr>
+                        <td width="35%" style="color: #64748b; font-weight: 600; vertical-align: top;">Impact ID:</td>
+                        <td width="65%" style="color: #0f172a; font-weight: 700; font-family: monospace;">${impactId}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Client:</td>
+                        <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Opportunity Title:</td>
+                        <td style="color: #0f172a;">${leadTitle}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Submitted By:</td>
+                        <td style="color: #0f172a;">${submitterName} (${empId}, ${bu})</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Submitted On:</td>
+                        <td style="color: #0f172a;">${submissionDate}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Review Due Date:</td>
+                        <td style="color: #b91c1c; font-weight: 700;">${reviewDueDate} (7 Working Days)</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action CTA Button -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${reviewLink}" target="_blank" style="display: inline-block; background-color: #008080; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 128, 128, 0.2);">
+                      Assess &amp; Review Opportunity &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748b; text-align: center;">
+                If the button above does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 12px; color: #0284c7; text-align: center; word-break: break-all;">
+                <a href="${reviewLink}" style="color: #0284c7; text-decoration: underline;">${reviewLink}</a>
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+
+              <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #475569;">
+                Best regards,<br>
+                <strong style="color: #0f172a;">NeST People Experience Team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f1f5f9; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                This is an automated notification from the NeST IMPACT Opportunity Portal. Please do not reply directly to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { html, text };
+}
+
+// Outlook / Microsoft 365 friendly Multi-Part HTML + Text builder for Submitter Mailer
+function buildSubmitterEmailContent(params: {
+  submitterName: string;
+  impactId: string;
+  clientName: string;
+  leadTitle: string;
+  newStatus: string;
+  reason: string | null;
+  statusLink: string;
+}): { html: string; text: string } {
+  const { submitterName, impactId, clientName, leadTitle, newStatus, reason, statusLink } = params;
+
+  const trimmedReason = reason && reason.trim() ? reason.trim() : null;
+  const commentsBlock = trimmedReason ? `\n\nStatus Comments:\n"${trimmedReason}"\n` : '';
+
+  const text = `Dear ${submitterName},
+
+There is an important update on the opportunity you submitted through the IMPACT Model Portal.
+${commentsBlock}
+Current Status: ${newStatus}
+Impact ID: ${impactId}
+Client: ${clientName}
+Opportunity: ${leadTitle}
+
+Check status:
+${statusLink}
+
+Please use the link above to view the latest status and details of your submission.
+
+Regards,
+NeST People Experience Team`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opportunity Status Update</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px; border-bottom: 3px solid #008080;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <span style="display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #14b8a6; margin-bottom: 6px;">IMPACT Model Portal</span>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">Opportunity Status Update</h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${submitterName}</strong>,</p>
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                There is an update on the opportunity you submitted through the IMPACT Model Portal.
+              </p>
+
+              <!-- Status Badge Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Latest Stage Details</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 16px 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="font-size: 13px; line-height: 1.5;">
+                      <tr>
+                        <td width="35%" style="color: #64748b; font-weight: 600; vertical-align: top;">Impact ID:</td>
+                        <td width="65%" style="color: #0f172a; font-weight: 700; font-family: monospace;">${impactId}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Current Status:</td>
+                        <td style="color: #008080; font-weight: 800; font-size: 14px;">${newStatus}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Client:</td>
+                        <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Opportunity Title:</td>
+                        <td style="color: #0f172a;">${leadTitle}</td>
+                      </tr>
+                      ${trimmedReason ? `
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Review Comments:</td>
+                        <td style="color: #334155; background-color: #ffffff; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-style: italic;">
+                          &ldquo;${trimmedReason}&rdquo;
+                        </td>
+                      </tr>
+                      ` : ''}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action CTA Button -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${statusLink}" target="_blank" style="display: inline-block; background-color: #008080; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 128, 128, 0.2);">
+                      View Opportunity Details &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748b; text-align: center;">
+                If the button above does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 12px; color: #0284c7; text-align: center; word-break: break-all;">
+                <a href="${statusLink}" style="color: #0284c7; text-decoration: underline;">${statusLink}</a>
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+
+              <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #475569;">
+                Best regards,<br>
+                <strong style="color: #0f172a;">NeST People Experience Team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f1f5f9; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                This is an automated notification from the NeST IMPACT Opportunity Portal. Please do not reply directly to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { html, text };
+}
+
+// Robust Email Dispatcher:
+// - If EMAIL_SEND_ENABLED=false: records as 'QUEUED (SIMULATED)' in Prisma without network send.
+// - If EMAIL_SEND_ENABLED=true: attempts delivery via 10.45.0.12:25 with a 1-step retry.
+// - Updates Prisma EmailLog status to 'SENT_TO_SMTP' or 'FAILED' with diagnostic errorMessage.
+// - NEVER throws: caller remains completely protected against exceptions.
+async function dispatchRealEmail(
+  emailLogId: string,
+  options: { to: string; cc?: string | null; subject: string; text: string; html?: string }
+): Promise<{ success: boolean; messageId?: string; error?: string; simulated?: boolean }> {
+  if (!EMAIL_SEND_ENABLED) {
+    try {
+      await (prisma.emailLog as any).update({
+        where: { id: emailLogId },
+        data: {
+          status: 'QUEUED (SIMULATED)',
+          errorMessage: 'Network dispatch skipped (EMAIL_SEND_ENABLED=false)'
+        }
+      });
+      console.log(`[SMTP Dispatcher] ℹ️ EMAIL_SEND_ENABLED=false. Email #${emailLogId} logged as 'QUEUED (SIMULATED)'.`);
+    } catch (dbErr: any) {
+      console.warn(`[SMTP Dispatcher] ⚠️ Error updating EmailLog #${emailLogId}: ${dbErr.message}`);
+    }
+    return { success: true, simulated: true };
+  }
+
+  const mailOptions: any = {
+    from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`,
+    to: options.to,
+    subject: options.subject,
+    text: options.text,
+    ...(options.html ? { html: options.html } : {})
+  };
+
+  if (options.cc) {
+    mailOptions.cc = options.cc;
+  }
+
+  // Attempt 1 with 1-step retry
+  let lastError: any = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const info = await smtpTransporter.sendMail(mailOptions);
+      console.log(`[SMTP Dispatcher] ✉️ Real email sent via ${SMTP_HOST}:${SMTP_PORT}. Message ID: ${info.messageId}`);
+
+      await (prisma.emailLog as any).update({
+        where: { id: emailLogId },
+        data: {
+          status: 'SENT_TO_SMTP',
+          errorMessage: null
+        }
+      });
+
+      return { success: true, messageId: info.messageId };
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[SMTP Dispatcher] ⚠️ Attempt ${attempt}/2 failed via ${SMTP_HOST}:${SMTP_PORT}: ${err.message}`);
+      if (attempt < 2) {
+        // Wait 1 second before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+  // Record failure in EmailLog
+  const cleanErrMsg = lastError ? (lastError.message || String(lastError)).slice(0, 500) : 'Unknown delivery failure';
+  try {
+    await (prisma.emailLog as any).update({
+      where: { id: emailLogId },
       data: {
-        recipient: recipientEmails.join(', '),
-        subject: `[IMPACT Notification] New Opportunity Lead Submitted - ${submission.intelligenceId}`,
-        body: `Hi Stakeholders,\n\nA new opportunity submission has been registered by ${employee.name}.\n\nDetails:\n- Intelligence ID: ${submission.intelligenceId}\n- Client Name: ${submission.clientName}\n- Short Description: ${submission.shortDesc}\n- Business Unit: ${employee.businessUnit}\n\nPlease log in to the reviewer dashboard to take action.\n\nBest regards,\nIMPACT Portal Support`,
-        type: 'stakeholder'
+        status: 'FAILED',
+        errorMessage: cleanErrMsg
       }
     });
+  } catch (updateErr: any) {
+    console.warn(`[SMTP Dispatcher] ⚠️ Failed updating EmailLog #${emailLogId} with error: ${updateErr.message}`);
+  }
+
+  return { success: false, error: cleanErrMsg };
+}
+
+// 1. REVIEWER MAILER
+// Trigger: When a new opportunity is successfully submitted and requires reviewer action.
+// TO: RM, PM, BU Head, Sales Person of BU (deduplicated)
+// CC: HRBP (strictly non-overlapping)
+async function sendReviewerMailer(submission: any, employee: any, baseUrl?: string) {
+  try {
+    const impactId = submission.intelligenceId;
+    const resolvedUrl = baseUrl ? baseUrl.replace(/\/+$/, '') : IMPACT_BASE_URL;
+
+    // Duplicate protection: check if Reviewer Mailer was already created for this opportunity
+    const existing = await prisma.emailLog.findFirst({
+      where: {
+        impactId,
+        type: 'Reviewer Mailer'
+      }
+    });
+
+    if (existing) {
+      console.log(`[Reviewer Mailer] ⚠️ Duplicate mailer prevented for ${impactId}`);
+      return;
+    }
+
+    // Determine TO recipients: RM, PM, BU Head, Sales Person
+    const toCandidates = [
+      submission.reportingManager,
+      submission.projectManager,
+      submission.buHead,
+      submission.salesPerson
+    ];
+
+    // CC: HRBP
+    const ccCandidates = [submission.hrbp];
+
+    const { toList, ccList } = resolveRecipients(toCandidates, ccCandidates, DEFAULT_REVIEWER_EMAIL);
+
+    const submitterName = employee.name || 'NeST Colleague';
+    const clientName = submission.clientName || 'Valued Client';
+    const leadTitle = submission.shortDesc || 'Client Opportunity';
+    const empId = employee.employeeId || 'N/A';
+    const bu = employee.businessUnit || 'NeST Digital';
+
+    const subDateObj = submission.createdAt ? new Date(submission.createdAt) : new Date();
+    const submissionDate = subDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const reviewDueDate = calculateReviewDueDate(subDateObj, 7);
+
+    const reviewLink = `${resolvedUrl}/review/${impactId}`;
+
+    const rmRaw = submission.reportingManager || '';
+    const rmNameOnly = rmRaw.includes('(') ? rmRaw.split('(')[0].trim() : (rmRaw || 'Reviewer');
+    const reviewerSalutation = (rmNameOnly && rmNameOnly !== 'Not Specified') ? rmNameOnly : 'Review Team';
+
+    const subject = `Action Required: Review Opportunity | ${submitterName} | ${impactId} | ${clientName}`;
+
+    const { html, text } = buildReviewerEmailContent({
+      salutation: reviewerSalutation,
+      submitterName,
+      empId,
+      bu,
+      impactId,
+      clientName,
+      leadTitle,
+      submissionDate,
+      reviewDueDate,
+      reviewLink
+    });
+
+    // Create log with initial QUEUED status
+    const createdLog = await prisma.emailLog.create({
+      data: {
+        recipient: toList.join(', '),
+        cc: ccList.length > 0 ? ccList.join(', ') : null,
+        subject,
+        body: text,
+        type: 'Reviewer Mailer',
+        impactId,
+        status: 'QUEUED'
+      }
+    });
+
+    console.log(`[Reviewer Mailer] 📝 Queued for ${impactId} to: ${toList.join(', ')}`);
+
+    // Dispatch via SMTP relay
+    await dispatchRealEmail(createdLog.id, {
+      to: toList.join(', '),
+      cc: ccList.length > 0 ? ccList.join(', ') : null,
+      subject,
+      text,
+      html
+    });
+  } catch (err: any) {
+    console.error(`[Reviewer Mailer] ⚠️ Non-blocking error: ${err.message}`);
   }
 }
 
-async function logEmailsForStatusChange(submission: any, oldStatus: string, newStatus: string, reason: string | null, employee: any) {
-  const stakeholderFields = [
-    submission.reportingManager,
-    submission.projectManager,
-    submission.buHead,
-    submission.hrbp,
-    submission.salesPerson
-  ];
-  const recipientEmails = extractEmails(stakeholderFields);
-  
-  // Combine employee email and stakeholder emails to notify everyone
-  const allRecipients = [employee.email, ...recipientEmails].join(', ');
-  
-  let subject = `[IMPACT Notification] Stage Update - ${submission.intelligenceId}`;
-  let body = '';
-  
-  if (newStatus === 'Validated') {
-    subject = `[IMPACT Validated] Opportunity Approved - ${submission.intelligenceId}`;
-    body = `Hi All,\n\nOpportunity submission ${submission.intelligenceId} (${submission.clientName}) has been VALIDATED by the Reviewer.\n\nNext Step: This lead has been pushed to the CRM for Sales integration.\n\nBest regards,\nIMPACT Portal Support`;
-  } else if (newStatus === 'Closed - Not Valid' || newStatus === 'Deal Lost' || newStatus === 'Lead Dropped') {
-    subject = `[IMPACT Closure] Opportunity Closed/Rejected - ${submission.intelligenceId}`;
-    body = `Hi All,\n\nOpportunity submission ${submission.intelligenceId} (${submission.clientName}) has been closed.\n\nNew Status: ${newStatus}\nRejection / Closure Reason: "${reason || 'No specific reason provided.'}"\n\nBest regards,\nIMPACT Portal Support`;
-  } else if (newStatus === 'Clarification Requested' || newStatus === 'More Info Needed') {
-    subject = `[IMPACT Clarification] More Information Needed - ${submission.intelligenceId}`;
-    body = `Hi ${employee.name},\n\nClarification has been requested for your opportunity submission: ${submission.intelligenceId}.\n\nReviewer Message: "${reason || 'Please provide more details.'}"\n\nPlease submit your response directly through the portal page.\n\nBest regards,\nIMPACT Portal Support`;
-  } else {
-    // Stage updates (CRM Progression)
-    subject = `[IMPACT Progress] Stage Moved to ${newStatus} - ${submission.intelligenceId}`;
-    body = `Hi All,\n\nOpportunity submission ${submission.intelligenceId} (${submission.clientName}) has progressed to the CRM stage: "${newStatus}".\n\nBest regards,\nIMPACT Portal Support`;
-  }
+// 2. SUBMITTER MAILER
+// Trigger: Notify the employee who submitted an opportunity when there is a material status change.
+// Material changes: 'Validated', 'Closed - Not Valid', 'Deal Won', 'Deal Lost', 'Lead Dropped', 'Clarification Requested'
+// TO: Submitter employee email
+// CC: RM, PM, BU Head, HRBP, Sales Person (strictly non-overlapping with TO)
+async function sendSubmitterMailer(submission: any, newStatus: string, reason: string | null = null, employee: any, baseUrl?: string) {
+  try {
+    const impactId = submission.intelligenceId;
+    const resolvedUrl = baseUrl ? baseUrl.replace(/\/+$/, '') : IMPACT_BASE_URL;
 
-  await prisma.emailLog.create({
-    data: {
-      recipient: allRecipients,
-      subject,
-      body,
-      type: 'stakeholder'
+    // Material status filter
+    const materialStatuses = [
+      'Validated',
+      'Closed - Not Valid',
+      'Deal Won',
+      'Deal Lost',
+      'Lead Dropped',
+      'Clarification Requested'
+    ];
+
+    if (!materialStatuses.includes(newStatus)) {
+      console.log(`[Submitter Mailer] ℹ️ Skipping non-material status update: ${newStatus} for ${impactId}`);
+      return;
     }
-  });
+
+    // Duplicate protection: Check if Submitter Mailer was already created for this exact status transition
+    const existing = await prisma.emailLog.findFirst({
+      where: {
+        impactId,
+        type: 'Submitter Mailer',
+        subject: { contains: `| ${newStatus}` }
+      }
+    });
+
+    if (existing) {
+      console.log(`[Submitter Mailer] ⚠️ Duplicate mailer prevented for ${impactId} with status ${newStatus}`);
+      return;
+    }
+
+    const submitterEmail = employee.email;
+    const submitterName = employee.name || 'Colleague';
+    const clientName = submission.clientName || 'Valued Client';
+    const leadTitle = submission.shortDesc || 'Client Opportunity';
+
+    // CC candidates: RM, PM, BU Head, HRBP, Sales Person
+    const ccCandidates = [
+      submission.reportingManager,
+      submission.projectManager,
+      submission.buHead,
+      submission.hrbp,
+      submission.salesPerson
+    ];
+
+    const { toList, ccList } = resolveRecipients([submitterEmail], ccCandidates, submitterEmail);
+
+    const subject = `[IMPACT] Opportunity Update | ${impactId} | ${newStatus}`;
+    const statusLink = `${resolvedUrl}/status/${impactId}`;
+
+    const { html, text } = buildSubmitterEmailContent({
+      submitterName,
+      impactId,
+      clientName,
+      leadTitle,
+      newStatus,
+      reason,
+      statusLink
+    });
+
+    // Create log with initial QUEUED status
+    const createdLog = await prisma.emailLog.create({
+      data: {
+        recipient: toList.join(', '),
+        cc: ccList.length > 0 ? ccList.join(', ') : null,
+        subject,
+        body: text,
+        type: 'Submitter Mailer',
+        impactId,
+        status: 'QUEUED'
+      }
+    });
+
+    console.log(`[Submitter Mailer] 📝 Queued for ${impactId} (${newStatus}) to: ${toList.join(', ')}`);
+
+    // Dispatch via SMTP relay
+    await dispatchRealEmail(createdLog.id, {
+      to: toList.join(', '),
+      cc: ccList.length > 0 ? ccList.join(', ') : null,
+      subject,
+      text,
+      html
+    });
+  } catch (err: any) {
+    console.error(`[Submitter Mailer] ⚠️ Non-blocking error: ${err.message}`);
+  }
 }
 
 // ----------------------------------------------------
@@ -858,6 +1480,8 @@ async function pushLeadToCrm(submission: any, employee: any): Promise<string | n
     opportunityDescription: submission.detailedDesc,
     clientContact: {
       provided: !!submission.hasContact,
+      contactPerson: submission.contactPerson || null,
+      companyWebsite: submission.companyWebsite || null,
       email: submission.contactEmail || null,
       phone: submission.contactPhone || null
     },
@@ -1050,8 +1674,13 @@ async function pollCrmStatusUpdates() {
             };
           }
 
-          // Trigger email alerts and in-app notifications
-          await logEmailsForStatusChange(updatedSub, existingSub.status, impactStatus, record.remarks || null, emp);
+          // Trigger Submitter Mailer only for material updates (e.g., Deal Won, Deal Lost, Lead Dropped)
+          try {
+            const baseUrl = resolveBaseUrl();
+            await sendSubmitterMailer(updatedSub, impactStatus, record.remarks || null, emp, baseUrl);
+          } catch (mailerErr: any) {
+            console.error(`[CRM Background Poller] Non-blocking mailer failure: ${mailerErr.message}`);
+          }
             
             const stakeholderFields = [
               updatedSub.reportingManager,
@@ -1082,6 +1711,8 @@ app.post('/api/submissions', authenticateToken, async (req: any, res) => {
     shortDesc,
     detailedDesc,
     hasContact,
+    contactPerson,
+    companyWebsite,
     contactPhone,
     contactEmail,
     clientName,
@@ -1102,15 +1733,17 @@ app.post('/api/submissions', authenticateToken, async (req: any, res) => {
 
     const intelligenceId = await generateIntelligenceId();
 
-    const submission = await prisma.submission.create({
+    const submission = await (prisma.submission as any).create({
       data: {
         intelligenceId,
         employeeId,
         shortDesc,
         detailedDesc,
         hasContact: !!hasContact,
-        contactPhone,
-        contactEmail,
+        contactPerson: hasContact ? (contactPerson || null) : null,
+        companyWebsite: hasContact ? (companyWebsite || null) : null,
+        contactPhone: hasContact ? (contactPhone || null) : null,
+        contactEmail: hasContact ? (contactEmail || null) : null,
         clientName,
         status: 'Opportunity Registered',
         reportingManager: reportingManager || employee.reportingManager,
@@ -1151,8 +1784,13 @@ app.post('/api/submissions', authenticateToken, async (req: any, res) => {
       })
     ));
 
-    // Auto-trigger confirmation and stakeholder emails
-    await logEmailsForNewSubmission(submission, employee);
+    // Auto-trigger Reviewer Mailer upon submission (isolated non-blocking boundary)
+    try {
+      const baseUrl = resolveBaseUrl(req);
+      await sendReviewerMailer(submission, employee, baseUrl);
+    } catch (mailerErr: any) {
+      console.error(`[POST /api/submissions] Non-blocking mailer failure: ${mailerErr.message}`);
+    }
 
     res.status(201).json({
       ...submission,
@@ -1245,8 +1883,13 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
         })
       ));
 
-      // Auto-trigger corporate and stakeholder email logging
-      await logEmailsForStatusChange(updated, existing.status, status, reason || null, emp);
+      // Auto-trigger Submitter Mailer for material status change (isolated non-blocking boundary)
+      try {
+        const baseUrl = resolveBaseUrl(req);
+        await sendSubmitterMailer(updated, status, reason || null, emp, baseUrl);
+      } catch (mailerErr: any) {
+        console.error(`[PATCH /api/submissions/:id] Non-blocking mailer failure: ${mailerErr.message}`);
+      }
 
       // Auto-push lead to live CRM API (port 8089) when validated
       if (status === 'Validated' && (!updated.crmLeadId || updated.crmLeadId.startsWith('CRM-LEAD-'))) {
@@ -1382,10 +2025,23 @@ app.post('/api/notifications/read', authenticateToken, async (req: any, res) => 
 // GET /api/email-logs
 app.get('/api/email-logs', authenticateToken, async (req: any, res) => {
   try {
+    const userEmail = req.user?.email || '';
+    const userRole = req.user?.role || '';
+
+    // If reviewer/admin, show all outbox email logs for governance
+    // Otherwise show logs where user is in TO or CC
+    let whereClause: any = {};
+    if (userRole !== 'reviewer' && userRole !== 'admin') {
+      whereClause = {
+        OR: [
+          { recipient: { contains: userEmail } },
+          { cc: { contains: userEmail } }
+        ]
+      };
+    }
+
     const logs = await prisma.emailLog.findMany({
-      where: {
-        recipient: { contains: req.user.email }
-      },
+      where: whereClause,
       orderBy: { timestamp: 'desc' }
     });
     res.json(logs);
@@ -1441,6 +2097,8 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         shortDesc: "bdsjbj",
         detailedDesc: "Detailed intelligence regarding MRF retail expansion lead.",
         hasContact: true,
+        contactPerson: "Rajiv Sharma (Head of Procurement)",
+        companyWebsite: "https://www.mrftyres.com",
         contactPhone: "+91 9447012345",
         contactEmail: "contact@mrf.com",
         clientName: "MRF",
@@ -1475,6 +2133,8 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         shortDesc: "Enterprise Cloud Migration",
         detailedDesc: "Legacy on-premise ERP application migration to Azure Cloud.",
         hasContact: true,
+        contactPerson: "Sarah Jenkins (VP Supply Chain)",
+        companyWebsite: "https://www.apexretail.com",
         contactPhone: "+91 9995551212",
         contactEmail: "procurement@apexretail.com",
         clientName: "Apex Retail Solutions",
@@ -1494,6 +2154,8 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         shortDesc: "Enterprise Cloud Migration Opportunity",
         detailedDesc: "The client is planning to migrate their legacy on-premise ERP application to Azure Cloud. They require assistance with migration planning, execution, and subsequent managed services support.",
         hasContact: true,
+        contactPerson: "David Miller (IT Director)",
+        companyWebsite: "https://www.apexretail.com",
         contactPhone: "+91 9876543210",
         contactEmail: "it.buyer@apexretail.com",
         clientName: "Apex Retail Solutions Inc.",
@@ -1512,6 +2174,8 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         shortDesc: "Telemedicine Platform Upgrade",
         detailedDesc: "Upgrading client's legacy telemedicine backend to support high-throughput WebRTC streams and HIPAA-compliant database encryption standards.",
         hasContact: true,
+        contactPerson: "Dr. Evelyn Reed (Chief Medical Officer)",
+        companyWebsite: "https://www.vanguardhealth.org",
         contactPhone: "+91 9998887776",
         contactEmail: "partner@vanguardhealth.org",
         clientName: "Vanguard Health Systems",
