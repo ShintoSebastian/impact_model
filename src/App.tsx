@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import type { Submission, EmailLog, Employee } from './types.ts';
 
 // Context
@@ -19,7 +19,7 @@ import { API_BASE_URL } from './utils.ts';
 export { useAuth } from './context/AuthContext.tsx';
 
 // ----------------------------------------------------
-// ROUTE GUARDS
+// ROUTE GUARDS & DEEP LINK WRAPPERS
 // ----------------------------------------------------
 
 // Protected Route component redirecting to /login if unauthenticated
@@ -28,6 +28,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   if (!loggedInUser) {
+    // Save target path so user lands directly on the exact lead after logging in
+    if (location.pathname && location.pathname !== '/login') {
+      sessionStorage.setItem('impact_redirect_after_login', `${location.pathname}${location.search}`);
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -41,6 +45,37 @@ function RootRedirect() {
     return <Navigate to="/login" replace />;
   }
   return <Navigate to="/home" replace />;
+}
+
+// Deep Link Wrapper for /review/:id
+function ReviewRouteWrapper({ submissions, updateSubmission, logEmails, currentUserRole, loggedInUser, addNotification }: any) {
+  const { id } = useParams();
+  return (
+    <StakeholderDashboard
+      submissions={submissions}
+      updateSubmission={updateSubmission}
+      logEmails={logEmails}
+      currentUserRole={currentUserRole}
+      loggedInUser={loggedInUser}
+      addNotification={addNotification}
+      initialSubId={id}
+    />
+  );
+}
+
+// Deep Link Wrapper for /status/:id
+function StatusRouteWrapper(props: any) {
+  const { id } = useParams();
+  const { setSelectedSubId, setShowModal } = props;
+
+  useEffect(() => {
+    if (id) {
+      setSelectedSubId(id);
+      setShowModal(true);
+    }
+  }, [id, setSelectedSubId, setShowModal]);
+
+  return <HomeView {...props} />;
 }
 
 // ----------------------------------------------------
@@ -314,6 +349,44 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <StakeholderDashboard 
+                submissions={reviewSubmissions}
+                updateSubmission={updateSubmission}
+                logEmails={logEmails}
+                currentUserRole={currentUserRole}
+                loggedInUser={loggedInUser!}
+                addNotification={addNotification}
+              />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="status/:id" 
+          element={
+            <ProtectedRoute>
+              <StatusRouteWrapper 
+                submissions={submissions}
+                selectedSubId={selectedSubId}
+                setSelectedSubId={setSelectedSubId}
+                showModal={showModal}
+                setShowModal={setShowModal}
+                loggedInUser={loggedInUser!}
+                currentUserRole={currentUserRole}
+                notifications={notifications}
+                markAllAsRead={markAllAsRead}
+                resetDb={resetDb}
+                navigate={navigate}
+                updateSubmission={updateSubmission}
+                logEmails={logEmails}
+                addNotification={addNotification}
+              />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="review/:id" 
+          element={
+            <ProtectedRoute>
+              <ReviewRouteWrapper 
                 submissions={reviewSubmissions}
                 updateSubmission={updateSubmission}
                 logEmails={logEmails}

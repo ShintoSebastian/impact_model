@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { Employee, Submission } from '../types.ts';
 import { generateIntelligenceId } from '../utils.ts';
-import { Shield, Sparkles, Send, PhoneCall, ArrowLeft, Mail, ChevronDown, ChevronUp } from 'lucide-react';
+import { Shield, Sparkles, Send, PhoneCall, ArrowLeft, Mail, ChevronDown, ChevronUp, User, Globe } from 'lucide-react';
 
 interface EmployeePortalProps {
   submissions: Submission[];
@@ -21,6 +21,8 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
   const [shortDesc, setShortDesc] = useState('');
   const [detailedDesc, setDetailedDesc] = useState('');
   const [hasContact, setHasContact] = useState<boolean | null>(null);
+  const [contactPerson, setContactPerson] = useState('');
+  const [companyWebsite, setCompanyWebsite] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [clientName, setClientName] = useState('');
@@ -44,13 +46,32 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
     if (hasContact === null) newErrors.hasContact = 'Please specify if you have direct contact details';
     
     if (hasContact === true) {
+      // 1. Contact Person Name (Optional, but validate length if provided)
+      if (contactPerson.trim() && contactPerson.trim().length < 2) {
+        newErrors.contactPerson = 'Contact person name must be at least 2 characters';
+      }
+
+      // 2. Company Website validation (Optional, but if provided must include valid domain extension)
+      const websiteRegex = /^(https?:\/\/)?(www\.)?([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\.)+[a-zA-Z]{2,}(\/[^\s]*)?$/i;
+      if (companyWebsite.trim() && !websiteRegex.test(companyWebsite.trim())) {
+        newErrors.companyWebsite = 'Please enter a valid website with domain extension (e.g. .com, .net, .org)';
+      }
+
+      // 3. Phone Number validation (10 digits) - Mandatory
+      const phoneDigits = contactPhone.replace(/\D/g, '');
+      const isValidPhonePattern = /^[+]?[\d\s\-()]+$/.test(contactPhone.trim());
       if (!contactPhone.trim()) {
         newErrors.contactPhone = 'Client contact phone number is required';
+      } else if (!isValidPhonePattern || (phoneDigits.length !== 10 && !(phoneDigits.length === 12 && phoneDigits.startsWith('91')))) {
+        newErrors.contactPhone = 'Please enter a valid 10-digit phone number';
       }
+
+      // 4. Email Address validation - Mandatory
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
       if (!contactEmail.trim()) {
         newErrors.contactEmail = 'Client contact email address is required';
-      } else if (!/\S+@\S+\.\S+/.test(contactEmail)) {
-        newErrors.contactEmail = 'Please enter a valid email address';
+      } else if (!emailRegex.test(contactEmail.trim())) {
+        newErrors.contactEmail = 'Please enter a valid email address (e.g. name@domain.com)';
       }
     }
 
@@ -72,6 +93,8 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       shortDesc: shortDesc.trim(),
       detailedDesc: detailedDesc.trim(),
       hasContact: !!hasContact,
+      contactPerson: hasContact && contactPerson.trim() ? contactPerson.trim() : undefined,
+      companyWebsite: hasContact && companyWebsite.trim() ? companyWebsite.trim() : undefined,
       contactPhone: hasContact ? contactPhone.trim() : undefined,
       contactEmail: hasContact ? contactEmail.trim() : undefined,
       clientName: clientName.trim(),
@@ -284,6 +307,8 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
               type="button" 
               onClick={() => {
                 setHasContact(false);
+                setContactPerson('');
+                setCompanyWebsite('');
                 setContactPhone('');
                 setContactEmail('');
               }}
@@ -304,6 +329,50 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
         {hasContact && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
             
+            {/* Contact Person Name Field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                Client Contact Person Name
+              </label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border text-xs transition-all focus:outline-none focus:ring-2 ${
+                    errors.contactPerson 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/15'
+                  }`}
+                  placeholder="e.g. contact name" 
+                  value={contactPerson}
+                  onChange={(e) => setContactPerson(e.target.value)}
+                />
+                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
+              {errors.contactPerson && <span className="text-[10px] text-red-600 font-bold mt-1">⚠️ {errors.contactPerson}</span>}
+            </div>
+
+            {/* Company Website URL Field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                Company Website URL
+              </label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border text-xs transition-all focus:outline-none focus:ring-2 ${
+                    errors.companyWebsite 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-slate-200 focus:border-brand-navy focus:ring-brand-navy/15'
+                  }`}
+                  placeholder="e.g. https://www.company.com or company.com" 
+                  value={companyWebsite}
+                  onChange={(e) => setCompanyWebsite(e.target.value)}
+                />
+                <Globe size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
+              {errors.companyWebsite && <span className="text-[10px] text-red-600 font-bold mt-1">⚠️ {errors.companyWebsite}</span>}
+            </div>
+
             {/* Phone Number Field */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
@@ -392,6 +461,18 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                 <span className="text-slate-400 font-bold uppercase text-[10px]">Client / Account:</span>
                 <span className="font-extrabold text-slate-800">{pendingSubmission.clientName}</span>
               </div>
+              {pendingSubmission.contactPerson && (
+                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
+                  <span className="text-slate-400 font-bold uppercase text-[10px]">Contact Person:</span>
+                  <span className="font-bold text-slate-700 truncate max-w-[200px]">{pendingSubmission.contactPerson}</span>
+                </div>
+              )}
+              {pendingSubmission.companyWebsite && (
+                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
+                  <span className="text-slate-400 font-bold uppercase text-[10px]">Company Website:</span>
+                  <span className="font-bold text-blue-600 truncate max-w-[200px]">{pendingSubmission.companyWebsite}</span>
+                </div>
+              )}
               <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
                 <span className="text-slate-400 font-bold uppercase text-[10px]">Short Title:</span>
                 <span className="font-bold text-slate-700 truncate max-w-[200px]">{pendingSubmission.shortDesc}</span>
@@ -480,6 +561,8 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                   setShortDesc('');
                   setDetailedDesc('');
                   setHasContact(null);
+                  setContactPerson('');
+                  setCompanyWebsite('');
                   setContactPhone('');
                   setContactEmail('');
                   setClientName('');

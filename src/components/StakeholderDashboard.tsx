@@ -58,6 +58,7 @@ interface StakeholderDashboardProps {
   currentUserRole: string;
   loggedInUser: Employee;
   addNotification: (message: string) => void;
+  initialSubId?: string;
 }
 
 interface ToastInfo {
@@ -73,10 +74,21 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   logEmails,
   currentUserRole,
   loggedInUser,
-  addNotification
+  addNotification,
+  initialSubId
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
+
+  // Auto-open requested opportunity when deep linked via /review/:id
+  useEffect(() => {
+    if (initialSubId && submissions.length > 0) {
+      const match = submissions.find(s => s.intelligenceId === initialSubId);
+      if (match) {
+        setSelectedSub(match);
+      }
+    }
+  }, [initialSubId, submissions]);
   
   // Rejection sub-flow states
   const [showRejectForm, setShowRejectForm] = useState(false);
@@ -173,6 +185,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         'Employee ID': sub.employeeId,
         'Employee Name': sub.employeeName,
         'Client Name': sub.clientName,
+        'Contact Person': sub.contactPerson || 'N/A',
+        'Company Website': sub.companyWebsite || 'N/A',
+        'Contact Phone': sub.contactPhone || 'N/A',
+        'Contact Email': sub.contactEmail || 'N/A',
         'Opportunity Title': sub.shortDesc,
         'Detailed Description': sub.detailedDesc,
         'Submitted Date': new Date(sub.createdAt).toLocaleDateString('en-GB'),
@@ -190,6 +206,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         intelligenceId: sub.intelligenceId,
         employeeName: `${sub.employeeName} (${sub.employeeId})`,
         clientName: sub.clientName,
+        contactPerson: sub.contactPerson || 'N/A',
+        companyWebsite: sub.companyWebsite || 'N/A',
+        contactPhone: sub.contactPhone || 'N/A',
+        contactEmail: sub.contactEmail || 'N/A',
         shortDesc: sub.shortDesc,
         createdAt: new Date(sub.createdAt).toLocaleDateString('en-GB')
       }));
@@ -197,6 +217,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         { header: 'Impact ID', dataKey: 'intelligenceId' },
         { header: 'Employee', dataKey: 'employeeName' },
         { header: 'Client Name', dataKey: 'clientName' },
+        { header: 'Contact Person', dataKey: 'contactPerson' },
+        { header: 'Website', dataKey: 'companyWebsite' },
+        { header: 'Phone', dataKey: 'contactPhone' },
+        { header: 'Email', dataKey: 'contactEmail' },
         { header: 'Lead Title', dataKey: 'shortDesc' },
         { header: 'Submitted Date', dataKey: 'createdAt' }
       ], 'Pending_Reviews');
@@ -212,6 +236,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         'Employee ID': sub.employeeId,
         'Employee Name': sub.employeeName,
         'Client Name': sub.clientName,
+        'Contact Person': sub.contactPerson || 'N/A',
+        'Company Website': sub.companyWebsite || 'N/A',
+        'Contact Phone': sub.contactPhone || 'N/A',
+        'Contact Email': sub.contactEmail || 'N/A',
         'Opportunity Title': sub.shortDesc,
         'Current CRM Stage': sub.status,
         'CRM Lead ID': sub.crmLeadId || 'N/A',
@@ -232,6 +260,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         intelligenceId: sub.intelligenceId,
         employeeName: sub.employeeName,
         clientName: sub.clientName,
+        contactPerson: sub.contactPerson || 'N/A',
+        companyWebsite: sub.companyWebsite || 'N/A',
+        contactPhone: sub.contactPhone || 'N/A',
+        contactEmail: sub.contactEmail || 'N/A',
         shortDesc: sub.shortDesc,
         status: sub.status,
         crmLeadId: sub.crmLeadId || 'N/A',
@@ -241,6 +273,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         { header: 'Impact ID', dataKey: 'intelligenceId' },
         { header: 'Employee', dataKey: 'employeeName' },
         { header: 'Client', dataKey: 'clientName' },
+        { header: 'Contact Person', dataKey: 'contactPerson' },
+        { header: 'Website', dataKey: 'companyWebsite' },
+        { header: 'Phone', dataKey: 'contactPhone' },
+        { header: 'Email', dataKey: 'contactEmail' },
         { header: 'Lead Title', dataKey: 'shortDesc' },
         { header: 'Current CRM Stage', dataKey: 'status' },
         { header: 'CRM Lead ID', dataKey: 'crmLeadId' },
@@ -1371,11 +1407,19 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                         <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 self-start">
                           Yes
                         </span>
+                        {selectedSub.contactPerson && (
+                          <span className="text-slate-700 font-medium text-xs">👤 {selectedSub.contactPerson}</span>
+                        )}
+                        {selectedSub.companyWebsite && (
+                          <span className="text-blue-600 font-medium text-xs truncate max-w-[240px]">
+                            🌐 <a href={selectedSub.companyWebsite.startsWith('http') ? selectedSub.companyWebsite : `https://${selectedSub.companyWebsite}`} target="_blank" rel="noreferrer" className="hover:underline">{selectedSub.companyWebsite}</a>
+                          </span>
+                        )}
                         {selectedSub.contactPhone && (
-                          <span className="text-slate-700 font-mono">📞 {selectedSub.contactPhone}</span>
+                          <span className="text-slate-700 font-mono text-xs">📞 {selectedSub.contactPhone}</span>
                         )}
                         {selectedSub.contactEmail && (
-                          <span className="text-slate-700 font-mono">✉️ {selectedSub.contactEmail}</span>
+                          <span className="text-slate-700 font-mono text-xs">✉️ {selectedSub.contactEmail}</span>
                         )}
                       </div>
                     ) : (

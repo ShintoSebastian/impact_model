@@ -35,6 +35,8 @@ model Submission {
   shortDesc             String
   detailedDesc          String
   hasContact            Boolean         @default(false)
+  contactPerson         String?
+  companyWebsite        String?
   contactPhone          String?
   contactEmail          String?
   clientName            String
@@ -68,12 +70,16 @@ model StatusHistory {
 }
 
 model EmailLog {
-  id        String   @id @default(uuid())
-  recipient String
-  subject   String
-  body      String
-  type      String
-  timestamp DateTime @default(now())
+  id           String   @id @default(uuid())
+  recipient    String
+  cc           String?
+  subject      String
+  body         String
+  type         String
+  impactId     String?
+  status       String   @default("QUEUED")
+  errorMessage String?
+  timestamp    DateTime @default(now())
 }
 
 model Notification {

@@ -66,6 +66,8 @@ export const DbViewer: React.FC<DbViewerProps> = ({ submissions, resetDb }) => {
                 <th className="px-4 py-3">intelligence_id (PK)</th>
                 <th className="px-4 py-3">employee_id (FK)</th>
                 <th className="px-4 py-3">client_name</th>
+                <th className="px-4 py-3">contact_person</th>
+                <th className="px-4 py-3">company_website</th>
                 <th className="px-4 py-3">short_desc</th>
                 <th className="px-4 py-3">status</th>
                 <th className="px-4 py-3">created_at</th>
@@ -78,6 +80,8 @@ export const DbViewer: React.FC<DbViewerProps> = ({ submissions, resetDb }) => {
                   <td className="px-4 py-3 font-mono font-bold text-brand-red">{sub.intelligenceId}</td>
                   <td className="px-4 py-3 font-mono">{sub.employeeId}</td>
                   <td className="px-4 py-3 font-bold text-slate-800">{sub.clientName}</td>
+                  <td className="px-4 py-3 text-slate-700 font-medium">{sub.contactPerson || '-'}</td>
+                  <td className="px-4 py-3 text-blue-600 font-medium truncate max-w-[150px]">{sub.companyWebsite || '-'}</td>
                   <td className="px-4 py-3 max-w-[200px] truncate text-slate-500">{sub.shortDesc}</td>
                   <td className="px-4 py-3">
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-50 border border-slate-200 text-slate-500">
