@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { EmailLog } from '../types.ts';
-import { Mail, User, Clock, Search, Filter, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  Mail, User, Clock, Search, Filter, CheckCircle2, AlertCircle, ArrowRight, 
+  ShieldCheck, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FileText, 
+  Building2, Calendar, Sparkles
+} from 'lucide-react';
 
 interface EmailSimulatorProps {
   emailLogs: EmailLog[];
@@ -13,6 +17,11 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
   const [filterType, setFilterType] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(4);
+  const [expandedEmails, setExpandedEmails] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (id: string) => {
+    setExpandedEmails(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -29,11 +38,17 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
     if (!matchesSearch) return false;
     
     if (filterType === 'All') return true;
+    if (filterType === 'Reviewer Mailer') {
+      return log.type === 'Reviewer Mailer' || log.subject.includes('Action Required: Review Opportunity');
+    }
+    if (filterType === 'Submitter Mailer') {
+      return log.type === 'Submitter Mailer' || log.subject.includes('[IMPACT] Opportunity Update');
+    }
     if (filterType === 'Lead Submitted') {
-      return log.subject.includes('Received') || log.subject.includes('Submitted');
+      return log.subject.includes('Received') || log.subject.includes('Submitted') || log.type === 'Reviewer Mailer';
     }
     if (filterType === 'Status Changed') {
-      return log.subject.includes('Progress') || log.subject.includes('Moved to') || log.subject.includes('Stage');
+      return log.subject.includes('Progress') || log.subject.includes('Moved to') || log.subject.includes('Stage') || log.type === 'Submitter Mailer';
     }
     if (filterType === 'Validated') {
       return log.subject.includes('Validated') || log.subject.includes('Approved');
@@ -52,48 +67,100 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
   const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
 
-  // Determines badge style based on email type or subject
+  // Determines badge style based on email type or subject (muted neutral style)
   const getBadgeStyle = (log: EmailLog) => {
     if (log.type === 'Reviewer Mailer' || log.subject.includes('Action Required: Review Opportunity')) {
-      return { label: 'Reviewer Mailer', bg: 'bg-indigo-500/10 text-indigo-600 border-indigo-200', icon: ShieldCheck };
+      return { label: 'Reviewer Mailer' };
     }
     if (log.type === 'Submitter Mailer' || log.subject.includes('[IMPACT] Opportunity Update')) {
-      return { label: 'Submitter Mailer', bg: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', icon: CheckCircle2 };
+      return { label: 'Submitter Mailer' };
     }
     if (log.subject.includes('Validated') || log.subject.includes('Approved')) {
-      return { label: 'Validated & CRM Synced', bg: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', icon: ShieldCheck };
+      return { label: 'Validated & CRM Synced' };
     }
     if (log.subject.includes('Progress') || log.subject.includes('Moved')) {
-      return { label: 'CRM Stage Progression', bg: 'bg-blue-500/10 text-blue-600 border-blue-200', icon: ArrowRight };
+      return { label: 'Stage Progression' };
     }
     if (log.subject.includes('Closed') || log.subject.includes('Rejected')) {
-      return { label: 'Lead Closed', bg: 'bg-rose-500/10 text-rose-600 border-rose-200', icon: AlertCircle };
+      return { label: 'Lead Closed' };
     }
     if (log.subject.includes('Clarification') || log.subject.includes('Needed')) {
-      return { label: 'Clarification Needed', bg: 'bg-amber-500/10 text-amber-600 border-amber-200', icon: AlertCircle };
+      return { label: 'Clarification Needed' };
     }
-    return { label: log.type || 'Notification', bg: 'bg-slate-500/10 text-slate-600 border-slate-200', icon: CheckCircle2 };
+    return { label: log.type || 'Notification' };
   };
 
-  // Determines delivery status badge styling
+  // Determines delivery status badge styling (clean subtle dot indicator)
   const getDeliveryBadge = (status?: string) => {
     const s = (status || '').toUpperCase();
-    if (s === 'SENT_TO_SMTP') {
-      return { label: 'Sent to SMTP Relay', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle2 };
-    }
-    if (s === 'DELIVERED') {
-      return { label: 'Delivered', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle2 };
+    if (s === 'SENT_TO_SMTP' || s === 'DELIVERED') {
+      return { label: s === 'SENT_TO_SMTP' ? 'Sent to SMTP' : 'Delivered', bg: 'bg-slate-50 text-slate-700 border-slate-200', dot: 'bg-emerald-500' };
     }
     if (s === 'FAILED') {
-      return { label: 'Relay Failed', bg: 'bg-rose-100 text-rose-800 border-rose-200', icon: AlertCircle };
+      return { label: 'Failed', bg: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' };
     }
     if (s.includes('SIMULATED')) {
-      return { label: 'Queued (Simulated)', bg: 'bg-sky-100 text-sky-800 border-sky-200', icon: Clock };
+      return { label: 'Simulated', bg: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400' };
     }
     if (s === 'QUEUED') {
-      return { label: 'Queued', bg: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock };
+      return { label: 'Queued', bg: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-amber-400' };
     }
-    return { label: status || 'Queued', bg: 'bg-slate-100 text-slate-700 border-slate-200', icon: Clock };
+    return { label: status || 'Queued', bg: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400' };
+  };
+
+  // Parses email body into concise key data
+  const parseEmailSummary = (log: EmailLog) => {
+    const body = log.body || '';
+    const isReviewer = log.type === 'Reviewer Mailer' || log.subject.includes('Action Required: Review Opportunity');
+    const isSubmitter = log.type === 'Submitter Mailer' || log.subject.includes('[IMPACT] Opportunity Update');
+
+    // Extract action deep link
+    const urlMatch = body.match(/https?:\/\/[^\s]+/);
+    const actionUrl = urlMatch ? urlMatch[0] : null;
+
+    if (isReviewer) {
+      const clientMatch = body.match(/• Client:\s*(.+)/) || body.match(/Client:\s*(.+)/);
+      const oppMatch = body.match(/• Opportunity:\s*(.+)/) || body.match(/Opportunity:\s*(.+)/);
+      const dueDateMatch = body.match(/• Review due date:\s*(.+)/) || body.match(/Review due date:\s*(.+)/);
+
+      return {
+        client: clientMatch ? clientMatch[1].trim() : null,
+        opportunity: oppMatch ? oppMatch[1].trim() : null,
+        dueDate: dueDateMatch ? dueDateMatch[1].trim() : null,
+        status: null,
+        comments: null,
+        actionUrl,
+        actionLabel: 'Assess & Review Lead'
+      };
+    }
+
+    if (isSubmitter) {
+      const statusMatch = log.subject.match(/\|\s*([^|]+)$/);
+      const status = statusMatch ? statusMatch[1].trim() : null;
+      const clientMatch = body.match(/Client:\s*(.+)/);
+      const oppMatch = body.match(/Opportunity:\s*(.+)/);
+      const commentsMatch = body.match(/Status Comments:\s*\n?"?([^"\n]+)"?/);
+
+      return {
+        client: clientMatch ? clientMatch[1].trim() : null,
+        opportunity: oppMatch ? oppMatch[1].trim() : null,
+        dueDate: null,
+        status,
+        comments: commentsMatch ? commentsMatch[1].trim() : null,
+        actionUrl,
+        actionLabel: 'View Lead Status'
+      };
+    }
+
+    return {
+      client: null,
+      opportunity: null,
+      dueDate: null,
+      status: null,
+      comments: null,
+      actionUrl,
+      actionLabel: 'View Lead'
+    };
   };
 
   // Helper to render text with clickable URLs that open the exact lead
@@ -205,7 +272,7 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
         </div>
 
         {/* Email Cards List */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {paginatedLogs.length === 0 ? (
             <div className="text-center py-16 px-4 text-slate-400 text-xs font-semibold">
               No email notification logs match your search.
@@ -214,78 +281,135 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
             paginatedLogs.map(log => {
               const badge = getBadgeStyle(log);
               const delivery = getDeliveryBadge(log.status);
-              const BadgeIcon = badge.icon;
-              const DeliveryIcon = delivery.icon;
+              const summary = parseEmailSummary(log);
               const impactId = log.impactId || (log.subject.match(/IM-\d+-\d+/)?.[0]);
+              const isExpanded = !!expandedEmails[log.id];
 
               return (
                 <div 
                   key={log.id} 
-                  className="bg-slate-50/50 hover:bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm transition-all flex flex-col gap-3.5 hover:shadow-md"
+                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-slate-300 transition-all flex flex-col gap-2.5"
                 >
-                  {/* Top Bar Meta */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs border-b border-slate-200/60 pb-3">
+                  {/* Top Bar: Impact ID, Type, Timestamp, Status */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold border flex items-center gap-1.5 ${badge.bg}`}>
-                        <BadgeIcon size={12} />
-                        {badge.label}
-                      </span>
                       {impactId && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 font-mono">
+                        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
                           {impactId}
                         </span>
                       )}
+                      <span className="text-[11px] font-medium text-slate-500">
+                        {badge.label}
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
-                        <Clock size={13} className="text-slate-400" />
-                        <span>{new Date(log.timestamp).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        {new Date(log.timestamp).toLocaleDateString([], { day: 'numeric', month: 'short' })} at {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </span>
                       
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border flex items-center gap-1 ${delivery.bg}`}>
-                        <DeliveryIcon size={11} /> {delivery.label}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium border flex items-center gap-1.5 ${delivery.bg}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${delivery.dot}`} />
+                        {delivery.label}
                       </span>
                     </div>
                   </div>
 
-                  {/* Recipient & CC Rows */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2 text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200/80">
-                      <User size={14} className="text-slate-400 flex-shrink-0" />
-                      <span className="font-bold text-slate-500 w-8">To:</span>
-                      <span className="font-extrabold text-slate-800 break-all">{log.recipient}</span>
-                    </div>
-
-                    {log.cc && (
-                      <div className="flex items-center gap-2 text-xs text-slate-600 bg-white/80 p-2.5 rounded-lg border border-slate-200/60">
-                        <User size={14} className="text-slate-400 flex-shrink-0" />
-                        <span className="font-bold text-slate-500 w-8">CC:</span>
-                        <span className="font-medium text-slate-600 break-all">{log.cc}</span>
-                      </div>
-                    )}
-                  </div>
-
                   {/* Subject Line */}
-                  <div className="text-sm font-extrabold text-brand-navy tracking-tight">
+                  <div className="text-sm font-semibold text-slate-800 tracking-tight">
                     {log.subject}
                   </div>
 
-                  {/* SMTP Error Notice if Failed */}
-                  {log.errorMessage && (
-                    <div className="flex items-start gap-2.5 text-xs bg-rose-50 border border-rose-200 rounded-lg p-3 text-rose-800">
-                      <AlertCircle size={15} className="text-rose-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-bold text-[11px] text-rose-900 uppercase tracking-wide">SMTP Relay Diagnostic Notice:</span>
-                        <span className="text-xs font-mono text-rose-700 break-all">{log.errorMessage}</span>
-                      </div>
+                  {/* Concise Key Details Row (Clean subtle slate text) */}
+                  {(summary.client || summary.opportunity || summary.status || summary.dueDate) && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+                      {summary.client && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400">Client:</span>
+                          <span className="font-medium text-slate-700">{summary.client}</span>
+                        </div>
+                      )}
+                      {summary.opportunity && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400">Lead:</span>
+                          <span className="font-medium text-slate-700">{summary.opportunity}</span>
+                        </div>
+                      )}
+                      {summary.status && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400">Stage:</span>
+                          <span className="font-semibold text-slate-800">{summary.status}</span>
+                        </div>
+                      )}
+                      {summary.dueDate && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400">Due:</span>
+                          <span className="font-semibold text-slate-800">{summary.dueDate}</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Email Body Card */}
-                  <div className="bg-white border border-slate-200/80 rounded-xl p-4 text-xs text-slate-700 font-medium whitespace-pre-wrap leading-relaxed shadow-inner">
-                    {renderBodyWithLinks(log.body)}
+                  {/* Status Comments / Remarks (Clean minimal quote line) */}
+                  {summary.comments && (
+                    <div className="text-xs text-slate-600 bg-slate-50 border-l-2 border-slate-300 px-2.5 py-1.5 rounded-r text-left italic">
+                      &ldquo;{summary.comments}&rdquo;
+                    </div>
+                  )}
+
+                  {/* Real SMTP Error Notice ONLY when delivery actually failed */}
+                  {log.status === 'FAILED' && log.errorMessage && (
+                    <div className="flex items-start gap-2 text-xs bg-rose-50 border border-rose-200 rounded p-2 text-rose-800">
+                      <AlertCircle size={14} className="text-rose-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs font-mono text-rose-700 break-all">{log.errorMessage}</span>
+                    </div>
+                  )}
+
+                  {/* Action Bar: Direct Link & Expand Full Email Toggle */}
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
+                    {summary.actionUrl ? (
+                      <button
+                        onClick={() => {
+                          const targetUrl = summary.actionUrl;
+                          if (!targetUrl) return;
+                          try {
+                            const parsed = new URL(targetUrl);
+                            if (parsed.pathname.startsWith('/status/') || parsed.pathname.startsWith('/review/')) {
+                              navigate(parsed.pathname);
+                              return;
+                            }
+                          } catch {}
+                          window.open(targetUrl, '_blank');
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-brand-navy hover:underline cursor-pointer transition-colors"
+                      >
+                        <span>{summary.actionLabel || 'View Details'}</span>
+                        <ArrowRight size={12} />
+                      </button>
+                    ) : <div />}
+
+                    <button
+                      onClick={() => toggleExpand(log.id)}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-700 ml-auto cursor-pointer transition-colors py-0.5 px-1.5 rounded hover:bg-slate-100"
+                    >
+                      <FileText size={12} className="text-slate-400" />
+                      <span>{isExpanded ? 'Hide Details' : 'View Full Email'}</span>
+                      {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
                   </div>
+
+                  {/* Collapsible Verbatim Email Body & Recipients */}
+                  {isExpanded && (
+                    <div className="mt-1 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                      <div className="text-[11px] text-slate-600 flex flex-col gap-1 bg-slate-50 p-2.5 rounded border border-slate-200/70 font-mono">
+                        <div><strong className="font-sans text-slate-700">To:</strong> {log.recipient}</div>
+                        {log.cc && <div><strong className="font-sans text-slate-700">CC:</strong> {log.cc}</div>}
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
+                        {renderBodyWithLinks(log.body)}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })
