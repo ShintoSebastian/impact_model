@@ -15,11 +15,16 @@ const PORT = process.env.PORT || 7000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
 const CORPORATE_API_URL = process.env.CORPORATE_API_URL || '';
 
-app.use(cors());
+const allowedOrigins = process.env.IMPACT_BASE_URL ? [process.env.IMPACT_BASE_URL, 'http://localhost:5173'] : '*';
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' && process.env.IMPACT_BASE_URL ? process.env.IMPACT_BASE_URL : allowedOrigins
+}));
 app.use(express.json());
 
 // Disable TLS certificate validation for corporate API (self-signed/corporate certificates)
-const tlsAgent = new https.Agent({ rejectUnauthorized: false });
+const tlsAgent = new https.Agent({ 
+  rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0' ? false : true 
+});
 
 // ----------------------------------------------------
 // CORPORATE API INTEGRATION (Read-Only, Server-Side Only)
@@ -824,7 +829,7 @@ const smtpTransporter = nodemailer.createTransport({
   port: SMTP_PORT,
   secure: SMTP_SECURE,
   tls: {
-    rejectUnauthorized: false
+    rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0' ? false : true
   },
   connectionTimeout: 10000,
   greetingTimeout: 10000
@@ -1869,6 +1874,10 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
   const { id } = req.params; // intelligenceId
   const { status, reason, clarificationResponse, crmLeadId, salesPerson, timestamp } = req.body;
   const changedBy = req.user.name || req.user.email;
+
+  if (req.user.role !== 'reviewer') {
+    return res.status(403).json({ error: 'Forbidden: Only reviewers can modify submissions.' });
+  }
 
   try {
     const existing = await prisma.submission.findUnique({
