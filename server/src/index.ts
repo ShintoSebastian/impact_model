@@ -1209,7 +1209,7 @@ async function dispatchRealEmail(
         where: { id: emailLogId },
         data: {
           status: 'QUEUED (SIMULATED)',
-          errorMessage: 'Network dispatch skipped (EMAIL_SEND_ENABLED=false)'
+          errorMessage: null
         }
       });
       console.log(`[SMTP Dispatcher] ℹ️ EMAIL_SEND_ENABLED=false. Email #${emailLogId} logged as 'QUEUED (SIMULATED)'.`);
