@@ -140,8 +140,40 @@ const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
   'employees@nestdigital.com': { role: 'employee', designation: 'Senior Consultant' },
   'shinto.s@nestdigital.com': { role: 'employee', designation: 'Tech Lead' },
   'arun.kumar@nestdigital.com': { role: 'reviewer', designation: 'Delivery Head' },
-  'jacob.varghese@nestdigital.com': { role: 'reviewer', designation: 'Sales' }
+  'jacob.varghese@nestdigital.com': { role: 'reviewer', designation: 'Sales' },
+  'sony.k@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - HBU' },
+  'jobins.jose@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - BFS' },
+  'jonathan.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - MBU/IBU' },
+  'jose.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - GIS' },
+  'madhusudhanan.c@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - INS' }
 };
+
+const BU_REVIEWERS: Record<string, string> = {
+  'hbu': 'sony.k@nestgroup.net',
+  'healthcare business unit': 'sony.k@nestgroup.net',
+  'bfs': 'jobins.jose@nestgroup.net',
+  'banking financial services': 'jobins.jose@nestgroup.net',
+  'mbu': 'jonathan.george@nestgroup.net',
+  'mobility business unit': 'jonathan.george@nestgroup.net',
+  'ibu': 'jonathan.george@nestgroup.net',
+  'industrial business unit': 'jonathan.george@nestgroup.net',
+  'gis': 'jose.george@nestgroup.net',
+  'geographic information service': 'jose.george@nestgroup.net',
+  'ins': 'madhusudhanan.c@nestgroup.net',
+  'insurance service': 'madhusudhanan.c@nestgroup.net',
+};
+
+// Helper to get BU assigned to a reviewer email
+function getAssignedBUsForReviewer(email: string): string[] {
+  const normalizedEmail = email.toLowerCase().trim();
+  const assignedBUs: string[] = [];
+  for (const [bu, revEmail] of Object.entries(BU_REVIEWERS)) {
+    if (revEmail === normalizedEmail) {
+      assignedBUs.push(bu);
+    }
+  }
+  return assignedBUs;
+}
 
 // ----------------------------------------------------
 // DIAGNOSTIC ENDPOINT (No Auth Required — for debugging corporate API)
@@ -644,30 +676,40 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
 
   try {
     let whereClause: any = {};
-    if (userRole === 'reviewer' || userRole === 'admin' || userEmail.includes('arun.kumar')) {
-      whereClause = {}; // Reviewers/admins see all submissions to review
+    const assignedBUs = getAssignedBUsForReviewer(userEmail);
+    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0) || userRole === 'admin' || userEmail.includes('arun.kumar');
+
+    if (isGlobalReviewer) {
+      whereClause = {}; // Global Reviewers/admins see all submissions to review
     } else {
       const username = userEmail.split('@')[0];
       const nameParts = username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-      whereClause = {
-        OR: [
-          { reportingManager: { contains: userEmail } },
-          { reportingManager: { contains: username } },
-          { reportingManager: { contains: nameParts } },
-          { projectManager: { contains: userEmail } },
-          { projectManager: { contains: username } },
-          { projectManager: { contains: nameParts } },
-          { buHead: { contains: userEmail } },
-          { buHead: { contains: username } },
-          { buHead: { contains: nameParts } },
-          { hrbp: { contains: userEmail } },
-          { hrbp: { contains: username } },
-          { hrbp: { contains: nameParts } },
-          { salesPerson: { contains: userEmail } },
-          { salesPerson: { contains: username } },
-          { salesPerson: { contains: nameParts } },
-        ]
-      };
+      
+      const orConditions: any[] = [
+        { reportingManager: { contains: userEmail } },
+        { reportingManager: { contains: username } },
+        { reportingManager: { contains: nameParts } },
+        { projectManager: { contains: userEmail } },
+        { projectManager: { contains: username } },
+        { projectManager: { contains: nameParts } },
+        { buHead: { contains: userEmail } },
+        { buHead: { contains: username } },
+        { buHead: { contains: nameParts } },
+        { hrbp: { contains: userEmail } },
+        { hrbp: { contains: username } },
+        { hrbp: { contains: nameParts } },
+        { salesPerson: { contains: userEmail } },
+        { salesPerson: { contains: username } },
+        { salesPerson: { contains: nameParts } },
+      ];
+
+      if (assignedBUs.length > 0) {
+        assignedBUs.forEach(bu => {
+          orConditions.push({ employee: { businessUnit: { contains: bu } } });
+        });
+      }
+
+      whereClause = { OR: orConditions };
     }
 
     const count = await prisma.submission.count({ where: whereClause });
@@ -694,30 +736,40 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
       whereClause = { employeeId: String(employeeId) };
     } else if (mode === 'review') {
       // Review mode: show all for reviewers/admins or submissions where user is stakeholder
-      if (userRole === 'reviewer' || userRole === 'admin' || userEmail.includes('arun.kumar')) {
+      const assignedBUs = getAssignedBUsForReviewer(userEmail);
+      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0) || userRole === 'admin' || userEmail.includes('arun.kumar');
+
+      if (isGlobalReviewer) {
         whereClause = {};
       } else {
         const username = userEmail.split('@')[0];
         const nameParts = username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-        whereClause = {
-          OR: [
-            { reportingManager: { contains: userEmail } },
-            { reportingManager: { contains: username } },
-            { reportingManager: { contains: nameParts } },
-            { projectManager: { contains: userEmail } },
-            { projectManager: { contains: username } },
-            { projectManager: { contains: nameParts } },
-            { buHead: { contains: userEmail } },
-            { buHead: { contains: username } },
-            { buHead: { contains: nameParts } },
-            { hrbp: { contains: userEmail } },
-            { hrbp: { contains: username } },
-            { hrbp: { contains: nameParts } },
-            { salesPerson: { contains: userEmail } },
-            { salesPerson: { contains: username } },
-            { salesPerson: { contains: nameParts } },
-          ]
-        };
+        
+        const orConditions: any[] = [
+          { reportingManager: { contains: userEmail } },
+          { reportingManager: { contains: username } },
+          { reportingManager: { contains: nameParts } },
+          { projectManager: { contains: userEmail } },
+          { projectManager: { contains: username } },
+          { projectManager: { contains: nameParts } },
+          { buHead: { contains: userEmail } },
+          { buHead: { contains: username } },
+          { buHead: { contains: nameParts } },
+          { hrbp: { contains: userEmail } },
+          { hrbp: { contains: username } },
+          { hrbp: { contains: nameParts } },
+          { salesPerson: { contains: userEmail } },
+          { salesPerson: { contains: username } },
+          { salesPerson: { contains: nameParts } },
+        ];
+
+        if (assignedBUs.length > 0) {
+          assignedBUs.forEach(bu => {
+            orConditions.push({ employee: { businessUnit: { contains: bu } } });
+          });
+        }
+
+        whereClause = { OR: orConditions };
       }
     } else {
       // Default: show the user's own submissions
@@ -1304,6 +1356,14 @@ async function sendReviewerMailer(submission: any, employee: any, baseUrl?: stri
       submission.salesPerson
     ];
 
+    // Add BU specific reviewer if BU matches
+    const buLower = (employee.businessUnit || '').toLowerCase();
+    for (const [buKey, revEmail] of Object.entries(BU_REVIEWERS)) {
+      if (buLower.includes(buKey.toLowerCase())) {
+        toCandidates.push(revEmail);
+      }
+    }
+
     // CC: HRBP
     const ccCandidates = [submission.hrbp];
 
@@ -1677,7 +1737,9 @@ async function pollCrmStatusUpdates() {
           // Trigger Submitter Mailer only for material updates (e.g., Deal Won, Deal Lost, Lead Dropped)
           try {
             const baseUrl = resolveBaseUrl();
-            await sendSubmitterMailer(updatedSub, impactStatus, record.remarks || null, emp, baseUrl);
+            // TEMPORARILY DISABLED PER USER REQUEST
+            // await sendSubmitterMailer(updatedSub, impactStatus, record.remarks || null, emp, baseUrl);
+            console.log(`[CRM Background Poller] Mailer for ${updatedSub.intelligenceId} is currently held back.`);
           } catch (mailerErr: any) {
             console.error(`[CRM Background Poller] Non-blocking mailer failure: ${mailerErr.message}`);
           }
