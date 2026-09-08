@@ -22,8 +22,8 @@ app.use(cors({
 app.use(express.json());
 
 // Disable TLS certificate validation for corporate API (self-signed/corporate certificates)
-const tlsAgent = new https.Agent({ 
-  rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0' ? false : true 
+const tlsAgent = new https.Agent({
+  rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0' ? false : true
 });
 
 // ----------------------------------------------------
@@ -40,7 +40,7 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Reporting Manager': 'Dummy Manager',
       'Reporting Manager Email': 'dummy.manager@nestdigital.com',
       'Business Unit Head': 'Amina Rashad',
-      'Business Unit Head Email': 'amina.rashad@nestdigital.com',
+      'Business Unit Head Email': 'amina.rashad@nestgroup.net',
       'role': 'employee'
     };
   }
@@ -66,7 +66,7 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
 
   try {
     console.log(`[Corporate API] Fetching profile for username: "${username}" from ${apiUrl}`);
-    
+
     // Use custom HTTPS agent to bypass self-signed certificate rejection
     const fetchOptions: any = {
       method: 'POST',
@@ -77,14 +77,14 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       body: JSON.stringify({ username }),
       signal: AbortSignal.timeout(10000) // 10 second timeout
     };
-    
+
     // For HTTPS URLs, attach the custom agent that ignores self-signed certs
     if (CORPORATE_API_URL.startsWith('https')) {
       (fetchOptions as any).dispatcher = undefined; // Node 18+ uses dispatcher
       // For Node.js built-in fetch, we need to set the env var
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     }
-    
+
     const response = await fetch(apiUrl, fetchOptions);
 
     if (!response.ok) {
@@ -96,7 +96,7 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
 
     const rawText = await response.text();
     console.log(`[Corporate API] Raw response text (first 1000 chars): ${rawText.substring(0, 1000)}`);
-    
+
     let result: any;
     try {
       result = JSON.parse(rawText);
@@ -104,14 +104,14 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       console.warn(`[Corporate API] ⚠️ Response is not valid JSON`);
       return null;
     }
-    
+
     // Handle multiple response formats:
     // Format 1: { success: true, data: { ... } }
     // Format 2: { data: { ... } } (no success field)
     // Format 3: Direct object { employeeId: ..., name: ..., ... }
     // Format 4: Array [ { employeeId: ..., ... } ]
     let employeeData: any = null;
-    
+
     if (result.success && result.data) {
       employeeData = result.data;
     } else if (result.data && typeof result.data === 'object') {
@@ -122,7 +122,7 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       // Direct object response
       employeeData = result;
     }
-    
+
     if (employeeData) {
       console.log(`[Corporate API] ✅ Employee data found for: ${username}`);
       console.log(`[Corporate API] Data keys: ${Object.keys(employeeData).join(', ')}`);
@@ -190,20 +190,20 @@ app.get('/api/test-corporate-api/:email', async (req, res) => {
   const email = req.params.email;
   const username = email.split('@')[0];
   const apiUrl = `${CORPORATE_API_URL}/api/employee/GetEmployeeData`;
-  
+
   console.log(`\n========== DIAGNOSTIC: Testing Corporate API ==========`);
   console.log(`Email: ${email}`);
   console.log(`Username: ${username}`);
   console.log(`API URL: ${apiUrl}`);
   console.log(`CORPORATE_API_URL env: "${CORPORATE_API_URL}"`);
-  
+
   if (!CORPORATE_API_URL) {
     return res.json({ error: 'CORPORATE_API_URL not configured in .env', envValue: CORPORATE_API_URL });
   }
 
   try {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -218,7 +218,7 @@ app.get('/api/test-corporate-api/:email', async (req, res) => {
     console.log(`HTTP Status: ${response.status}`);
     console.log(`Raw Response: ${rawText.substring(0, 2000)}`);
     console.log(`========== END DIAGNOSTIC ==========\n`);
-    
+
     let parsed: any = null;
     try {
       parsed = JSON.parse(rawText);
@@ -238,19 +238,19 @@ app.get('/api/test-corporate-api/:email', async (req, res) => {
     console.log(`DIAGNOSTIC ERROR: ${err.message}`);
     console.log(`Error type: ${err.constructor.name}`);
     console.log(`========== END DIAGNOSTIC ==========\n`);
-    
+
     res.json({
       error: err.message,
       errorType: err.constructor.name,
       apiUrl,
       username,
-      hint: err.message.includes('certificate') || err.message.includes('CERT') 
-        ? 'SSL Certificate error — the corporate API uses a self-signed cert' 
-        : err.message.includes('ECONNREFUSED') 
-        ? 'Connection refused — API server may be down or not reachable from this network'
-        : err.message.includes('ENOTFOUND')
-        ? 'DNS lookup failed — hostname not resolvable from this network'
-        : 'Unknown error — check server terminal for details'
+      hint: err.message.includes('certificate') || err.message.includes('CERT')
+        ? 'SSL Certificate error — the corporate API uses a self-signed cert'
+        : err.message.includes('ECONNREFUSED')
+          ? 'Connection refused — API server may be down or not reachable from this network'
+          : err.message.includes('ENOTFOUND')
+            ? 'DNS lookup failed — hostname not resolvable from this network'
+            : 'Unknown error — check server terminal for details'
     });
   }
 });
@@ -261,7 +261,7 @@ app.get('/api/test-corporate-api/:email', async (req, res) => {
 // ----------------------------------------------------
 app.get('/api/test-crm-api', async (req, res) => {
   const crmUrl = process.env.CRM_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities';
-  
+
   const testPayload = {
     impactIntelligenceId: `IM-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-DIAG`,
     clientName: 'Diagnostic Health Systems',
@@ -294,7 +294,7 @@ app.get('/api/test-crm-api', async (req, res) => {
 
   try {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    
+
     const response = await fetch(crmUrl, {
       method: 'POST',
       headers: {
@@ -308,7 +308,7 @@ app.get('/api/test-crm-api', async (req, res) => {
     const rawText = await response.text();
     console.log(`HTTP Status Code: ${response.status} ${response.statusText}`);
     console.log(`Raw CRM Response: ${rawText}`);
-    
+
     let parsed: any = null;
     try {
       parsed = JSON.parse(rawText);
@@ -335,7 +335,7 @@ app.get('/api/test-crm-api', async (req, res) => {
   } catch (err: any) {
     console.log(`CRM DIAGNOSTIC ERROR: ${err.message}`);
     console.log(`================ END CRM DIAGNOSTIC ==================\n`);
-    
+
     res.json({
       success: false,
       error: err.message,
@@ -361,7 +361,7 @@ app.get('/api/test-crm-status-api', async (req, res) => {
 
   try {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    
+
     const response = await fetch(queryUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
@@ -464,11 +464,11 @@ async function authLdap(username: string, userPassword?: string) {
   if (!userPassword) {
     return { success: false, error: 'Password is required' };
   }
-  
+
   if (['dummy.employee', 'dummy.manager'].includes(username.split('@')[0]) && userPassword === 'dummy') {
     return { success: true };
   }
-  
+
   let cleanUsername = username;
   let bindDn = username;
 
@@ -509,7 +509,7 @@ async function authLdap(username: string, userPassword?: string) {
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
   const { email, username, password } = req.body;
-  
+
   const loginInput = username || email;
   if (!loginInput) {
     return res.status(400).json({ error: 'Username is required' });
@@ -520,7 +520,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   // Perform LDAP Authentication First
   const ldapResult = await authLdap(loginInput, password);
-  
+
   if (!ldapResult.success) {
     return res.status(401).json({ error: `LDAP Error: ${ldapResult.error || 'Invalid credentials'}` });
   }
@@ -538,30 +538,30 @@ app.post('/api/auth/login', async (req, res) => {
     if (corporateData) {
       // Corporate API returned real employee data — map it to our schema
       const empId = corporateData['Employee ID'] || corporateData.employeeId || corporateData.employee_id || corporateData.empId || corporateData.emp_code || `ND-${Math.floor(10000 + Math.random() * 90000)}`;
-      
+
       const empName = corporateData['Employee Name'] || corporateData.name || corporateData.employeeName || corporateData.employee_name || corporateData.fullName || corporateData.full_name || normalizedEmail.split('@')[0].split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-      
+
       const empBU = corporateData['Business Unit'] || corporateData['Department'] || corporateData.businessUnit || corporateData.business_unit || corporateData.department || corporateData.bu || 'Not Specified';
-      
+
       // For managers, prefer combining name + email if both exist
       const rmName = corporateData['Reporting Manager'] || corporateData.reportingManager || corporateData.reporting_manager || corporateData.manager || corporateData.reportingManagerName || 'Not Specified';
       const rmEmail = corporateData['Reporting Manager Email'] ? ` (${corporateData['Reporting Manager Email']})` : '';
       const empRM = rmName !== 'Not Specified' ? `${rmName}${rmEmail}` : rmName;
-      
+
       const empPM = corporateData['Project Manager'] || corporateData.projectManager || corporateData.project_manager || corporateData.pm || 'Not Specified';
-      
+
       const buHeadName = corporateData['Business Unit Head'] || corporateData.buHead || corporateData.bu_head || corporateData.businessUnitHead || 'Not Specified';
       const buHeadEmail = corporateData['Business Unit Head Email'] ? ` (${corporateData['Business Unit Head Email']})` : '';
       const empBUHead = buHeadName !== 'Not Specified' ? `${buHeadName}${buHeadEmail}` : buHeadName;
-      
+
       const empHRBP = corporateData['HRBP'] || corporateData.hrbp || corporateData.hrBusinessPartner || corporateData.hr_bp || 'Not Specified';
-      
+
       const empSales = corporateData['Sales Person'] || corporateData.salesPerson || corporateData.sales_person || corporateData.salesOwner || 'Not Specified';
-      
+
       const empDesignation = corporateData['Designation'] || corporateData.designation || corporateData.title || corporateData.jobTitle || corporateData.job_title || 'Employee';
-      
+
       const empJobRole = corporateData['Jobrole'] || corporateData.jobRole || corporateData.job_role || 'Not Specified';
-      
+
       const empPhone = corporateData['Phone Number'] || corporateData.phoneNumber || corporateData.phone_number || corporateData.phone || 'Not Specified';
 
       // Determine role from corporate data or fall back to ROLE_MAP
@@ -691,7 +691,7 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
     } else {
       const username = userEmail.split('@')[0];
       const nameParts = username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-      
+
       const orConditions: any[] = [
         { reportingManager: { contains: userEmail } },
         { reportingManager: { contains: username } },
@@ -751,7 +751,7 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
       } else {
         const username = userEmail.split('@')[0];
         const nameParts = username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-        
+
         const orConditions: any[] = [
           { reportingManager: { contains: userEmail } },
           { reportingManager: { contains: username } },
@@ -1539,7 +1539,7 @@ async function sendSubmitterMailer(submission: any, newStatus: string, reason: s
 // ----------------------------------------------------
 async function pushLeadToCrm(submission: any, employee: any): Promise<string | null> {
   const crmUrl = process.env.CRM_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities';
-  
+
   const crmPayload = {
     impactIntelligenceId: submission.intelligenceId,
     clientName: submission.clientName,
@@ -1572,7 +1572,7 @@ async function pushLeadToCrm(submission: any, employee: any): Promise<string | n
     console.log(`CRM Endpoint URL: ${crmUrl}`);
     console.log(`Payload Sent:\n`, JSON.stringify(crmPayload, null, 2));
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    
+
     const response = await fetch(crmUrl, {
       method: 'POST',
       headers: {
@@ -1664,7 +1664,7 @@ async function pollCrmStatusUpdates() {
     const lookbackTimestamp = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const queryUrl = `${statusApiUrl}?since=${encodeURIComponent(lookbackTimestamp)}`;
     console.log(`\n[CRM Background Poller] 🔄 Polling status updates since 30 days ago (${lookbackTimestamp})...`);
-    
+
     const response = await fetch(queryUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
@@ -1750,26 +1750,26 @@ async function pollCrmStatusUpdates() {
           } catch (mailerErr: any) {
             console.error(`[CRM Background Poller] Non-blocking mailer failure: ${mailerErr.message}`);
           }
-            
-            const stakeholderFields = [
-              updatedSub.reportingManager,
-              updatedSub.projectManager,
-              updatedSub.buHead,
-              updatedSub.hrbp,
-              updatedSub.salesPerson
-            ];
-            const recipientEmails = extractEmails(stakeholderFields);
-            const allRecipients = Array.from(new Set([emp.email, ...recipientEmails]));
-            const msg = `${updatedSub.intelligenceId} moved to ${impactStatus} stage via CRM Sync`;
 
-            await Promise.all(allRecipients.map(email =>
-              prisma.notification.create({
-                data: { message: msg, recipientEmail: email }
-              })
-            ));
-          }
+          const stakeholderFields = [
+            updatedSub.reportingManager,
+            updatedSub.projectManager,
+            updatedSub.buHead,
+            updatedSub.hrbp,
+            updatedSub.salesPerson
+          ];
+          const recipientEmails = extractEmails(stakeholderFields);
+          const allRecipients = Array.from(new Set([emp.email, ...recipientEmails]));
+          const msg = `${updatedSub.intelligenceId} moved to ${impactStatus} stage via CRM Sync`;
+
+          await Promise.all(allRecipients.map(email =>
+            prisma.notification.create({
+              data: { message: msg, recipientEmail: email }
+            })
+          ));
         }
       }
+    }
   } catch (err: any) {
     console.warn(`[CRM Background Poller] ⚠️ Error during polling: ${err.message}`);
   }
@@ -1938,7 +1938,7 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
         const stepName = status === 'Deal Won' ? 'Converted Won' : status;
         msg = `${id} moved to ${stepName} stage`;
       }
-      
+
       // Save notification log for all stakeholders and submitter
       const stakeholderFields = [
         updated.reportingManager,
@@ -2319,7 +2319,7 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
-  
+
   // Start automated CRM status poller immediately on server start and every 5 minutes (300,000 ms)
   pollCrmStatusUpdates();
   setInterval(pollCrmStatusUpdates, 5 * 60 * 1000);
