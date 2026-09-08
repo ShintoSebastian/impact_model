@@ -665,7 +665,7 @@ export function HomeView({
           {selectedSubId ? (
             <span className="text-[11px] font-semibold text-slate-400">
               {(() => {
-                const sub = mySubmissions.find(s => s.intelligenceId === selectedSubId);
+                const sub = mySubmissions.find(s => s.intelligenceId === selectedSubId) || submissions.find(s => s.intelligenceId === selectedSubId);
                 if (!sub) return '0%';
                 if (sub.status.startsWith('Closed') || sub.status === 'Deal Lost' || sub.status === 'Lead Dropped' || sub.status === 'Lead Rejected') return '100% Complete';
                 if (sub.status === 'Negotiation') return '85% Complete';
@@ -682,7 +682,7 @@ export function HomeView({
 
         {selectedSubId ? (
           (() => {
-            const selectedSub = mySubmissions.find(s => s.intelligenceId === selectedSubId);
+            const selectedSub = mySubmissions.find(s => s.intelligenceId === selectedSubId) || submissions.find(s => s.intelligenceId === selectedSubId) || null;
             if (!selectedSub) return null;
             return (
               <>
