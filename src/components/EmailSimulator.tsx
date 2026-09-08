@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.tsx';
 import type { EmailLog } from '../types.ts';
 import { 
   Mail, User, Clock, Search, Filter, CheckCircle2, AlertCircle, ArrowRight, 
@@ -13,6 +14,7 @@ interface EmailSimulatorProps {
 
 export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => {
   const navigate = useNavigate();
+  const { loggedInUser } = useAuth();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
@@ -375,7 +377,18 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                           try {
                             const parsed = new URL(targetUrl);
                             if (parsed.pathname.startsWith('/status/') || parsed.pathname.startsWith('/review/')) {
-                              navigate(parsed.pathname);
+                              const impactId = parsed.pathname.split('/').pop();
+                              // Reviewers clicking "View Lead Status" on a Submitter Mailer
+                              // should go to the review board so they see the right submission
+                              if (
+                                summary.actionLabel === 'View Lead Status' &&
+                                impactId &&
+                                (loggedInUser as any)?.role === 'reviewer'
+                              ) {
+                                navigate(`/review/${impactId}`);
+                              } else {
+                                navigate(parsed.pathname);
+                              }
                               return;
                             }
                           } catch {}

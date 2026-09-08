@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 7000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
 const CORPORATE_API_URL = process.env.CORPORATE_API_URL || '';
 
-const allowedOrigins = process.env.IMPACT_BASE_URL ? [process.env.IMPACT_BASE_URL, 'http://localhost:5173'] : '*';
+const allowedOrigins = process.env.IMPACT_BASE_URL ? [process.env.IMPACT_BASE_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'] : '*';
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' && process.env.IMPACT_BASE_URL ? process.env.IMPACT_BASE_URL : allowedOrigins
 }));
@@ -51,7 +51,7 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Not Specified',
       'Reporting Manager Email': '',
-      'role': 'employee'
+      'role': 'reviewer'
     };
   }
 
@@ -808,7 +808,29 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
     res.status(500).json({ error: 'Failed to retrieve submissions' });
   }
 });
-// ----------------------------------------------------
+
+// GET /api/submissions/:id — Fetch a single submission by intelligenceId (any authenticated user)
+app.get('/api/submissions/:id', authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const submission = await prisma.submission.findUnique({
+      where: { intelligenceId: id },
+      include: {
+        statusHistory: { orderBy: { timestamp: 'asc' } }
+      }
+    });
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+    const emp = await prisma.employee.findUnique({ where: { employeeId: submission.employeeId } });
+    res.json({ ...submission, employeeName: emp ? emp.name : 'Unknown Employee' });
+  } catch (error) {
+    console.error('Fetch submission by ID error:', error);
+    res.status(500).json({ error: 'Failed to retrieve submission' });
+  }
+});
+
+
 // PRODUCTION-HARDENED SMTP & NOTIFICATION AUTOMATION
 // Approved Corporate Relay: 10.45.0.12:25 (Unauthenticated internal corporate relay)
 // Approved Sender: peopleexperience@nestgroup.net / NeST People Experience Team
