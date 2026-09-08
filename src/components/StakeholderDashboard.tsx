@@ -350,6 +350,19 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   const rejectedCount = reviewedSubmissions.filter(s => s.status === 'Closed - Not Valid' || s.status === 'Deal Lost' || s.status === 'Lead Dropped').length;
   const totalReviewed = validatedCount + rejectedCount;
 
+  // Calculate dynamic average review time
+  const avgReviewTimeRaw = reviewedSubmissions.length > 0 
+    ? reviewedSubmissions.reduce((acc, sub) => {
+        const firstReview = sub.statusHistory?.find(h => h.status !== 'Opportunity Registered' && h.status !== 'Under Review' && h.status !== 'Clarification Requested');
+        const reviewDate = firstReview ? new Date(firstReview.timestamp) : new Date(sub.updatedAt);
+        const submitDate = new Date(sub.createdAt);
+        const days = (reviewDate.getTime() - submitDate.getTime()) / (1000 * 60 * 60 * 24);
+        return acc + Math.max(0, days);
+      }, 0) / reviewedSubmissions.length
+    : 0;
+  
+  const avgReviewTime = avgReviewTimeRaw > 0 ? avgReviewTimeRaw.toFixed(1) : '0.0';
+
   const [reviewedStatusFilter, setReviewedStatusFilter] = useState('All');
   const [dateRangeFilter, setDateRangeFilter] = useState('All');
 
@@ -703,7 +716,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
             <RefreshCcw size={16} />
           </div>
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Avg Review Time</span>
-          <span className="text-4xl font-extrabold text-brand-navy leading-none mt-2 mb-2">1.2</span>
+          <span className="text-4xl font-extrabold text-brand-navy leading-none mt-2 mb-2">{avgReviewTime}</span>
           <span className="text-[10px] font-bold text-blue-600 tracking-wide">Days</span>
         </div>
       </div>
