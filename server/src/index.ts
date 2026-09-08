@@ -54,6 +54,16 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'role': 'reviewer'
     };
   }
+  if (email === 'amina.rashad@nestgroup.net') {
+    return {
+      'Employee ID': 'DUMMY-BU-01',
+      'Employee Name': 'Amina Rashad',
+      'Business Unit': 'Engineering',
+      'Reporting Manager': 'Not Specified',
+      'Reporting Manager Email': '',
+      'role': 'reviewer'
+    };
+  }
 
   if (!CORPORATE_API_URL) {
     console.log('[Corporate API] No CORPORATE_API_URL configured, skipping.');
@@ -147,6 +157,7 @@ const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
   'employees@nestdigital.com': { role: 'employee', designation: 'Senior Consultant' },
   'shinto.s@nestdigital.com': { role: 'employee', designation: 'Tech Lead' },
   'arun.kumar@nestdigital.com': { role: 'reviewer', designation: 'Delivery Head' },
+  'amina.rashad@nestgroup.net': { role: 'reviewer', designation: 'Business Unit Head' },
   'jacob.varghese@nestdigital.com': { role: 'reviewer', designation: 'Sales' },
   'sony.k@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - HBU' },
   'jobins.jose@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - BFS' },
