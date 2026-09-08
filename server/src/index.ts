@@ -39,6 +39,8 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Dummy Manager',
       'Reporting Manager Email': 'dummy.manager@nestdigital.com',
+      'Business Unit Head': 'Amina Rashad',
+      'Business Unit Head Email': 'amina.rashad@nestdigital.com',
       'role': 'employee'
     };
   }
