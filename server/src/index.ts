@@ -1049,7 +1049,7 @@ NeST People Experience Team`;
             <td style="padding: 32px;">
               <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${salutation}</strong>,</p>
               <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
-                A new business opportunity has been submitted by <strong>${submitterName}</strong>. Please assess this submission, record your decision, and assign BU follow-up before the SLA review due date.
+                A new opportunity has been submitted by <strong>${submitterName}</strong>. Please use the link below to assess the opportunity, record your decision, and track its current status.
               </p>
 
               <!-- Opportunity Summary Card -->
@@ -1071,7 +1071,7 @@ NeST People Experience Team`;
                         <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
                       </tr>
                       <tr>
-                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Opportunity Title:</td>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Opportunity:</td>
                         <td style="color: #0f172a;">${leadTitle}</td>
                       </tr>
                       <tr>
@@ -1199,7 +1199,7 @@ NeST People Experience Team`;
             <td style="padding: 32px;">
               <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${submitterName}</strong>,</p>
               <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
-                There is an update on the opportunity you submitted through the IMPACT Model Portal.
+                There is an important update on the opportunity you submitted through the IMPACT Model Portal.
               </p>
 
               <!-- Status Badge Card -->
@@ -1225,7 +1225,7 @@ NeST People Experience Team`;
                         <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
                       </tr>
                       <tr>
-                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Opportunity Title:</td>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Opportunity:</td>
                         <td style="color: #0f172a;">${leadTitle}</td>
                       </tr>
                       ${trimmedReason ? `
@@ -1388,27 +1388,6 @@ async function sendReviewerMailer(submission: any, employee: any, baseUrl?: stri
       return;
     }
 
-    // Determine TO recipients: RM, PM, BU Head, Sales Person
-    const toCandidates = [
-      submission.reportingManager,
-      submission.projectManager,
-      submission.buHead,
-      submission.salesPerson
-    ];
-
-    // Add BU specific reviewer if BU matches
-    const buLower = (employee.businessUnit || '').toLowerCase();
-    for (const [buKey, revEmail] of Object.entries(BU_REVIEWERS)) {
-      if (buLower.includes(buKey.toLowerCase())) {
-        toCandidates.push(revEmail);
-      }
-    }
-
-    // CC: HRBP
-    const ccCandidates = [submission.hrbp];
-
-    const { toList, ccList } = resolveRecipients(toCandidates, ccCandidates, DEFAULT_REVIEWER_EMAIL);
-
     const submitterName = employee.name || 'NeST Colleague';
     const clientName = submission.clientName || 'Valued Client';
     const leadTitle = submission.shortDesc || 'Client Opportunity';
@@ -1420,49 +1399,84 @@ async function sendReviewerMailer(submission: any, employee: any, baseUrl?: stri
     const reviewDueDate = calculateReviewDueDate(subDateObj, 7);
 
     const reviewLink = `${resolvedUrl}/review/${impactId}`;
-
-    const rmRaw = submission.reportingManager || '';
-    const rmNameOnly = rmRaw.includes('(') ? rmRaw.split('(')[0].trim() : (rmRaw || 'Reviewer');
-    const reviewerSalutation = (rmNameOnly && rmNameOnly !== 'Not Specified') ? rmNameOnly : 'Review Team';
-
     const subject = `Action Required: Review Opportunity | ${submitterName} | ${impactId} | ${clientName}`;
 
-    const { html, text } = buildReviewerEmailContent({
-      salutation: reviewerSalutation,
-      submitterName,
-      empId,
-      bu,
-      impactId,
-      clientName,
-      leadTitle,
-      submissionDate,
-      reviewDueDate,
-      reviewLink
-    });
+    // Map to keep track of unique emails to names
+    const reviewersMap = new Map<string, string>();
 
-    // Create log with initial QUEUED status
-    const createdLog = await prisma.emailLog.create({
-      data: {
-        recipient: toList.join(', '),
-        cc: ccList.length > 0 ? ccList.join(', ') : null,
-        subject,
-        body: text,
-        type: 'Reviewer Mailer',
-        impactId,
-        status: 'QUEUED'
+    const addReviewer = (rawCandidate: string, fallbackName: string) => {
+      if (!rawCandidate) return;
+      const email = sanitizeEmail(rawCandidate);
+      if (!email) return;
+
+      if (!reviewersMap.has(email)) {
+        let namePart = rawCandidate.includes('(') ? rawCandidate.split('(')[0].trim() : rawCandidate.split('<')[0].trim();
+        // Fallback if the parsed name is basically just the email or generic
+        if (namePart.includes('@') || namePart.toLowerCase() === 'not specified') {
+           namePart = fallbackName;
+        }
+        reviewersMap.set(email, namePart || fallbackName);
       }
-    });
+    };
 
-    console.log(`[Reviewer Mailer] 📝 Queued for ${impactId} to: ${toList.join(', ')}`);
+    addReviewer(submission.reportingManager, 'Reporting Manager');
+    addReviewer(submission.projectManager, 'Project Manager');
+    addReviewer(submission.buHead, 'BU Head');
+    addReviewer(submission.salesPerson, 'Sales Person');
+    addReviewer(submission.hrbp, 'HRBP'); // HRBP as a regular reviewer with their own email
 
-    // Dispatch via SMTP relay
-    await dispatchRealEmail(createdLog.id, {
-      to: toList.join(', '),
-      cc: ccList.length > 0 ? ccList.join(', ') : null,
-      subject,
-      text,
-      html
-    });
+    // Add BU specific reviewer if BU matches
+    const buLower = (employee.businessUnit || '').toLowerCase();
+    for (const [buKey, revEmail] of Object.entries(BU_REVIEWERS)) {
+      if (buLower.includes(buKey.toLowerCase())) {
+        addReviewer(revEmail as string, 'Review Team');
+      }
+    }
+
+    if (reviewersMap.size === 0 && DEFAULT_REVIEWER_EMAIL) {
+      const email = sanitizeEmail(DEFAULT_REVIEWER_EMAIL);
+      if (email) reviewersMap.set(email, 'Review Team');
+    }
+
+    // Send individual emails to each reviewer
+    for (const [email, name] of reviewersMap.entries()) {
+      const { html, text } = buildReviewerEmailContent({
+        salutation: name,
+        submitterName,
+        empId,
+        bu,
+        impactId,
+        clientName,
+        leadTitle,
+        submissionDate,
+        reviewDueDate,
+        reviewLink
+      });
+
+      // Create log with initial QUEUED status
+      const createdLog = await prisma.emailLog.create({
+        data: {
+          recipient: email,
+          cc: null,
+          subject,
+          body: text,
+          type: 'Reviewer Mailer',
+          impactId,
+          status: 'QUEUED'
+        }
+      });
+
+      console.log(`[Reviewer Mailer] 📝 Queued for ${impactId} to: ${email}`);
+
+      // Dispatch via SMTP relay
+      await dispatchRealEmail(createdLog.id, {
+        to: email,
+        cc: null,
+        subject,
+        text,
+        html
+      });
+    }
   } catch (err: any) {
     console.error(`[Reviewer Mailer] ⚠️ Non-blocking error: ${err.message}`);
   }
