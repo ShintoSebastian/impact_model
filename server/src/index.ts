@@ -51,7 +51,7 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Not Specified',
       'Reporting Manager Email': '',
-      'role': 'reviewer'
+      'role': 'employee'
     };
   }
   if (email === 'amina.rashad@nestgroup.net') {
@@ -61,7 +61,7 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Not Specified',
       'Reporting Manager Email': '',
-      'role': 'reviewer'
+      'role': 'employee'
     };
   }
 
@@ -1901,12 +1901,10 @@ app.post('/api/submissions', authenticateToken, async (req: any, res) => {
     ));
 
     // Auto-trigger Reviewer Mailer upon submission (isolated non-blocking boundary)
-    try {
-      const baseUrl = resolveBaseUrl(req);
-      await sendReviewerMailer(submission, employee, baseUrl);
-    } catch (mailerErr: any) {
+    const baseUrl = resolveBaseUrl(req);
+    sendReviewerMailer(submission, employee, baseUrl).catch((mailerErr: any) => {
       console.error(`[POST /api/submissions] Non-blocking mailer failure: ${mailerErr.message}`);
-    }
+    });
 
     res.status(201).json({
       ...submission,
@@ -1924,10 +1922,6 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
   const { status, reason, clarificationResponse, crmLeadId, salesPerson, timestamp } = req.body;
   const changedBy = req.user.name || req.user.email;
 
-  if (req.user.role !== 'reviewer') {
-    return res.status(403).json({ error: 'Forbidden: Only reviewers can modify submissions.' });
-  }
-
   try {
     const existing = await prisma.submission.findUnique({
       where: { intelligenceId: id }
@@ -1935,6 +1929,22 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
 
     if (!existing) {
       return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    const userEmail = req.user.email || '';
+    const userRole = req.user.role || '';
+    const isGlobalReviewer = userRole === 'reviewer' || userRole === 'admin';
+    const isStakeholder = 
+      (existing.reportingManager && existing.reportingManager.includes(userEmail)) ||
+      (existing.projectManager && existing.projectManager.includes(userEmail)) ||
+      (existing.buHead && existing.buHead.includes(userEmail)) ||
+      (existing.hrbp && existing.hrbp.includes(userEmail)) ||
+      (existing.salesPerson && existing.salesPerson.includes(userEmail));
+    
+    const isSubmitter = existing.employeeId === req.user.employeeId;
+
+    if (!isGlobalReviewer && !isStakeholder && !isSubmitter) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify this submission.' });
     }
 
     // Capture Reason validation (mandatory on rejection/closure)
