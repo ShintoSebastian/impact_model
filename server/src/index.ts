@@ -554,10 +554,10 @@ app.post('/api/auth/login', async (req, res) => {
   const normalizedInput = loginInput.toLowerCase().trim();
   // Ensure we have an email format for the local database and ROLE_MAP
   let normalizedEmail = normalizedInput.includes('@') ? normalizedInput : `${normalizedInput}@nestdigital.com`;
-  if (normalizedInput === 'dummy.buhead') {
+  if (normalizedInput === 'dummy.buhead' || normalizedInput === 'dummy.buhead@nestdigital.com') {
     normalizedEmail = 'amina.rashad@nestgroup.net';
-  } else if (['dummy.manager', 'jayashankar', 'jayasankar', 'jayasankar.j'].includes(normalizedInput)) {
-    normalizedEmail = 'jayasankar.j@nestgroup.net';
+  } else if (['dummy.manager', 'dummy.manager@nestdigital.com', 'jayashankar', 'jayasankar', 'jayasankar.j', 'jayasankar.j@nestgroup.net', 'jayasankar.j@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy.manager@nestdigital.com';
   }
 
   try {
@@ -741,6 +741,14 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
         { salesPerson: { contains: nameParts } },
       ];
 
+      // Alias handling: Ensure dummy manager / Jayasankar matches both tags
+      if (userEmail.includes('dummy.manager') || userEmail.includes('jayasankar')) {
+        orConditions.push(
+          { reportingManager: { contains: 'jayasankar' } },
+          { reportingManager: { contains: 'dummy.manager' } }
+        );
+      }
+
       if (assignedBUs.length > 0) {
         assignedBUs.forEach(bu => {
           orConditions.push({ employee: { businessUnit: { contains: bu } } });
@@ -800,6 +808,14 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
           { salesPerson: { contains: username } },
           { salesPerson: { contains: nameParts } },
         ];
+
+        // Alias handling: Ensure dummy manager / Jayasankar matches both tags
+        if (userEmail.includes('dummy.manager') || userEmail.includes('jayasankar')) {
+          orConditions.push(
+            { reportingManager: { contains: 'jayasankar' } },
+            { reportingManager: { contains: 'dummy.manager' } }
+          );
+        }
 
         if (assignedBUs.length > 0) {
           assignedBUs.forEach(bu => {
