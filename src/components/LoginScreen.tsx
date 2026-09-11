@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import { Loader2 } from 'lucide-react';
 
@@ -7,12 +8,29 @@ import nestLogo from '../assets/nest_logo.png';
 import nestIcon from '../assets/nest_icon.png';
 
 export function LoginScreen() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const {
+    loggedInUser,
     isConnecting, connectingMsg,
     executeSsoFlow, loginUsername, setLoginUsername,
     loginPassword, setLoginPassword,
     loginError, setLoginError
   } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const redirectTarget = params.get('redirect');
+    if (redirectTarget) {
+      sessionStorage.setItem('impact_redirect_after_login', redirectTarget);
+      if (loggedInUser) {
+        sessionStorage.removeItem('impact_redirect_after_login');
+        navigate(redirectTarget, { replace: true });
+      }
+    } else if (loggedInUser) {
+      navigate('/home', { replace: true });
+    }
+  }, [location.search, loggedInUser, navigate]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();

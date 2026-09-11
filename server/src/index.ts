@@ -32,36 +32,44 @@ const tlsAgent = new https.Agent({
 // Returns null if API is unavailable or employee not found — never crashes.
 // ----------------------------------------------------
 async function fetchCorporateEmployee(email: string): Promise<any | null> {
-  if (email === 'dummy.employee@nestdigital.com') {
+  const normEmail = email.toLowerCase().trim();
+  if (normEmail === 'dummy.employee@nestdigital.com') {
     return {
       'Employee ID': 'DUMMY-EMP-01',
       'Employee Name': 'Dummy Employee',
       'Business Unit': 'Engineering',
-      'Reporting Manager': 'Dummy Manager',
-      'Reporting Manager Email': 'dummy.manager@nestdigital.com',
+      'Reporting Manager': 'Jayasankar',
+      'Reporting Manager Email': 'jayasankar.j@nestgroup.net',
       'Business Unit Head': 'Amina Rashad',
       'Business Unit Head Email': 'amina.rashad@nestgroup.net',
-      'role': 'employee'
+      'role': 'employee',
+      'Designation': 'Software Engineer'
     };
   }
-  if (email === 'dummy.manager@nestdigital.com') {
+  if (normEmail === 'jayasankar.j@nestgroup.net' || normEmail === 'dummy.manager@nestdigital.com' || normEmail === 'jayashankar@nestdigital.com' || normEmail === 'jayasankar.j@nestdigital.com') {
     return {
       'Employee ID': 'DUMMY-MGR-01',
-      'Employee Name': 'Dummy Manager',
+      'Employee Name': 'Jayasankar',
       'Business Unit': 'Engineering',
-      'Reporting Manager': 'Not Specified',
-      'Reporting Manager Email': '',
-      'role': 'employee'
+      'Reporting Manager': 'Amina Rashad',
+      'Reporting Manager Email': 'amina.rashad@nestgroup.net',
+      'Business Unit Head': 'Amina Rashad',
+      'Business Unit Head Email': 'amina.rashad@nestgroup.net',
+      'role': 'employee',
+      'Designation': 'Reporting Manager'
     };
   }
-  if (email === 'amina.rashad@nestgroup.net') {
+  if (normEmail === 'dummy.buhead@nestdigital.com' || normEmail === 'amina.rashad@nestgroup.net') {
     return {
       'Employee ID': 'DUMMY-BU-01',
       'Employee Name': 'Amina Rashad',
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Not Specified',
       'Reporting Manager Email': '',
-      'role': 'employee'
+      'Business Unit Head': 'Amina Rashad',
+      'Business Unit Head Email': 'amina.rashad@nestgroup.net',
+      'role': 'employee',
+      'Designation': 'Business Unit Head'
     };
   }
 
@@ -154,10 +162,16 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
 
 // Helper: Role Mapping for fallback Auto-Provisioning
 const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
+  'dummy.employee@nestdigital.com': { role: 'employee', designation: 'Software Engineer' },
+  'jayasankar.j@nestgroup.net': { role: 'employee', designation: 'Reporting Manager' },
+  'jayasankar.j@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
+  'dummy.manager@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
+  'dummy.buhead@nestdigital.com': { role: 'employee', designation: 'Business Unit Head' },
+  'jayashankar@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
   'employees@nestdigital.com': { role: 'employee', designation: 'Senior Consultant' },
   'shinto.s@nestdigital.com': { role: 'employee', designation: 'Tech Lead' },
   'arun.kumar@nestdigital.com': { role: 'reviewer', designation: 'Delivery Head' },
-  'amina.rashad@nestgroup.net': { role: 'reviewer', designation: 'Business Unit Head' },
+  'amina.rashad@nestgroup.net': { role: 'employee', designation: 'Business Unit Head' },
   'jacob.varghese@nestdigital.com': { role: 'reviewer', designation: 'Sales' },
   'sony.k@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - HBU' },
   'jobins.jose@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - BFS' },
@@ -476,7 +490,8 @@ async function authLdap(username: string, userPassword?: string) {
     return { success: false, error: 'Password is required' };
   }
 
-  if (['dummy.employee', 'dummy.manager'].includes(username.split('@')[0]) && userPassword === 'dummy') {
+  const cleanUser = username.split('@')[0].toLowerCase();
+  if (['dummy.employee', 'dummy.manager', 'dummy.buhead', 'jayashankar', 'jayasankar', 'jayasankar.j', 'amina.rashad'].includes(cleanUser) && userPassword === 'dummy') {
     return { success: true };
   }
 
@@ -538,7 +553,12 @@ app.post('/api/auth/login', async (req, res) => {
 
   const normalizedInput = loginInput.toLowerCase().trim();
   // Ensure we have an email format for the local database and ROLE_MAP
-  const normalizedEmail = normalizedInput.includes('@') ? normalizedInput : `${normalizedInput}@nestdigital.com`;
+  let normalizedEmail = normalizedInput.includes('@') ? normalizedInput : `${normalizedInput}@nestdigital.com`;
+  if (normalizedInput === 'dummy.buhead') {
+    normalizedEmail = 'amina.rashad@nestgroup.net';
+  } else if (['dummy.manager', 'jayashankar', 'jayasankar', 'jayasankar.j'].includes(normalizedInput)) {
+    normalizedEmail = 'jayasankar.j@nestgroup.net';
+  }
 
   try {
     // STEP 1: ALWAYS try to fetch fresh data from Corporate HRMS API first
@@ -695,7 +715,7 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
   try {
     let whereClause: any = {};
     const assignedBUs = getAssignedBUsForReviewer(userEmail);
-    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0) || userRole === 'admin' || userEmail.includes('arun.kumar');
+    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('jayasankar') && !userEmail.includes('amina.rashad') && !userEmail.includes('dummy')) || userRole === 'admin' || userEmail.includes('arun.kumar');
 
     if (isGlobalReviewer) {
       whereClause = {}; // Global Reviewers/admins see all submissions to review
@@ -755,7 +775,7 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
     } else if (mode === 'review') {
       // Review mode: show all for reviewers/admins or submissions where user is stakeholder
       const assignedBUs = getAssignedBUsForReviewer(userEmail);
-      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0) || userRole === 'admin' || userEmail.includes('arun.kumar');
+      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('jayasankar') && !userEmail.includes('amina.rashad') && !userEmail.includes('dummy')) || userRole === 'admin' || userEmail.includes('arun.kumar');
 
       if (isGlobalReviewer) {
         whereClause = {};
@@ -1398,7 +1418,8 @@ async function sendReviewerMailer(submission: any, employee: any, baseUrl?: stri
     const submissionDate = subDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const reviewDueDate = calculateReviewDueDate(subDateObj, 7);
 
-    const reviewLink = `${resolvedUrl}/review/${impactId}`;
+    // Deep link directly redirects to login page with redirect target
+    const reviewLink = `${resolvedUrl}/login?redirect=${encodeURIComponent(`/review/${impactId}`)}`;
     const subject = `Action Required: Review Opportunity | ${submitterName} | ${impactId} | ${clientName}`;
 
     // Map to keep track of unique emails to names
@@ -1538,7 +1559,8 @@ async function sendSubmitterMailer(submission: any, newStatus: string, reason: s
     const { toList, ccList } = resolveRecipients([submitterEmail], ccCandidates, submitterEmail);
 
     const subject = `[IMPACT] Opportunity Update | ${impactId} | ${newStatus}`;
-    const statusLink = `${resolvedUrl}/status/${impactId}`;
+    // Deep link directly redirects to login page with redirect target
+    const statusLink = `${resolvedUrl}/login?redirect=${encodeURIComponent(`/status/${impactId}`)}`;
 
     const { html, text } = buildSubmitterEmailContent({
       submitterName,
@@ -1933,7 +1955,7 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
 
     const userEmail = req.user.email || '';
     const userRole = req.user.role || '';
-    const isGlobalReviewer = userRole === 'reviewer' || userRole === 'admin';
+    const isGlobalReviewer = userRole === 'admin' || userEmail.includes('arun.kumar');
     const isStakeholder = 
       (existing.reportingManager && existing.reportingManager.includes(userEmail)) ||
       (existing.projectManager && existing.projectManager.includes(userEmail)) ||
