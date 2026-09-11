@@ -1418,8 +1418,8 @@ async function sendReviewerMailer(submission: any, employee: any, baseUrl?: stri
     const submissionDate = subDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const reviewDueDate = calculateReviewDueDate(subDateObj, 7);
 
-    // Deep link directly redirects to login page with redirect target
-    const reviewLink = `${resolvedUrl}/login?redirect=${encodeURIComponent(`/review/${impactId}`)}`;
+    // Deep link routes via root /?redirect= so IIS default document serves index.html without 404
+    const reviewLink = `${resolvedUrl}/?redirect=${encodeURIComponent(`/review/${impactId}`)}`;
     const subject = `Action Required: Review Opportunity | ${submitterName} | ${impactId} | ${clientName}`;
 
     // Map to keep track of unique emails to names
@@ -1559,8 +1559,8 @@ async function sendSubmitterMailer(submission: any, newStatus: string, reason: s
     const { toList, ccList } = resolveRecipients([submitterEmail], ccCandidates, submitterEmail);
 
     const subject = `[IMPACT] Opportunity Update | ${impactId} | ${newStatus}`;
-    // Deep link directly redirects to login page with redirect target
-    const statusLink = `${resolvedUrl}/login?redirect=${encodeURIComponent(`/status/${impactId}`)}`;
+    // Deep link routes via root /?redirect= so IIS default document serves index.html without 404
+    const statusLink = `${resolvedUrl}/?redirect=${encodeURIComponent(`/status/${impactId}`)}`;
 
     const { html, text } = buildSubmitterEmailContent({
       submitterName,
