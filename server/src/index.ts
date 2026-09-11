@@ -554,9 +554,9 @@ app.post('/api/auth/login', async (req, res) => {
   const normalizedInput = loginInput.toLowerCase().trim();
   // Ensure we have an email format for the local database and ROLE_MAP
   let normalizedEmail = normalizedInput.includes('@') ? normalizedInput : `${normalizedInput}@nestdigital.com`;
-  if (normalizedInput === 'dummy.buhead') {
+  if (normalizedInput === 'dummy.buhead' || normalizedInput === 'dummy.buhead@nestdigital.com') {
     normalizedEmail = 'amina.rashad@nestgroup.net';
-  } else if (['dummy.manager', 'jayashankar', 'jayasankar', 'jayasankar.j'].includes(normalizedInput)) {
+  } else if (['dummy.manager', 'dummy.manager@nestdigital.com', 'jayashankar', 'jayasankar', 'jayasankar.j', 'jayasankar.j@nestgroup.net', 'jayasankar.j@nestdigital.com'].includes(normalizedInput)) {
     normalizedEmail = 'jayasankar.j@nestgroup.net';
   }
 
@@ -631,6 +631,7 @@ app.post('/api/auth/login', async (req, res) => {
         console.warn(`[Login] ⚠️ Upsert failed: ${upsertErr.message}. Trying update without employeeId change...`);
         try {
           const existingByEmail = await prisma.employee.findUnique({ where: { email: normalizedEmail } });
+          const existingById = await prisma.employee.findUnique({ where: { employeeId: freshData.employeeId } });
           if (existingByEmail) {
             const { employeeId: _skipId, ...updateWithoutId } = freshData;
             employee = await prisma.employee.update({
@@ -638,11 +639,18 @@ app.post('/api/auth/login', async (req, res) => {
               data: updateWithoutId
             });
             console.log(`[Login] ✅ Updated employee profile (kept existing ID): ${employee.name}`);
-          } else {
-            employee = await prisma.employee.create({
+          } else if (existingById) {
+            employee = await prisma.employee.update({
+              where: { employeeId: freshData.employeeId },
               data: { ...freshData, email: normalizedEmail }
             });
-            console.log(`[Login] ✅ Created new employee from corporate API: ${freshData.name}`);
+            console.log(`[Login] ✅ Updated employee record (${freshData.employeeId}) with email ${normalizedEmail}: ${employee.name}`);
+          } else {
+            const safeId = `ND-${Math.floor(10000 + Math.random() * 90000)}`;
+            employee = await prisma.employee.create({
+              data: { ...freshData, employeeId: safeId, email: normalizedEmail }
+            });
+            console.log(`[Login] ✅ Created new employee from corporate API with safe ID: ${employee.name}`);
           }
         } catch (fallbackErr: any) {
           console.warn(`[Login] ⚠️ Could not save corporate data: ${fallbackErr.message}`);
@@ -741,6 +749,14 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
         { salesPerson: { contains: nameParts } },
       ];
 
+      // Alias handling: Ensure dummy manager / Jayasankar matches both tags
+      if (userEmail.includes('dummy.manager') || userEmail.includes('jayasankar')) {
+        orConditions.push(
+          { reportingManager: { contains: 'jayasankar' } },
+          { reportingManager: { contains: 'dummy.manager' } }
+        );
+      }
+
       if (assignedBUs.length > 0) {
         assignedBUs.forEach(bu => {
           orConditions.push({ employee: { businessUnit: { contains: bu } } });
@@ -800,6 +816,14 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
           { salesPerson: { contains: username } },
           { salesPerson: { contains: nameParts } },
         ];
+
+        // Alias handling: Ensure dummy manager / Jayasankar matches both tags
+        if (userEmail.includes('dummy.manager') || userEmail.includes('jayasankar')) {
+          orConditions.push(
+            { reportingManager: { contains: 'jayasankar' } },
+            { reportingManager: { contains: 'dummy.manager' } }
+          );
+        }
 
         if (assignedBUs.length > 0) {
           assignedBUs.forEach(bu => {
