@@ -557,7 +557,7 @@ app.post('/api/auth/login', async (req, res) => {
   if (normalizedInput === 'dummy.buhead' || normalizedInput === 'dummy.buhead@nestdigital.com') {
     normalizedEmail = 'amina.rashad@nestgroup.net';
   } else if (['dummy.manager', 'dummy.manager@nestdigital.com', 'jayashankar', 'jayasankar', 'jayasankar.j', 'jayasankar.j@nestgroup.net', 'jayasankar.j@nestdigital.com'].includes(normalizedInput)) {
-    normalizedEmail = 'dummy.manager@nestdigital.com';
+    normalizedEmail = 'jayasankar.j@nestgroup.net';
   }
 
   try {
@@ -631,6 +631,7 @@ app.post('/api/auth/login', async (req, res) => {
         console.warn(`[Login] ⚠️ Upsert failed: ${upsertErr.message}. Trying update without employeeId change...`);
         try {
           const existingByEmail = await prisma.employee.findUnique({ where: { email: normalizedEmail } });
+          const existingById = await prisma.employee.findUnique({ where: { employeeId: freshData.employeeId } });
           if (existingByEmail) {
             const { employeeId: _skipId, ...updateWithoutId } = freshData;
             employee = await prisma.employee.update({
@@ -638,11 +639,18 @@ app.post('/api/auth/login', async (req, res) => {
               data: updateWithoutId
             });
             console.log(`[Login] ✅ Updated employee profile (kept existing ID): ${employee.name}`);
-          } else {
-            employee = await prisma.employee.create({
+          } else if (existingById) {
+            employee = await prisma.employee.update({
+              where: { employeeId: freshData.employeeId },
               data: { ...freshData, email: normalizedEmail }
             });
-            console.log(`[Login] ✅ Created new employee from corporate API: ${freshData.name}`);
+            console.log(`[Login] ✅ Updated employee record (${freshData.employeeId}) with email ${normalizedEmail}: ${employee.name}`);
+          } else {
+            const safeId = `ND-${Math.floor(10000 + Math.random() * 90000)}`;
+            employee = await prisma.employee.create({
+              data: { ...freshData, employeeId: safeId, email: normalizedEmail }
+            });
+            console.log(`[Login] ✅ Created new employee from corporate API with safe ID: ${employee.name}`);
           }
         } catch (fallbackErr: any) {
           console.warn(`[Login] ⚠️ Could not save corporate data: ${fallbackErr.message}`);
