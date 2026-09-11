@@ -38,9 +38,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Component to handle redirect from root `/` — all users go to /home
+// Component to handle redirect from root `/` — preserves and honors ?redirect= param
 function RootRedirect() {
   const { loggedInUser } = useAuth();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const redirectTarget = params.get('redirect');
+
+  if (redirectTarget) {
+    sessionStorage.setItem('impact_redirect_after_login', redirectTarget);
+    if (!loggedInUser) {
+      return <Navigate to={`/login${location.search}`} replace />;
+    }
+    return <Navigate to={redirectTarget} replace />;
+  }
+
   if (!loggedInUser) {
     return <Navigate to="/login" replace />;
   }
