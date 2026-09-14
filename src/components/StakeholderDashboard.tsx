@@ -32,7 +32,7 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   else if (status === 'Lead Registered') currentStageIndex = 2;
   else if (status === 'Lead Accepted') currentStageIndex = 3;
   else if (status === 'Lead Rejected') currentStageIndex = 3;
-  else if (status === 'Lead Dropped') currentStageIndex = 4;
+  else if (status === 'Lead Dropped') currentStageIndex = 3;
   else if (status === 'Proposal') currentStageIndex = 4;
   else if (status === 'Negotiation') currentStageIndex = 5;
   else if (status === 'Deal Lost') currentStageIndex = 6;
@@ -992,6 +992,11 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm">
                                   ❌ Closed - Not Valid
                                 </span>
+                              ) : sub.status === 'Lead Dropped' || sub.status === 'Lead Rejected' || sub.status === 'Deal Lost' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm">
+                                  ❌ {sub.status}
+                                </span>
+
                               ) : isClarify ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
                                   💬 Clarification Requested
@@ -1351,12 +1356,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                           </div>
 
                           <button
-                            onClick={() => {
-                              setRewardSub(selectedSub);
-                              setSelectedRewardTier('Reward 1');
-                              setRewardNotes('');
-                              setSelectedSub(null);
-                            }}
+                            onClick={() => {}}
                             className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer active:scale-95 shrink-0"
                           >
                             <Gift size={15} />

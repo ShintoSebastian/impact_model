@@ -376,8 +376,12 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                           if (!targetUrl) return;
                           try {
                             const parsed = new URL(targetUrl);
-                            if (parsed.pathname.startsWith('/status/') || parsed.pathname.startsWith('/review/')) {
-                              const impactId = parsed.pathname.split('/').pop();
+                            let targetPath = parsed.pathname;
+                            if (parsed.searchParams.has('redirect')) {
+                              targetPath = parsed.searchParams.get('redirect') || targetPath;
+                            }
+                            if (targetPath.startsWith('/status/') || targetPath.startsWith('/review/')) {
+                              const impactId = targetPath.split('/').pop();
                               // Reviewers clicking "View Lead Status" on a Submitter Mailer
                               // should go to the review board so they see the right submission
                               if (
@@ -387,7 +391,7 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                               ) {
                                 navigate(`/review/${impactId}`);
                               } else {
-                                navigate(parsed.pathname);
+                                navigate(targetPath);
                               }
                               return;
                             }

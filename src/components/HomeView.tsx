@@ -29,7 +29,7 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   else if (status === 'Lead Registered') currentStageIndex = 2;
   else if (status === 'Lead Accepted') currentStageIndex = 3;
   else if (status === 'Lead Rejected') currentStageIndex = 3; // Failed at "Lead Accepted"
-  else if (status === 'Lead Dropped') currentStageIndex = 4; // Passed "Lead Accepted", failed at Proposal
+  else if (status === 'Lead Dropped') currentStageIndex = 3; // Passed "Lead Registered in CRM", failed to be Accepted
   else if (status === 'Proposal') currentStageIndex = 4;
   else if (status === 'Negotiation') currentStageIndex = 5;
   else if (status === 'Deal Lost') currentStageIndex = 6; // Passed "Negotiation", failed at Converted Won
@@ -274,7 +274,7 @@ export function HomeView({
   const activeProposalsCount = rawMySubmissions.filter(s => s.status === 'Opportunity Registered' || s.status === 'Proposal' || s.status === 'Negotiation').length;
   const winRatioText = (() => {
     const closedLeads = rawMySubmissions.filter(s => s.status.startsWith('Closed') || s.status === 'Lead Dropped');
-    if (closedLeads.length === 0) return '100%';
+    if (closedLeads.length === 0) return '0%';
     const wonLeads = closedLeads.filter(s => s.status === 'Deal Won').length;
     return `${((wonLeads / closedLeads.length) * 100).toFixed(0)}%`;
   })();
