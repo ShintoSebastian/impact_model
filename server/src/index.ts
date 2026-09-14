@@ -2423,7 +2423,8 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
 
-  // Start automated CRM status poller immediately on server start and every 5 minutes (300,000 ms)
+  // Start automated CRM status poller immediately on server start and at specified interval
+  const pollInterval = parseInt(process.env.CRM_POLL_INTERVAL_MS || '300000', 10);
   pollCrmStatusUpdates();
-  setInterval(pollCrmStatusUpdates, 5 * 60 * 1000);
+  setInterval(pollCrmStatusUpdates, pollInterval);
 });
