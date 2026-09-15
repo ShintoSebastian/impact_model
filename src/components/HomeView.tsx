@@ -273,7 +273,13 @@ export function HomeView({
   const crmSyncPendingCount = rawMySubmissions.filter(s => !s.crmLeadId).length;
   const activeProposalsCount = rawMySubmissions.filter(s => s.status === 'Opportunity Registered' || s.status === 'Proposal' || s.status === 'Negotiation').length;
   const winRatioText = (() => {
-    const closedLeads = rawMySubmissions.filter(s => s.status.startsWith('Closed') || s.status === 'Lead Dropped');
+    const closedLeads = rawMySubmissions.filter(s => 
+      s.status.startsWith('Closed') || 
+      s.status === 'Lead Dropped' || 
+      s.status === 'Lead Rejected' ||
+      s.status === 'Deal Lost' || 
+      s.status === 'Deal Won'
+    );
     if (closedLeads.length === 0) return '0%';
     const wonLeads = closedLeads.filter(s => s.status === 'Deal Won').length;
     return `${((wonLeads / closedLeads.length) * 100).toFixed(0)}%`;
