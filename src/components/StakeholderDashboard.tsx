@@ -14,7 +14,7 @@ const LIFECYCLE_STEPS = [
   "Lead Registered",
   "Accepted",
   "Lead Registered in CRM",
-  "Accepted ", // Space to ensure uniqueness
+  "Opportunity Registered",
   "Proposal",
   "Negotiation",
   "Deal Won"
@@ -30,9 +30,8 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   else if (status === 'Closed - Not Valid') currentStageIndex = 1;
   else if (status === 'Validated') currentStageIndex = 2; // Reviewer validated & registered as lead
   else if (status === 'Lead Registered') currentStageIndex = 2;
-  else if (status === 'Lead Accepted') currentStageIndex = 3;
-  else if (status === 'Lead Rejected') currentStageIndex = 3;
-  else if (status === 'Lead Dropped') currentStageIndex = 3;
+  else if (status === 'Lead Accepted' || status === 'Lead Rejected') currentStageIndex = 2;
+  else if (status === 'Firm Awaiting PO' || status === 'Lead Dropped') currentStageIndex = 3;
   else if (status === 'Proposal') currentStageIndex = 4;
   else if (status === 'Negotiation') currentStageIndex = 5;
   else if (status === 'Deal Lost') currentStageIndex = 6;
@@ -419,7 +418,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
     if (!matchesQuery || !matchesMultiCriteria(sub)) return false;
 
     if (reviewedStatusFilter === 'All') return true;
-    if (reviewedStatusFilter === 'Pipeline') return ['Validated', 'Lead Registered', 'Lead Accepted', 'Proposal', 'Negotiation'].includes(sub.status);
+    if (reviewedStatusFilter === 'Pipeline') return ['Validated', 'Lead Registered', 'Lead Accepted', 'Proposal', 'Firm Awaiting PO', 'Negotiation'].includes(sub.status);
     if (reviewedStatusFilter === 'Won') return sub.status === 'Deal Won';
     if (reviewedStatusFilter === 'Closed') return ['Closed - Not Valid', 'Deal Lost', 'Lead Dropped', 'Lead Rejected'].includes(sub.status);
     return true;
@@ -1009,10 +1008,11 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
                                   sub.status === 'Negotiation' ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' :
                                   sub.status === 'Proposal' ? 'bg-purple-50 text-purple-700 border border-purple-200 shadow-sm' :
+                                  sub.status === 'Firm Awaiting PO' ? 'bg-teal-50 text-teal-700 border border-teal-200 shadow-sm' :
                                   sub.status.startsWith('Lead') ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm' :
                                   'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm'
                                 }`}>
-                                  ✅ {sub.status}
+                                  ✅ {sub.status === 'Firm Awaiting PO' ? 'Opportunity Registered' : sub.status}
                                 </span>
                               )}
 
@@ -1143,7 +1143,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                     {/* Top Right Stage Pill */}
                     <div className="px-4 py-1.5 rounded-full bg-[#081226] border border-amber-500/50 shadow-inner flex items-center gap-2">
                       <span className="text-base">🏆</span>
-                      <span className="text-xs font-bold text-slate-300">Stage: <strong className="text-blue-400 font-extrabold">{selectedSub.status}</strong></span>
+                      <span className="text-xs font-bold text-slate-300">Stage: <strong className="text-blue-400 font-extrabold">{selectedSub.status === 'Firm Awaiting PO' ? 'Opportunity Registered' : selectedSub.status}</strong></span>
                     </div>
                   </div>
 
@@ -1229,8 +1229,9 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                             const hs = h.status;
                             if (hs === 'Closed - Not Valid') stageIdx = 1;
                             else if (hs === 'Validated' || hs === 'Lead Registered') stageIdx = 2;
-                            else if (hs === 'Lead Accepted' || hs === 'Lead Rejected') stageIdx = 3;
-                            else if (hs === 'Proposal' || hs === 'Lead Dropped') stageIdx = 4;
+                            else if (hs === 'Lead Accepted' || hs === 'Lead Rejected') stageIdx = 2;
+                            else if (hs === 'Firm Awaiting PO' || hs === 'Lead Dropped') stageIdx = 3;
+                            else if (hs === 'Proposal') stageIdx = 4;
                             else if (hs === 'Negotiation') stageIdx = 5;
                             else if (hs === 'Deal Won' || hs === 'Deal Lost') stageIdx = 6;
                             

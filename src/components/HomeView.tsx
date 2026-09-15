@@ -10,7 +10,7 @@ const LIFECYCLE_STEPS = [
   "Lead Registered",
   "Accepted",
   "Lead Registered in CRM",
-  "Accepted ", // Space to ensure uniqueness if needed
+  "Opportunity Registered",
   "Proposal",
   "Negotiation",
   "Deal Won"
@@ -27,9 +27,8 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   else if (status === 'Closed - Not Valid') currentStageIndex = 1; // Failed at "Accepted" (Review)
   else if (status === 'Validated') currentStageIndex = 2; // Reviewer validated & registered as lead
   else if (status === 'Lead Registered') currentStageIndex = 2;
-  else if (status === 'Lead Accepted') currentStageIndex = 3;
-  else if (status === 'Lead Rejected') currentStageIndex = 3; // Failed at "Lead Accepted"
-  else if (status === 'Lead Dropped') currentStageIndex = 3; // Passed "Lead Registered in CRM", failed to be Accepted
+  else if (status === 'Lead Accepted' || status === 'Lead Rejected') currentStageIndex = 2; 
+  else if (status === 'Firm Awaiting PO' || status === 'Lead Dropped') currentStageIndex = 3;
   else if (status === 'Proposal') currentStageIndex = 4;
   else if (status === 'Negotiation') currentStageIndex = 5;
   else if (status === 'Deal Lost') currentStageIndex = 6; // Passed "Negotiation", failed at Converted Won
@@ -254,7 +253,7 @@ export function HomeView({
       if (statusFilter === 'Under Review') return s.status === 'Opportunity Registered';
       if (statusFilter === 'Clarification Requested') return s.status === 'Clarification Requested';
       if (statusFilter === 'Validated') return s.status === 'Validated';
-      if (statusFilter === 'Active') return ['Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Negotiation'].includes(s.status);
+      if (statusFilter === 'Active') return ['Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Firm Awaiting PO', 'Negotiation'].includes(s.status);
       if (statusFilter === 'Closed') return s.status.startsWith('Closed') || s.status === 'Lead Dropped';
       return true;
     })
@@ -975,6 +974,9 @@ export function HomeView({
                   } else if (isClosed) {
                     statusLabel = 'Closed';
                     statusBadgeStyles = 'text-slate-500';
+                  } else if (sub.status === 'Firm Awaiting PO') {
+                    statusLabel = 'Opportunity Registered';
+                    statusBadgeStyles = 'text-blue-600 bg-blue-50';
                   } else {
                     statusLabel = 'Sent to Sales Team';
                     statusBadgeStyles = 'text-blue-600';
@@ -1041,7 +1043,7 @@ export function HomeView({
                         ) : sub.status === 'Opportunity Registered' || sub.status.startsWith('Closed') ? (
                           <span className="text-slate-400 italic font-normal text-[13px] whitespace-nowrap">N/A</span>
                         ) : (
-                          <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/50 text-[11px] uppercase whitespace-nowrap">{sub.status}</span>
+                          <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/50 text-[11px] uppercase whitespace-nowrap">{sub.status === 'Firm Awaiting PO' ? 'Opportunity Registered' : sub.status}</span>
                         )}
                       </td>
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
@@ -1306,7 +1308,7 @@ export function HomeView({
               </div>
 
               {/* SECTION 4 — CRM Information */}
-              {['Sent to Sales Team', 'CRM Synced', 'Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Negotiation', 'Deal Won'].includes(currentSelectedSub.status) && (
+              {['Sent to Sales Team', 'CRM Synced', 'Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Firm Awaiting PO', 'Negotiation', 'Deal Won'].includes(currentSelectedSub.status) && (
                 <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm flex flex-col gap-4">
                   <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block">
                     🔗 CRM INTEGRATION DETAILS
@@ -1509,7 +1511,7 @@ export function HomeView({
                   {currentSelectedSub.statusHistory && currentSelectedSub.statusHistory.filter(hist => hist.status !== 'Opportunity Registered' || hist.changedBy !== 'System').map((hist, idx) => {
                     // Dot helper
                     const getDotStyle = (st: string) => {
-                      if (['Validated', 'Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Negotiation', 'Deal Won', 'CRM Synced', 'Synced'].includes(st)) {
+                      if (['Validated', 'Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Firm Awaiting PO', 'Negotiation', 'Deal Won', 'CRM Synced', 'Synced'].includes(st)) {
                         return { bg: 'bg-emerald-500', icon: '✓' };
                       }
                       if (['Closed - Not Valid', 'Deal Lost', 'Lead Dropped'].includes(st)) {

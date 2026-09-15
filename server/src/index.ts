@@ -1715,8 +1715,13 @@ function mapCrmStatusToImpactStatus(crmStatus: string): string | null {
     return 'Proposal';
   }
 
+  // Stage 5.5: Firm Awaiting PO
+  if (['FirmawaitingPO', 'Firm Awaiting PO'].includes(status)) {
+    return 'Firm Awaiting PO';
+  }
+
   // Stage 6: Negotiation
-  if (['Negotiation', 'NegotiationReview', 'FirmawaitingPO', 'Commercial Proposal Phase', 'Firm Awaiting PO', 'Queries'].includes(status)) {
+  if (['Negotiation', 'NegotiationReview', 'Commercial Proposal Phase', 'Queries'].includes(status)) {
     return 'Negotiation';
   }
 
