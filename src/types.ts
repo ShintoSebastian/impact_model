@@ -35,7 +35,7 @@ export interface Submission {
   contactPhone?: string;
   contactEmail?: string;
   clientName: string;
-  status: 'Under Review' | 'Validated' | 'Closed - Not Valid' | 'Lead Registered' | 'Lead Accepted' | 'Lead Dropped' | 'Lead Rejected' | 'Opportunity Registered' | 'Proposal' | 'Negotiation' | 'Deal Lost' | 'Deal Won' | 'Clarification Requested';
+  status: 'Under Review' | 'Validated' | 'Closed - Not Valid' | 'Lead Registered' | 'Lead Accepted' | 'Lead Dropped' | 'Lead Rejected' | 'Opportunity Registered' | 'Proposal' | 'Firm Awaiting PO' | 'Negotiation' | 'Deal Lost' | 'Deal Won' | 'Clarification Requested';
   createdAt: string;
   updatedAt: string;
   reason?: string;

@@ -8,7 +8,8 @@ function mapCrmStatusToImpactStatus(crmStatus) {
   const status = crmStatus.trim();
   if (['ValueProposition', 'RFPReceived', 'InProgress', 'Value Proposition', 'RFP Received', 'In Progress'].includes(status)) return 'Lead Accepted';
   if (['ProposalPreparation', 'ProposalPriceQuote', 'Proposal Preparation', 'Proposal Submitted'].includes(status)) return 'Proposal';
-  if (['NegotiationReview', 'FirmawaitingPO', 'Commercial Proposal Phase', 'Firm Awaiting PO', 'Negotiation'].includes(status)) return 'Negotiation';
+  if (['FirmawaitingPO', 'Firm Awaiting PO'].includes(status)) return 'Firm Awaiting PO';
+  if (['NegotiationReview', 'Commercial Proposal Phase', 'Negotiation'].includes(status)) return 'Negotiation';
   if (['ClosedWon', 'Closed Won'].includes(status)) return 'Deal Won';
   if (['ClosedLost', 'Closed Lost'].includes(status)) return 'Deal Lost';
   if (['Dropped'].includes(status)) return 'Lead Dropped';
