@@ -15,6 +15,7 @@ interface EmailSimulatorProps {
 export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => {
   const navigate = useNavigate();
   const { loggedInUser } = useAuth();
+  const role = loggedInUser ? (loggedInUser as any).role || 'employee' : 'employee';
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
@@ -166,7 +167,7 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
   };
 
   // Helper to render text with clickable URLs that open the exact lead
-  const renderBodyWithLinks = (text: string) => {
+  const renderBodyWithLinks = (text: string, recipientEmail: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
     return parts.map((part, index) => {
@@ -176,15 +177,25 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
 
         try {
           const parsed = new URL(part);
+          let finalPath = '';
+          
           if (parsed.pathname.startsWith('/status/') || parsed.pathname.startsWith('/review/')) {
-            relativePath = parsed.pathname;
-            targetHref = `${window.location.origin}${parsed.pathname}`;
+            finalPath = parsed.pathname;
           } else if (parsed.pathname === '/' && parsed.searchParams.has('redirect')) {
             const redirectVal = parsed.searchParams.get('redirect');
             if (redirectVal && (redirectVal.startsWith('/status/') || redirectVal.startsWith('/review/'))) {
-              relativePath = redirectVal;
-              targetHref = `${window.location.origin}${redirectVal}`;
+              finalPath = redirectVal;
             }
+          }
+          
+          if (finalPath) {
+            // If viewing a status link from an email NOT sent to us, we are a reviewer viewing the outbox
+            if (finalPath.startsWith('/status/') && loggedInUser?.email?.toLowerCase() !== recipientEmail.toLowerCase()) {
+              finalPath = finalPath.replace('/status/', '/review/');
+            }
+            
+            relativePath = finalPath;
+            targetHref = `${window.location.origin}${finalPath}`;
           }
         } catch {}
 
@@ -393,7 +404,7 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                               if (
                                 summary.actionLabel === 'View Lead Status' &&
                                 impactId &&
-                                (loggedInUser as any)?.role === 'reviewer'
+                                loggedInUser?.email?.toLowerCase() !== log.recipient.toLowerCase()
                               ) {
                                 navigate(`/review/${impactId}`);
                               } else {
@@ -429,7 +440,7 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                         {log.cc && <div><strong className="font-sans text-slate-700">CC:</strong> {log.cc}</div>}
                       </div>
                       <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
-                        {renderBodyWithLinks(log.body)}
+                        {renderBodyWithLinks(log.body, log.recipient)}
                       </div>
                     </div>
                   )}
