@@ -179,6 +179,12 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
           if (parsed.pathname.startsWith('/status/') || parsed.pathname.startsWith('/review/')) {
             relativePath = parsed.pathname;
             targetHref = `${window.location.origin}${parsed.pathname}`;
+          } else if (parsed.pathname === '/' && parsed.searchParams.has('redirect')) {
+            const redirectVal = parsed.searchParams.get('redirect');
+            if (redirectVal && (redirectVal.startsWith('/status/') || redirectVal.startsWith('/review/'))) {
+              relativePath = redirectVal;
+              targetHref = `${window.location.origin}${redirectVal}`;
+            }
           }
         } catch {}
 
