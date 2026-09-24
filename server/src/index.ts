@@ -1738,9 +1738,9 @@ function mapCrmStatusToImpactStatus(crmStatus: string): string | null {
     return 'Lead Dropped';
   }
 
-  // On Hold / Clarification
+  // On Hold
   if (['OnHold', 'On Hold'].includes(status)) {
-    return 'Clarification Requested';
+    return 'On Hold';
   }
 
   return null;
@@ -1912,7 +1912,7 @@ app.post('/api/submissions', authenticateToken, async (req: any, res) => {
         contactPhone: hasContact ? (contactPhone || null) : null,
         contactEmail: hasContact ? (contactEmail || null) : null,
         clientName,
-        status: 'Opportunity Registered',
+        status: 'Opportunity Accepted',
         reportingManager: reportingManager || employee.reportingManager,
         projectManager: projectManager || employee.projectManager,
         buHead: buHead || employee.buHead,
@@ -1920,7 +1920,7 @@ app.post('/api/submissions', authenticateToken, async (req: any, res) => {
         salesPerson: salesPerson || employee.salesPerson,
         statusHistory: {
           create: {
-            status: 'Opportunity Registered',
+            status: 'Opportunity Accepted',
             changedBy: 'System',
             comment: 'Submission recorded'
           }
@@ -2042,7 +2042,7 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
       let msg = `${id} status changed to ${status}`;
       if (status === 'Validated') {
         msg = `${id} has been Validated`;
-      } else if (['Opportunity Registered', 'Proposal', 'Negotiation', 'Deal Won'].includes(status)) {
+      } else if (['Opportunity Accepted', 'Proposal', 'Negotiation', 'Deal Won'].includes(status)) {
         const stepName = status === 'Deal Won' ? 'Converted Won' : status;
         msg = `${id} moved to ${stepName} stage`;
       }
@@ -2283,7 +2283,7 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         contactPhone: "+91 9447012345",
         contactEmail: "contact@mrf.com",
         clientName: "MRF",
-        status: "Opportunity Registered",
+        status: "Opportunity Accepted",
         reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
         projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
         buHead: "Suresh Nair (suresh.n@nestdigital.com)",
@@ -2299,7 +2299,7 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         detailedDesc: "The client is looking for a cognitive conversational chatbot to integrate into their banking app.",
         hasContact: false,
         clientName: "Horizon Mutual Bank",
-        status: "Opportunity Registered",
+        status: "Opportunity Accepted",
         reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
         projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
         buHead: "Suresh Nair (suresh.n@nestdigital.com)",
@@ -2340,7 +2340,7 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         contactPhone: "+91 9876543210",
         contactEmail: "it.buyer@apexretail.com",
         clientName: "Apex Retail Solutions Inc.",
-        status: "Opportunity Registered",
+        status: "Opportunity Accepted",
         reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
         projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
         buHead: "Suresh Nair (suresh.n@nestdigital.com)",
@@ -2374,23 +2374,23 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
     ];
 
     const seedHistories = [
-      { id: "IM-20260701-001", status: "Opportunity Registered", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-07-01T09:30:00Z") },
-      { id: "IM-20260629-001", status: "Opportunity Registered", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-29T14:45:00Z") },
-      { id: "IM-20260628-001", status: "Opportunity Registered", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-28T10:00:00Z") },
+      { id: "IM-20260701-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-07-01T09:30:00Z") },
+      { id: "IM-20260629-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-29T14:45:00Z") },
+      { id: "IM-20260628-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-28T10:00:00Z") },
       { id: "IM-20260628-001", status: "Validated", changedBy: "Arun Kumar", comment: "Approved — CRM Lead created", timestamp: new Date("2026-06-30T14:00:00Z") },
-      { id: "IM-20260625-001", status: "Opportunity Registered", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-25T09:30:00Z") },
-      { id: "IM-20260624-001", status: "Opportunity Registered", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-24T08:00:00Z") },
+      { id: "IM-20260625-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-25T09:30:00Z") },
+      { id: "IM-20260624-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-24T08:00:00Z") },
       { id: "IM-20260624-001", status: "Validated", changedBy: "Arun Kumar", comment: "Approved by Delivery Head", timestamp: new Date("2026-06-24T16:00:00Z") },
       { id: "IM-20260624-001", status: "Lead Registered", changedBy: "CRM Sync", comment: "CRM Lead created", timestamp: new Date("2026-06-24T16:01:00Z") },
       { id: "IM-20260624-001", status: "Lead Accepted", changedBy: "CRM Sync", comment: "Sales accepted the lead", timestamp: new Date("2026-06-25T10:00:00Z") },
-      { id: "IM-20260624-001", status: "Opportunity Registered", changedBy: "CRM Sync", comment: "Opportunity created in CRM", timestamp: new Date("2026-06-25T14:00:00Z") },
+      { id: "IM-20260624-001", status: "Opportunity Accepted", changedBy: "CRM Sync", comment: "Opportunity created in CRM", timestamp: new Date("2026-06-25T14:00:00Z") },
       { id: "IM-20260624-001", status: "Proposal", changedBy: "CRM Sync", comment: "Proposal sent to client", timestamp: new Date("2026-06-26T09:00:00Z") },
       { id: "IM-20260624-001", status: "Negotiation", changedBy: "CRM Sync", comment: "Contract negotiations started", timestamp: new Date("2026-06-26T14:00:00Z") },
       { id: "IM-20260624-001", status: "Deal Won", changedBy: "CRM Sync", comment: "Deal won — $120k ARR", timestamp: new Date("2026-06-26T16:30:00Z") }
     ];
 
     const seedNotifications = [
-      { message: "IM-20260701-001 moved to Opportunity Registered", read: false, timestamp: new Date() },
+      { message: "IM-20260701-001 moved to Opportunity Accepted", read: false, timestamp: new Date() },
       { message: "IM-20260628-001 CRM Synced successfully", read: false, timestamp: new Date(Date.now() - 3600 * 1000) },
       { message: "SLA warning: IM-20260701-001 acknowledgment overdue.", read: false, timestamp: new Date(Date.now() - 2 * 3600 * 1000) }
     ];

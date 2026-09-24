@@ -98,7 +98,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       contactPhone: hasContact ? contactPhone.trim() : undefined,
       contactEmail: hasContact ? contactEmail.trim() : undefined,
       clientName: clientName.trim(),
-      status: 'Opportunity Registered',
+      status: 'Opportunity Accepted',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       reportingManager: loggedInUser.reportingManager || 'Not Specified',
@@ -107,7 +107,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       hrbp: loggedInUser.hrbp || 'Not Specified',
       salesPerson: loggedInUser.salesPerson || 'Not Specified',
       statusHistory: [
-        { status: 'Opportunity Registered', changedBy: 'System', timestamp: new Date().toISOString(), comment: 'Submission recorded' }
+        { status: 'Opportunity Accepted', changedBy: 'System', timestamp: new Date().toISOString(), comment: 'Submission recorded' }
       ]
     };
 

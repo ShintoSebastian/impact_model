@@ -68,7 +68,7 @@ const INITIAL_SUBMISSIONS = [
     contactPhone: "+91 9447012345",
     contactEmail: "contact@mrf.com",
     clientName: "MRF",
-    status: "Opportunity Registered",
+    status: "Opportunity Accepted",
     createdAt: new Date("2026-07-01T09:30:00Z"),
     updatedAt: new Date("2026-07-01T09:30:00Z"),
     reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
@@ -77,7 +77,7 @@ const INITIAL_SUBMISSIONS = [
     hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
     salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
     statusHistory: [
-      { status: "Opportunity Registered", changedBy: "System", timestamp: new Date("2026-07-01T09:30:00Z"), comment: "Submission recorded" }
+      { status: "Opportunity Accepted", changedBy: "System", timestamp: new Date("2026-07-01T09:30:00Z"), comment: "Submission recorded" }
     ]
   },
   {
@@ -87,7 +87,7 @@ const INITIAL_SUBMISSIONS = [
     detailedDesc: "The client is looking for a cognitive conversational chatbot to integrate into their banking app.",
     hasContact: false,
     clientName: "Horizon Mutual Bank",
-    status: "Opportunity Registered",
+    status: "Opportunity Accepted",
     createdAt: new Date("2026-06-29T14:45:00Z"),
     updatedAt: new Date("2026-06-29T14:45:00Z"),
     reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
@@ -173,7 +173,7 @@ const INITIAL_SUBMISSIONS = [
       { status: "Validated", changedBy: "Arun Kumar", timestamp: new Date("2026-06-24T16:00:00Z"), comment: "Approved by Delivery Head" },
       { status: "Lead Registered", changedBy: "CRM Sync", timestamp: new Date("2026-06-24T16:01:00Z"), comment: "CRM Lead created" },
       { status: "Lead Accepted", changedBy: "CRM Sync", timestamp: new Date("2026-06-25T10:00:00Z"), comment: "Sales accepted the lead" },
-      { status: "Opportunity Registered", changedBy: "CRM Sync", timestamp: new Date("2026-06-25T14:00:00Z"), comment: "Opportunity created in CRM" },
+      { status: "Opportunity Accepted", changedBy: "CRM Sync", timestamp: new Date("2026-06-25T14:00:00Z"), comment: "Opportunity created in CRM" },
       { status: "Proposal", changedBy: "CRM Sync", timestamp: new Date("2026-06-26T09:00:00Z"), comment: "Proposal sent to client" },
       { status: "Negotiation", changedBy: "CRM Sync", timestamp: new Date("2026-06-26T14:00:00Z"), comment: "Contract negotiations started" },
       { status: "Deal Won", changedBy: "CRM Sync", timestamp: new Date("2026-06-26T16:30:00Z"), comment: "Deal won — $120k ARR" }

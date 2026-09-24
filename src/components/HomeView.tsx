@@ -5,34 +5,52 @@ import { Database, RefreshCcw, ShieldCheck, Shield, Sparkles, Mail, PhoneCall, C
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import cityBg from '../assets/city_bg.jpg';
 
-// Steps for the Lead Lifecycle Tracker
 const LIFECYCLE_STEPS = [
   "Lead Registered",
-  "Accepted",
-  "Lead Registered in CRM",
-  "Opportunity Registered",
-  "Proposal",
-  "Negotiation",
+  "Opportunity Accepted",
+  "Proposal In Progress",
   "Deal Won"
 ];
 
-// Helper to determine stepper status
-const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'active' | 'future' | 'failed' => {
-  const status = sub.status;
-  const isFailed = status === 'Closed - Not Valid' || status === 'Deal Lost' || status === 'Lead Dropped' || status === 'Lead Rejected';
+export const isProposalPhase = (status: string) => {
+  const s = status.toLowerCase();
+  return [
+    'proposal', 'negotiation', 'proposal preparation', 'proposal submitted', 
+    'under negotiation', 'firm awaiting po', 'commercial proposal phase', 'lead accepted'
+  ].includes(s);
+};
 
-  // Map current status to the stepper index (0-6)
+export const getDisplayStatus = (status: string) => {
+  const s = status.toLowerCase();
+  if (isProposalPhase(status)) return 'Proposal In Progress';
+  if (s === 'lead registered') return 'Opportunity Accepted';
+  if (s === 'closed won' || s === 'deal won') return 'Deal Won';
+  if (s === 'closed lost' || s === 'dropped' || s === 'lead dropped' || s === 'deal lost') return 'Deal Lost';
+  if (s === 'lead rejected' || s === 'closed - not valid') return 'Rejected';
+  if (s === 'on hold') return 'On Hold';
+  return status;
+};
+
+// Helper to determine stepper status
+const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'active' | 'future' | 'failed' | 'on_hold' => {
+  const status = sub.status;
+  const s = status.toLowerCase();
+  const isFailed = s === 'closed - not valid' || s === 'deal lost' || s === 'lead dropped' || s === 'lead rejected' || s === 'closed lost' || s === 'dropped';
+  const isOnHold = s === 'on hold';
+
   let currentStageIndex = -1;
-  if (status === 'Opportunity Registered' || status === 'Clarification Requested' || status === 'Under Review') currentStageIndex = 0;
-  else if (status === 'Closed - Not Valid') currentStageIndex = 1; // Failed at "Accepted" (Review)
-  else if (status === 'Validated') currentStageIndex = 2; // Reviewer validated & registered as lead
-  else if (status === 'Lead Registered') currentStageIndex = 2;
-  else if (status === 'Lead Accepted' || status === 'Lead Rejected') currentStageIndex = 2; 
-  else if (status === 'Firm Awaiting PO' || status === 'Lead Dropped') currentStageIndex = 3;
-  else if (status === 'Proposal') currentStageIndex = 4;
-  else if (status === 'Negotiation') currentStageIndex = 5;
-  else if (status === 'Deal Lost') currentStageIndex = 6; // Passed "Negotiation", failed at Converted Won
-  else if (status === 'Deal Won') currentStageIndex = 6;
+  if (s === 'Opportunity Accepted' || s === 'clarification requested' || s === 'under review') {
+    currentStageIndex = 0;
+  }
+  else if (s === 'closed - not valid' || s === 'validated' || s === 'lead registered' || s === 'lead rejected' || s === 'rfp received') {
+    currentStageIndex = 1;
+  }
+  else if (isProposalPhase(status)) {
+    currentStageIndex = 2;
+  }
+  else if (s === 'deal lost' || s === 'deal won' || s === 'closed won' || s === 'closed lost' || s === 'lead dropped' || s === 'dropped' || s === 'on hold') {
+    currentStageIndex = 3;
+  }
 
   if (stepIndex < currentStageIndex) {
     return 'completed';
@@ -40,7 +58,8 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
 
   if (stepIndex === currentStageIndex) {
     if (isFailed) return 'failed';
-    if (status === 'Deal Won') return 'completed';
+    if (isOnHold) return 'on_hold';
+    if (status === 'Deal Won' || status === 'Closed won') return 'completed';
     return 'active';
   }
 
@@ -49,7 +68,7 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
 
 // Check if a review submission exceeds the 7 working days SLA
 const isOverdue = (createdAtStr: string, status: string): boolean => {
-  if (status !== 'Opportunity Registered') return false;
+  if (status !== 'Opportunity Accepted') return false;
   const createdDate = new Date(createdAtStr);
   const currentDate = new Date(); // Real-time dynamic current date
 
@@ -138,7 +157,7 @@ export function HomeView({
         'Contact Email': sub.contactEmail || 'N/A',
         'Opportunity Title': sub.shortDesc,
         'Detailed Description': sub.detailedDesc,
-        'Current CRM Stage': sub.status,
+        'Current CRM Stage': getDisplayStatus(sub.status),
         'CRM Lead ID': sub.crmLeadId || 'N/A',
         'Reward Status': sub.rewardTier ? `🏆 ${sub.rewardTier}` : 'N/A',
         'Submitted Date': new Date(sub.createdAt).toLocaleDateString('en-GB')
@@ -159,7 +178,7 @@ export function HomeView({
         contactPhone: sub.contactPhone || 'N/A',
         contactEmail: sub.contactEmail || 'N/A',
         shortDesc: sub.shortDesc,
-        status: sub.status,
+        status: getDisplayStatus(sub.status),
         crmLeadId: sub.crmLeadId || 'N/A',
         reward: sub.rewardTier ? `🏆 ${sub.rewardTier}` : 'N/A'
       }));
@@ -250,10 +269,10 @@ export function HomeView({
   const mySubmissions = rawMySubmissions
     .filter(s => {
       if (statusFilter === 'All') return true;
-      if (statusFilter === 'Under Review') return s.status === 'Opportunity Registered';
+      if (statusFilter === 'Under Review') return s.status === 'Opportunity Accepted';
       if (statusFilter === 'Clarification Requested') return s.status === 'Clarification Requested';
       if (statusFilter === 'Validated') return s.status === 'Validated';
-      if (statusFilter === 'Active') return ['Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Firm Awaiting PO', 'Negotiation'].includes(s.status);
+      if (statusFilter === 'Active') return ['Lead Registered', 'Lead Accepted', 'Opportunity Accepted', 'Proposal', 'Firm Awaiting PO', 'Negotiation'].includes(s.status);
       if (statusFilter === 'Closed') return s.status.startsWith('Closed') || s.status === 'Lead Dropped';
       return true;
     })
@@ -268,9 +287,9 @@ export function HomeView({
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Statistics calculation for Welcome Card Banner
-  const overdueReviewCount = rawMySubmissions.filter(s => s.status === 'Opportunity Registered' && isOverdue(s.createdAt, s.status)).length;
+  const overdueReviewCount = rawMySubmissions.filter(s => s.status === 'Opportunity Accepted' && isOverdue(s.createdAt, s.status)).length;
   const crmSyncPendingCount = rawMySubmissions.filter(s => !s.crmLeadId).length;
-  const activeProposalsCount = rawMySubmissions.filter(s => s.status === 'Opportunity Registered' || s.status === 'Proposal' || s.status === 'Negotiation').length;
+  const activeProposalsCount = rawMySubmissions.filter(s => s.status === 'Opportunity Accepted' || s.status === 'Proposal' || s.status === 'Negotiation').length;
   const winRatioText = (() => {
     const closedLeads = rawMySubmissions.filter(s => 
       s.status.startsWith('Closed') || 
@@ -286,7 +305,7 @@ export function HomeView({
 
   // Statistics calculation for Stat Cards Row
   const totalLeadsCount = rawMySubmissions.length;
-  const underReviewTotal = rawMySubmissions.filter(s => s.status === 'Opportunity Registered').length;
+  const underReviewTotal = rawMySubmissions.filter(s => s.status === 'Opportunity Accepted').length;
   const crmSyncedCount = rawMySubmissions.filter(s => !!s.crmLeadId).length;
   const convertedTotal = rawMySubmissions.filter(s => s.status === 'Deal Won').length;
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -618,7 +637,7 @@ export function HomeView({
           <div className="absolute top-4 right-4 text-slate-300 border border-slate-100 rounded-lg p-1.5 bg-slate-50">
             <Shield size={16} />
           </div>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Opportunity Registered</span>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Opportunity Accepted</span>
           <span className="text-4xl font-extrabold text-brand-navy leading-none mt-2 mb-2">{underReviewTotal}</span>
           <span className="text-[10px] font-bold text-brand-red tracking-wide">{overdueReviewCount} overdue</span>
         </div>
@@ -673,12 +692,10 @@ export function HomeView({
                 const sub = mySubmissions.find(s => s.intelligenceId === selectedSubId) || submissions.find(s => s.intelligenceId === selectedSubId);
                 if (!sub) return '0%';
                 if (sub.status.startsWith('Closed') || sub.status === 'Deal Lost' || sub.status === 'Lead Dropped' || sub.status === 'Lead Rejected') return '100% Complete';
-                if (sub.status === 'Negotiation') return '85% Complete';
-                if (sub.status === 'Proposal') return '70% Complete';
-                if (sub.status === 'Lead Accepted') return '55% Complete';
+                if (isProposalPhase(sub.status)) return '55% Complete';
                 if (sub.status === 'Lead Registered') return '40% Complete';
                 if (sub.status === 'Validated') return '25% Complete';
-                if (sub.status === 'Opportunity Registered' || sub.status === 'Clarification Requested' || sub.status === 'Under Review') return '10% Complete';
+                if (sub.status === 'Opportunity Accepted' || sub.status === 'Clarification Requested' || sub.status === 'Under Review') return '10% Complete';
                 return '0% Complete';
               })()}
             </span>
@@ -691,34 +708,34 @@ export function HomeView({
             if (!selectedSub) return null;
             return (
               <>
-                <div className="grid grid-cols-7 gap-1 w-full relative my-6 pt-2 pb-6">
+                <div className="grid grid-cols-4 gap-1 w-full relative my-6 pt-2 pb-6">
                   {LIFECYCLE_STEPS.map((step, idx) => {
                     const status = getStepStatus(selectedSub, idx);
                     const isLast = idx === LIFECYCLE_STEPS.length - 1;
                     const nextStatus = isLast ? null : getStepStatus(selectedSub, idx + 1);
 
                     const StepIcon = (() => {
-                      if (idx === 6 && (status === 'completed' || status === 'active')) {
+                      if (idx === 3 && (status === 'completed' || status === 'active')) {
                         return Check;
                       }
                       switch (idx) {
                         case 0: return Target;
                         case 1: return Check;
-                        case 2: return ClipboardList;
-                        case 3: return Check;
-                        case 4: return FileText;
-                        case 5: return Handshake;
-                        case 6: return Trophy;
+                        case 2: return FileText;
+                        case 3: return Trophy;
                         default: return Check;
                       }
                     })();
 
                     let circleMarkup;
-                    if (status === 'completed' || status === 'active') {
+                    if (status === 'completed' || status === 'active' || status === 'on_hold') {
                       circleMarkup = (
                         <div className="relative flex items-center justify-center z-10">
                           {status === 'active' && <div className="absolute w-12 h-12 rounded-full bg-emerald-500/30 animate-pulse" />}
-                          <div className="relative w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-[0_4px_16px_rgba(5,150,105,0.4)] ring-4 ring-emerald-50">
+                          {status === 'on_hold' && <div className="absolute w-12 h-12 rounded-full bg-amber-500/30 animate-pulse" />}
+                          <div className={`relative w-10 h-10 rounded-full text-white flex items-center justify-center ring-4 ${
+                            status === 'on_hold' ? 'bg-amber-500 shadow-[0_4px_16px_rgba(245,158,11,0.4)] ring-amber-50' : 'bg-emerald-600 shadow-[0_4px_16px_rgba(5,150,105,0.4)] ring-emerald-50'
+                          }`}>
                             <StepIcon size={18} strokeWidth={2.5} />
                           </div>
                         </div>
@@ -744,10 +761,12 @@ export function HomeView({
                       lineStyle = 'bg-emerald-600';
                     } else if (status === 'completed' && nextStatus === 'failed') {
                       lineStyle = 'bg-rose-500';
-                    } else if (status === 'completed' && nextStatus === 'active') {
+                    } else if (status === 'completed' && (nextStatus === 'active' || nextStatus === 'on_hold')) {
                       lineStyle = 'bg-emerald-600';
                     } else if (status === 'active' && nextStatus !== 'failed') {
                       lineStyle = 'bg-orange-400 animate-pulse';
+                    } else if (status === 'on_hold' && nextStatus !== 'failed') {
+                      lineStyle = 'bg-amber-400';
                     }
 
                     return (
@@ -762,17 +781,35 @@ export function HomeView({
 
                         {/* Title Label */}
                         <span className={`text-[10.5px] font-extrabold text-center leading-tight mt-2.5 px-0.5 break-words max-w-[85px] z-10 ${
-                          (status === 'completed' || status === 'active') ? 'text-slate-700 font-extrabold' : (status === 'failed' ? 'text-rose-600 font-extrabold' : 'text-slate-400')
+                          (status === 'completed' || status === 'active') ? 'text-slate-700 font-extrabold' : (status === 'failed' ? 'text-rose-600 font-extrabold' : (status === 'on_hold' ? 'text-amber-600 font-extrabold' : 'text-slate-400'))
                         }`}>
                           {status === 'failed' ? (
-                            step === 'Deal Won' ? 'Deal Lost' :
-                            step.includes('Accepted') ? 'Rejected' : 'Dropped'
+                            step === 'Deal Won' ? (selectedSub.status === 'Dropped' || selectedSub.status === 'Lead Dropped' ? 'Dropped' : 'Deal Lost') : 'Rejected'
+                          ) : status === 'on_hold' ? (
+                            'On Hold'
+                          ) : step === 'Proposal In Progress' ? (
+                            <>Proposal<br/><span className="text-amber-500">In progress</span></>
                           ) : step}
                         </span>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* GEM Award Banner for Opportunity Accepted */}
+                {(getStepStatus(selectedSub, 1) === 'completed' || getStepStatus(selectedSub, 1) === 'active' || getStepStatus(selectedSub, 1) === 'on_hold') && (
+                  <div className="mt-6 flex items-center bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 p-4 rounded-xl shadow-sm animate-fadeIn">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-amber-200/50 text-amber-600 flex items-center justify-center text-xl border border-amber-300">
+                        🏅
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-amber-700 font-extrabold text-[10px] uppercase tracking-wider">Milestone Reached</span>
+                        <span className="text-amber-900 font-bold text-xs">Employee has achieved the first Reward + GEM Award.</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Celebratory Reward Card Banner (Minimalist & Ultra-Premium with Hover Reveal) */}
                 {selectedSub.rewardTier && (
@@ -944,38 +981,31 @@ export function HomeView({
                   const isClosed = sub.status.startsWith('Closed');
 
                   // Map status badge text and colors
-                  let statusLabel: string = sub.status;
+                  let statusLabel: string = getDisplayStatus(sub.status);
                   let statusBadgeStyles = 'text-gray-500';
 
-                  if (sub.status === 'Opportunity Registered') {
+                  if (sub.status === 'Opportunity Accepted') {
                     statusLabel = 'Pending Review';
                     statusBadgeStyles = 'text-amber-600';
-                  } else if (sub.status === 'Clarification Requested') {
-                    statusLabel = 'More Info Needed';
+                  } else if (statusLabel === 'Clarification Requested') {
                     statusBadgeStyles = 'text-purple-600';
-                  } else if (sub.status === 'Validated') {
-                    statusLabel = 'Validated';
+                  } else if (statusLabel === 'Validated') {
                     statusBadgeStyles = 'text-emerald-600';
-                  } else if (sub.status === 'Closed - Not Valid') {
-                    statusLabel = 'Rejected';
-                    statusBadgeStyles = 'text-rose-600';
-                  } else if (sub.status === 'Deal Won') {
-                    statusLabel = 'Deal Won';
+                  } else if (statusLabel === 'Rejected') {
+                    statusBadgeStyles = 'text-rose-600 bg-rose-50';
+                  } else if (statusLabel === 'Deal Won') {
                     statusBadgeStyles = 'text-emerald-600 bg-emerald-50';
-                  } else if (sub.status === 'Deal Lost') {
-                    statusLabel = 'Deal Lost';
+                  } else if (statusLabel === 'Deal Lost') {
                     statusBadgeStyles = 'text-rose-600 bg-rose-50';
-                  } else if (sub.status === 'Lead Dropped') {
-                    statusLabel = 'Dropped';
-                    statusBadgeStyles = 'text-slate-500 bg-slate-100';
-                  } else if (sub.status === 'Lead Rejected') {
-                    statusLabel = 'Rejected';
-                    statusBadgeStyles = 'text-rose-600 bg-rose-50';
+                  } else if (statusLabel === 'On Hold') {
+                    statusLabel = 'Proposal In Progress';
+                    statusBadgeStyles = 'text-emerald-600 bg-emerald-50';
                   } else if (isClosed) {
                     statusLabel = 'Closed';
                     statusBadgeStyles = 'text-slate-500';
-                  } else if (sub.status === 'Firm Awaiting PO') {
-                    statusLabel = 'Opportunity Registered';
+                  } else if (statusLabel === 'Proposal In Progress') {
+                    statusBadgeStyles = 'text-emerald-600 bg-emerald-50';
+                  } else if (statusLabel === 'Opportunity Accepted') {
                     statusBadgeStyles = 'text-blue-600 bg-blue-50';
                   } else {
                     statusLabel = 'Sent to Sales Team';
@@ -1036,14 +1066,44 @@ export function HomeView({
                         )}
                       </td>
                       <td className="px-3 py-3.5 whitespace-nowrap">
-                        {sub.rewardTier ? (
-                          <span className="inline-flex items-center gap-1 font-extrabold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200 text-[11px] uppercase whitespace-nowrap shadow-sm">
-                            🏆 {sub.rewardTier} Awarded
-                          </span>
-                        ) : sub.status === 'Opportunity Registered' || sub.status.startsWith('Closed') ? (
+                        {sub.status === 'Opportunity Accepted' || sub.status === 'Closed - Not Valid' ? (
                           <span className="text-slate-400 italic font-normal text-[13px] whitespace-nowrap">N/A</span>
                         ) : (
-                          <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/50 text-[11px] uppercase whitespace-nowrap">{sub.status === 'Firm Awaiting PO' ? 'Opportunity Registered' : sub.status}</span>
+                          <div className="flex items-center gap-2">
+                            {getDisplayStatus(sub.status) === 'Deal Lost' || getDisplayStatus(sub.status) === 'Rejected' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm">
+                                ❌ {getDisplayStatus(sub.status)}
+                              </span>
+                            ) : getDisplayStatus(sub.status) === 'Clarification Requested' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
+                                💬 Clarification Requested
+                              </span>
+                            ) : getDisplayStatus(sub.status) === 'Deal Won' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
+                                🎉 Deal Won
+                              </span>
+                            ) : getDisplayStatus(sub.status) === 'On Hold' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
+                                ⏸️ On Hold
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
+                                isProposalPhase(sub.status) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm' :
+                                sub.status === 'Lead Registered' ? 'bg-teal-50 text-teal-700 border border-teal-200 shadow-sm' :
+                                sub.status.startsWith('Lead') ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm' :
+                                'bg-slate-50 text-slate-700 border border-slate-200 shadow-sm'
+                              }`}>
+                                ✅ {getDisplayStatus(sub.status)}
+                              </span>
+                            )}
+
+                            {/* Reward Status (If Won) */}
+                            {sub.rewardTier && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200 shadow-sm">
+                                🏆 {sub.rewardTier} Awarded
+                              </span>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
@@ -1137,7 +1197,7 @@ export function HomeView({
               {/* SECTION 3 — SLA Status Banner */}
               {(() => {
                 const isSubOverdue = isOverdue(currentSelectedSub.createdAt, currentSelectedSub.status);
-                const isUnderReview = currentSelectedSub.status === 'Opportunity Registered' || currentSelectedSub.status === 'Clarification Requested';
+                const isUnderReview = currentSelectedSub.status === 'Opportunity Accepted' || currentSelectedSub.status === 'Clarification Requested';
                 
                 if (isUnderReview) {
                   if (isSubOverdue) {
@@ -1308,7 +1368,7 @@ export function HomeView({
               </div>
 
               {/* SECTION 4 — CRM Information */}
-              {['Sent to Sales Team', 'CRM Synced', 'Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Firm Awaiting PO', 'Negotiation', 'Deal Won'].includes(currentSelectedSub.status) && (
+              {['Sent to Sales Team', 'CRM Synced', 'Lead Registered', 'Lead Accepted', 'Opportunity Accepted', 'Proposal', 'Firm Awaiting PO', 'Negotiation', 'Deal Won'].includes(currentSelectedSub.status) && (
                 <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm flex flex-col gap-4">
                   <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block">
                     🔗 CRM INTEGRATION DETAILS
@@ -1327,7 +1387,7 @@ export function HomeView({
                         <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">CRM Stage</span>
                         <div>
                           <span className="inline-flex px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-500/10 text-blue-700 border border-blue-200/30 uppercase tracking-wide">
-                            {currentSelectedSub.status}
+                            {getDisplayStatus(currentSelectedSub.status)}
                           </span>
                         </div>
                       </div>
@@ -1465,7 +1525,7 @@ export function HomeView({
                   );
                 }
 
-                if (status === 'Opportunity Registered' || status === 'Pending Review') {
+                if (status === 'Opportunity Accepted' || status === 'Pending Review') {
                   return (
                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs font-medium text-blue-700 flex items-center gap-2">
                       <span>⏳</span>
@@ -1508,10 +1568,10 @@ export function HomeView({
                   })()}
 
                   {/* Dynamic entries based on actual statusHistory */}
-                  {currentSelectedSub.statusHistory && currentSelectedSub.statusHistory.filter(hist => hist.status !== 'Opportunity Registered' || hist.changedBy !== 'System').map((hist, idx) => {
+                  {currentSelectedSub.statusHistory && currentSelectedSub.statusHistory.filter(hist => hist.status !== 'Opportunity Accepted' || hist.changedBy !== 'System').map((hist, idx) => {
                     // Dot helper
                     const getDotStyle = (st: string) => {
-                      if (['Validated', 'Lead Registered', 'Lead Accepted', 'Opportunity Registered', 'Proposal', 'Firm Awaiting PO', 'Negotiation', 'Deal Won', 'CRM Synced', 'Synced'].includes(st)) {
+                      if (['Validated', 'Lead Registered', 'Lead Accepted', 'Opportunity Accepted', 'Proposal', 'Firm Awaiting PO', 'Negotiation', 'Deal Won', 'CRM Synced', 'Synced'].includes(st)) {
                         return { bg: 'bg-emerald-500', icon: '✓' };
                       }
                       if (['Closed - Not Valid', 'Deal Lost', 'Lead Dropped'].includes(st)) {
@@ -1544,11 +1604,11 @@ export function HomeView({
                     return (
                       <div key={idx} className="flex justify-between items-start gap-4 text-xs relative">
                         {/* Dot container */}
-                        <div className={`absolute -left-[21px] top-0.5 w-[12px] h-[12px] rounded-full ${style.bg} border-2 border-white ring-2 ring-slate-100 flex items-center justify-center text-white text-[7px] font-bold flex-shrink-0`} title={hist.status}>
+                        <div className={`absolute -left-[21px] top-0.5 w-[12px] h-[12px] rounded-full ${style.bg} border-2 border-white ring-2 ring-slate-100 flex items-center justify-center text-white text-[7px] font-bold flex-shrink-0`} title={getDisplayStatus(hist.status)}>
                           {style.icon === '●' ? '' : style.icon}
                         </div>
                         <div>
-                          <strong className="text-slate-800 font-extrabold text-[13px] block">{hist.status}</strong>
+                          <strong className="text-slate-800 font-extrabold text-[13px] block">{getDisplayStatus(hist.status)}</strong>
                           <span className="text-slate-400 font-semibold text-[11px]">
                             by {hist.changedBy} ({role})
                           </span>

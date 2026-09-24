@@ -310,7 +310,7 @@ export function DashboardLayout({
                     <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block border-b border-slate-100 pb-1">📈 7-Stage Lead Lifecycle Stepper</span>
                     <div className="flex flex-col gap-2.5 pl-1">
                       <div>
-                        <strong className="text-brand-navy font-bold">1. Opportunity Registered (10%):</strong> 
+                        <strong className="text-brand-navy font-bold">1. Opportunity Accepted (10%):</strong> 
                         <p className="text-[11px] text-slate-500 mt-0.5">Opportunity submitted on portal by employee.</p>
                       </div>
                       <div>
@@ -322,8 +322,8 @@ export function DashboardLayout({
                         <p className="text-[11px] text-slate-500 mt-0.5">Pushed to CRM API & assigned a CRM Reference ID.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy font-bold">4. Lead Accepted (55%):</strong> 
-                        <p className="text-[11px] text-slate-500 mt-0.5">Accepted by the Sales team in the CRM.</p>
+                        <strong className="text-brand-navy font-bold">4. Proposal In Progress (55%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity under various proposal stages in the CRM.</p>
                       </div>
                       <div>
                         <strong className="text-brand-navy font-bold">5. Proposal (70%):</strong> 
