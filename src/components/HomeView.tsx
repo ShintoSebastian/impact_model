@@ -788,7 +788,7 @@ export function HomeView({
                           ) : status === 'on_hold' ? (
                             'On Hold'
                           ) : step === 'Proposal In Progress' ? (
-                            <>Proposal<br/><span className="text-amber-500">In progress</span></>
+                            <>Proposal<br/><span className={status === 'future' ? "" : "text-amber-500"}>In progress</span></>
                           ) : step}
                         </span>
                       </div>
@@ -913,18 +913,6 @@ export function HomeView({
                   className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200/60 rounded-lg text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/10 transition-all w-48 font-medium"
                 />
               </div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-lg text-sm outline-none focus:border-blue-400 cursor-pointer text-gray-600 font-bold"
-              >
-                <option value="All">All Status</option>
-                <option value="Under Review">Pending Review</option>
-                <option value="Clarification Requested">More Info Needed</option>
-                <option value="Validated">Validated</option>
-                <option value="Active">Active Pipeline</option>
-                <option value="Closed">Closed / Terminal</option>
-              </select>
               <div className="flex items-center gap-2 mr-2">
                 <button
                   onClick={handleDownloadExcel}
