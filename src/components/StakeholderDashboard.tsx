@@ -12,30 +12,50 @@ import { ROLE_MAP } from '../types.ts';
 // Steps for the Lead Lifecycle Tracker
 const LIFECYCLE_STEPS = [
   "Lead Registered",
-  "Accepted",
-  "Lead Registered in CRM",
-  "Opportunity Registered",
-  "Proposal",
-  "Negotiation",
+  "Opportunity Accepted",
+  "Proposal In Progress",
   "Deal Won"
 ];
 
+export const isProposalPhase = (status: string) => {
+  const s = status.toLowerCase();
+  return [
+    'proposal', 'negotiation', 'proposal preparation', 'proposal submitted', 
+    'under negotiation', 'firm awaiting po', 'commercial proposal phase', 'lead accepted'
+  ].includes(s);
+};
+
+export const getDisplayStatus = (status: string) => {
+  const s = status.toLowerCase();
+  if (isProposalPhase(status)) return 'Proposal In Progress';
+  if (s === 'lead registered') return 'Opportunity Accepted';
+  if (s === 'closed won' || s === 'deal won') return 'Deal Won';
+  if (s === 'closed lost' || s === 'dropped' || s === 'lead dropped' || s === 'deal lost') return 'Deal Lost';
+  if (s === 'lead rejected' || s === 'closed - not valid') return 'Rejected';
+  if (s === 'on hold') return 'On Hold';
+  return status;
+};
+
 // Helper to determine stepper status
-const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'active' | 'future' | 'failed' => {
+const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'active' | 'future' | 'failed' | 'on_hold' => {
   const status = sub.status;
-  const isFailed = status === 'Closed - Not Valid' || status === 'Deal Lost' || status === 'Lead Dropped' || status === 'Lead Rejected';
+  const s = status.toLowerCase();
+  const isFailed = s === 'closed - not valid' || s === 'deal lost' || s === 'lead dropped' || s === 'lead rejected' || s === 'closed lost' || s === 'dropped';
+  const isOnHold = s === 'on hold';
 
   let currentStageIndex = -1;
-  if (status === 'Opportunity Registered' || status === 'Clarification Requested' || status === 'Under Review') currentStageIndex = 0;
-  else if (status === 'Closed - Not Valid') currentStageIndex = 1;
-  else if (status === 'Validated') currentStageIndex = 2; // Reviewer validated & registered as lead
-  else if (status === 'Lead Registered') currentStageIndex = 2;
-  else if (status === 'Lead Accepted' || status === 'Lead Rejected') currentStageIndex = 2;
-  else if (status === 'Firm Awaiting PO' || status === 'Lead Dropped') currentStageIndex = 3;
-  else if (status === 'Proposal') currentStageIndex = 4;
-  else if (status === 'Negotiation') currentStageIndex = 5;
-  else if (status === 'Deal Lost') currentStageIndex = 6;
-  else if (status === 'Deal Won') currentStageIndex = 6;
+  if (s === 'Opportunity Accepted' || s === 'clarification requested' || s === 'under review') {
+    currentStageIndex = 0;
+  }
+  else if (s === 'closed - not valid' || s === 'validated' || s === 'lead registered' || s === 'lead rejected' || s === 'rfp received') {
+    currentStageIndex = 1;
+  }
+  else if (isProposalPhase(status)) {
+    currentStageIndex = 2;
+  }
+  else if (s === 'deal lost' || s === 'deal won' || s === 'closed won' || s === 'closed lost' || s === 'lead dropped' || s === 'dropped' || s === 'on hold') {
+    currentStageIndex = 3;
+  }
 
   if (stepIndex < currentStageIndex) {
     return 'completed';
@@ -43,7 +63,8 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
 
   if (stepIndex === currentStageIndex) {
     if (isFailed) return 'failed';
-    if (status === 'Deal Won') return 'completed';
+    if (isOnHold) return 'on_hold';
+    if (status === 'Deal Won' || status === 'Closed won') return 'completed';
     return 'active';
   }
 
@@ -240,7 +261,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         'Contact Phone': sub.contactPhone || 'N/A',
         'Contact Email': sub.contactEmail || 'N/A',
         'Opportunity Title': sub.shortDesc,
-        'Current CRM Stage': sub.status,
+        'Current CRM Stage': getDisplayStatus(sub.status),
         'CRM Lead ID': sub.crmLeadId || 'N/A',
         'Reward Tier': sub.rewardTier || 'N/A',
         'Reward Package': sub.rewardTitle || 'N/A',
@@ -264,7 +285,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
         contactPhone: sub.contactPhone || 'N/A',
         contactEmail: sub.contactEmail || 'N/A',
         shortDesc: sub.shortDesc,
-        status: sub.status,
+        status: getDisplayStatus(sub.status),
         crmLeadId: sub.crmLeadId || 'N/A',
         reward: sub.rewardTier ? `🏆 ${sub.rewardTier}` : 'N/A'
       }));
@@ -341,18 +362,18 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   };
 
   // Dynamic Metrics calculations
-  const pendingSubmissions = submissions.filter(s => s.status === 'Opportunity Registered' || s.status === 'Clarification Requested' || s.status === 'Under Review');
-  const reviewedSubmissions = submissions.filter(s => s.status !== 'Opportunity Registered' && s.status !== 'Clarification Requested' && s.status !== 'Under Review');
+  const pendingSubmissions = submissions.filter(s => s.status === 'Opportunity Accepted' || s.status === 'Clarification Requested' || s.status === 'Under Review');
+  const reviewedSubmissions = submissions.filter(s => s.status !== 'Opportunity Accepted' && s.status !== 'Clarification Requested' && s.status !== 'Under Review');
 
   const pendingCount = pendingSubmissions.length;
-  const validatedCount = reviewedSubmissions.filter(s => s.status === 'Validated' || s.status.startsWith('Lead') || s.status === 'Opportunity Registered' || s.status === 'Proposal' || s.status === 'Negotiation' || s.status === 'Deal Won').length;
+  const validatedCount = reviewedSubmissions.filter(s => s.status === 'Validated' || s.status.startsWith('Lead') || s.status === 'Opportunity Accepted' || s.status === 'Proposal' || s.status === 'Negotiation' || s.status === 'Deal Won').length;
   const rejectedCount = reviewedSubmissions.filter(s => s.status === 'Closed - Not Valid' || s.status === 'Deal Lost' || s.status === 'Lead Dropped').length;
   const totalReviewed = validatedCount + rejectedCount;
 
   // Calculate dynamic average review time
   const avgReviewTimeRaw = reviewedSubmissions.length > 0 
     ? reviewedSubmissions.reduce((acc, sub) => {
-        const firstReview = sub.statusHistory?.find(h => h.status !== 'Opportunity Registered' && h.status !== 'Under Review' && h.status !== 'Clarification Requested');
+        const firstReview = sub.statusHistory?.find(h => h.status !== 'Opportunity Accepted' && h.status !== 'Under Review' && h.status !== 'Clarification Requested');
         const reviewDate = firstReview ? new Date(firstReview.timestamp) : new Date(sub.updatedAt);
         const submitDate = new Date(sub.createdAt);
         const days = (reviewDate.getTime() - submitDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -987,32 +1008,30 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                           {/* Current Stage Column */}
                           <td className="px-3 py-3.5 whitespace-nowrap">
                             <div className="flex items-center gap-2">
-                              {isRejected ? (
+                              {getDisplayStatus(sub.status) === 'Deal Lost' || getDisplayStatus(sub.status) === 'Rejected' ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm">
-                                  ❌ Closed - Not Valid
+                                  ❌ {getDisplayStatus(sub.status)}
                                 </span>
-                              ) : sub.status === 'Lead Dropped' || sub.status === 'Lead Rejected' || sub.status === 'Deal Lost' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm">
-                                  ❌ {sub.status}
-                                </span>
-
-                              ) : isClarify ? (
+                              ) : getDisplayStatus(sub.status) === 'Clarification Requested' ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
                                   💬 Clarification Requested
                                 </span>
-                              ) : sub.status === 'Deal Won' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
+                              ) : getDisplayStatus(sub.status) === 'Deal Won' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
                                   🎉 Deal Won
+                                </span>
+                              ) : getDisplayStatus(sub.status) === 'On Hold' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
+                                  ⏸️ On Hold
                                 </span>
                               ) : (
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
-                                  sub.status === 'Negotiation' ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' :
-                                  sub.status === 'Proposal' ? 'bg-purple-50 text-purple-700 border border-purple-200 shadow-sm' :
-                                  sub.status === 'Firm Awaiting PO' ? 'bg-teal-50 text-teal-700 border border-teal-200 shadow-sm' :
+                                  isProposalPhase(sub.status) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm' :
+                                  sub.status === 'Lead Registered' ? 'bg-teal-50 text-teal-700 border border-teal-200 shadow-sm' :
                                   sub.status.startsWith('Lead') ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm' :
-                                  'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm'
+                                  'bg-slate-50 text-slate-700 border border-slate-200 shadow-sm'
                                 }`}>
-                                  ✅ {sub.status === 'Firm Awaiting PO' ? 'Opportunity Registered' : sub.status}
+                                  ✅ {getDisplayStatus(sub.status)}
                                 </span>
                               )}
 
@@ -1122,7 +1141,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
             <div className="p-6 overflow-y-auto flex flex-col gap-5 max-h-[calc(90vh-140px)]">
               
               {/* Lead Lifecycle Tracker Stepper (Visible for approved/reviewed leads) */}
-              {selectedSub.status !== 'Opportunity Registered' && selectedSub.status !== 'Clarification Requested' && (
+              {selectedSub.status !== 'Opportunity Accepted' && selectedSub.status !== 'Clarification Requested' && (
                 <div className="bg-[#091024] border border-slate-800 rounded-3xl p-6 md:p-7 shadow-2xl text-white">
                   {/* Header Row */}
                   <div className="flex justify-between items-center mb-6">
@@ -1143,28 +1162,25 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                     {/* Top Right Stage Pill */}
                     <div className="px-4 py-1.5 rounded-full bg-[#081226] border border-amber-500/50 shadow-inner flex items-center gap-2">
                       <span className="text-base">🏆</span>
-                      <span className="text-xs font-bold text-slate-300">Stage: <strong className="text-blue-400 font-extrabold">{selectedSub.status === 'Firm Awaiting PO' ? 'Opportunity Registered' : selectedSub.status}</strong></span>
+                      <span className="text-xs font-bold text-slate-300">Stage: <strong className="text-blue-400 font-extrabold">{getDisplayStatus(selectedSub.status)}</strong></span>
                     </div>
                   </div>
 
                   {/* Stepper Progress Bar */}
-                  <div className="grid grid-cols-7 gap-1 w-full relative my-4 pt-2 pb-2">
+                  <div className="grid grid-cols-4 gap-1 w-full relative my-4 pt-2 pb-2">
                     {LIFECYCLE_STEPS.map((step, idx) => {
                       const status = getStepStatus(selectedSub, idx);
-                      const isDealWonStep = idx === 6 && selectedSub.status === 'Deal Won';
+                      const isDealWonStep = idx === 3 && selectedSub.status === 'Deal Won';
                       const isLast = idx === LIFECYCLE_STEPS.length - 1;
                       const nextStatus = isLast ? null : getStepStatus(selectedSub, idx + 1);
 
                       const StepIcon = (() => {
-                        if (idx === 6 && (status === 'completed' || status === 'active')) return Check;
+                        if (idx === 3 && (status === 'completed' || status === 'active')) return Check;
                         switch (idx) {
                           case 0: return Target;
                           case 1: return Check;
-                          case 2: return ClipboardList;
-                          case 3: return Check;
-                          case 4: return FileText;
-                          case 5: return Handshake;
-                          case 6: return Trophy;
+                          case 2: return FileText;
+                          case 3: return Trophy;
                           default: return Check;
                         }
                       })();
@@ -1179,11 +1195,14 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                             </div>
                           </div>
                         );
-                      } else if (status === 'completed' || status === 'active') {
+                      } else if (status === 'completed' || status === 'active' || status === 'on_hold') {
                         circleMarkup = (
                           <div className="relative flex items-center justify-center z-10">
                             {status === 'active' && <div className="absolute w-10 h-10 rounded-full bg-emerald-500/30 animate-pulse" />}
-                            <div className="relative w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/50">
+                            {status === 'on_hold' && <div className="absolute w-10 h-10 rounded-full bg-amber-500/30 animate-pulse" />}
+                            <div className={`relative w-8 h-8 rounded-full text-white flex items-center justify-center shadow-lg ring-2 ${
+                              status === 'on_hold' ? 'bg-amber-500 shadow-amber-500/30 ring-amber-400/50' : 'bg-emerald-600 shadow-emerald-500/30 ring-emerald-400/50'
+                            }`}>
                               <StepIcon size={15} strokeWidth={2.5} />
                             </div>
                           </div>
@@ -1209,10 +1228,12 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                         lineStyle = 'bg-emerald-500';
                       } else if (status === 'completed' && nextStatus === 'failed') {
                         lineStyle = 'bg-rose-500';
-                      } else if (status === 'completed' && nextStatus === 'active') {
+                      } else if (status === 'completed' && (nextStatus === 'active' || nextStatus === 'on_hold')) {
                         lineStyle = 'bg-emerald-500';
                       } else if (status === 'active' && nextStatus !== 'failed') {
                         lineStyle = 'bg-amber-400 animate-pulse';
+                      } else if (status === 'on_hold' && nextStatus !== 'failed') {
+                        lineStyle = 'bg-amber-400';
                       }
 
                       const stepDate = (() => {
@@ -1226,14 +1247,11 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                         if (selectedSub.statusHistory && selectedSub.statusHistory.length > 0) {
                           const historyEntry = selectedSub.statusHistory.find(h => {
                             let stageIdx = -1;
-                            const hs = h.status;
-                            if (hs === 'Closed - Not Valid') stageIdx = 1;
-                            else if (hs === 'Validated' || hs === 'Lead Registered') stageIdx = 2;
-                            else if (hs === 'Lead Accepted' || hs === 'Lead Rejected') stageIdx = 2;
-                            else if (hs === 'Firm Awaiting PO' || hs === 'Lead Dropped') stageIdx = 3;
-                            else if (hs === 'Proposal') stageIdx = 4;
-                            else if (hs === 'Negotiation') stageIdx = 5;
-                            else if (hs === 'Deal Won' || hs === 'Deal Lost') stageIdx = 6;
+                            const hs = h.status.toLowerCase();
+                            if (hs === 'Opportunity Accepted' || hs === 'clarification requested' || hs === 'under review') stageIdx = 0;
+                            else if (hs === 'closed - not valid' || hs === 'validated' || hs === 'lead registered' || hs === 'lead rejected' || hs === 'rfp received') stageIdx = 1;
+                            else if (isProposalPhase(hs) || hs === 'on hold') stageIdx = 2;
+                            else if (hs === 'deal lost' || hs === 'deal won' || hs === 'closed won' || hs === 'closed lost' || hs === 'lead dropped' || hs === 'dropped') stageIdx = 3;
                             
                             return stageIdx >= idx;
                           });
@@ -1263,9 +1281,15 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                           <span className={`text-[10.5px] font-extrabold text-center leading-tight mt-2.5 px-0.5 break-words max-w-[85px] z-10 ${
                             isDealWonStep ? 'text-blue-400' :
                             (status === 'completed' || status === 'active') ? 'text-slate-200' : 
-                            (status === 'failed' ? 'text-rose-400' : 'text-slate-500')
+                            (status === 'failed' ? 'text-rose-400' : (status === 'on_hold' ? 'text-amber-400' : 'text-slate-500'))
                           }`}>
-                            {status === 'failed' ? (step === 'Deal Won' ? 'Deal Lost' : step.includes('Accepted') ? 'Rejected' : 'Dropped') : step}
+                            {status === 'failed' ? (
+                              step === 'Deal Won' ? (selectedSub.status === 'Dropped' || selectedSub.status === 'Lead Dropped' ? 'Dropped' : 'Deal Lost') : 'Rejected'
+                            ) : status === 'on_hold' ? (
+                              'On Hold'
+                            ) : step === 'Proposal In Progress' ? (
+                              <>Proposal<br/><span className="text-amber-500">In progress</span></>
+                            ) : step}
                           </span>
 
                           {/* Date Label */}
@@ -1276,6 +1300,21 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                       );
                     })}
                   </div>
+
+                  {/* GEM Award Banner for Opportunity Accepted */}
+                  {(getStepStatus(selectedSub, 1) === 'completed' || getStepStatus(selectedSub, 1) === 'active' || getStepStatus(selectedSub, 1) === 'on_hold') && (
+                    <div className="mt-6 flex items-center bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 p-4 rounded-xl shadow-sm animate-fadeIn">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-amber-200/50 text-amber-600 flex items-center justify-center text-xl border border-amber-300">
+                          🏅
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-amber-700 font-extrabold text-[10px] uppercase tracking-wider">Milestone Reached</span>
+                          <span className="text-amber-900 font-bold text-xs">Employee has achieved the first Reward + GEM Award.</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Achievement Reward Card (Exact Match to Screenshot 1) */}
                   {selectedSub.status === 'Deal Won' && (
@@ -1553,7 +1592,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
               )}
 
               {/* Section 4 — Decision Section */}
-              {selectedSub.status === 'Opportunity Registered' || selectedSub.status === 'Clarification Requested' || selectedSub.status === 'Under Review' ? (
+              {selectedSub.status === 'Opportunity Accepted' || selectedSub.status === 'Clarification Requested' || selectedSub.status === 'Under Review' ? (
                 <div className="border-t border-slate-100 pt-5 flex flex-col gap-4">
                   <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
                     YOUR DECISION
