@@ -745,18 +745,23 @@ export function HomeView({
                     })();
 
                     let circleMarkup;
-                    if (status === 'completed' || status === 'active' || status === 'on_hold') {
-                      circleMarkup = (
-                        <div className="relative flex items-center justify-center z-10">
-                          {status === 'active' && <div className="absolute w-12 h-12 rounded-full bg-emerald-500/30 animate-pulse" />}
-                          {status === 'on_hold' && <div className="absolute w-12 h-12 rounded-full bg-amber-500/30 animate-pulse" />}
-                          <div className={`relative w-10 h-10 rounded-full text-white flex items-center justify-center ring-4 ${
-                            status === 'on_hold' ? 'bg-amber-500 shadow-[0_4px_16px_rgba(245,158,11,0.4)] ring-amber-50' : 'bg-emerald-600 shadow-[0_4px_16px_rgba(5,150,105,0.4)] ring-emerald-50'
-                          }`}>
-                            <StepIcon size={18} strokeWidth={2.5} />
+                      if (status === 'completed' || status === 'active' || status === 'on_hold') {
+                        circleMarkup = (
+                          <div className="relative flex items-center justify-center z-10">
+                            {idx === 1 && (
+                              <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-amber-100/90 text-amber-700 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-sm whitespace-nowrap animate-bounce border border-amber-200">
+                                <span className="text-xs">🏅</span> GEM Award
+                              </div>
+                            )}
+                            {status === 'active' && <div className="absolute w-12 h-12 rounded-full bg-emerald-500/30 animate-pulse" />}
+                            {status === 'on_hold' && <div className="absolute w-12 h-12 rounded-full bg-amber-500/30 animate-pulse" />}
+                            <div className={`relative w-10 h-10 rounded-full text-white flex items-center justify-center ring-4 ${
+                              status === 'on_hold' ? 'bg-amber-500 shadow-[0_4px_16px_rgba(245,158,11,0.4)] ring-amber-50' : 'bg-emerald-600 shadow-[0_4px_16px_rgba(5,150,105,0.4)] ring-emerald-50'
+                            }`}>
+                              <StepIcon size={18} strokeWidth={2.5} />
+                            </div>
                           </div>
-                        </div>
-                      );
+                        );
                     } else if (status === 'failed') {
                       circleMarkup = (
                         <div className="relative flex items-center justify-center z-10">
