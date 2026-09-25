@@ -58,10 +58,12 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   const isOnHold = s === 'on hold';
 
   let currentStageIndex = -1;
-  if (s === 'Opportunity Accepted' || s === 'clarification requested' || s === 'under review') {
+  if (s === 'opportunity accepted' || s === 'clarification requested' || s === 'under review') {
+    // Newly submitted lead — Lead Registered step is active
     currentStageIndex = 0;
   }
-  else if (s === 'closed - not valid' || s === 'validated' || s === 'lead registered' || s === 'lead rejected' || s === 'rfp received') {
+  else if (s === 'closed - not valid' || s === 'validated' || s === 'lead registered' || s === 'lead accepted' || s === 'lead rejected' || s === 'rfp received') {
+    // Lead has been registered in CRM — Opportunity Accepted step is active
     currentStageIndex = 1;
   }
   else if (isProposalPhase(status)) {
@@ -1295,7 +1297,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                           <span className={`text-[10.5px] font-extrabold text-center leading-tight mt-2.5 px-0.5 break-words max-w-[85px] z-10 ${
                             isDealWonStep ? 'text-blue-400' :
                             (status === 'completed' || status === 'active') ? 'text-slate-200' : 
-                            (status === 'failed' ? 'text-rose-400' : (status === 'on_hold' ? 'text-amber-400' : 'text-slate-500'))
+                            (status === 'failed' ? 'text-rose-400' : (status === 'on_hold' ? 'text-slate-200' : 'text-slate-500'))
                           }`}>
                             {status === 'failed' ? (
                               step === 'Deal Won' ? (selectedSub.status === 'Dropped' || selectedSub.status === 'Lead Dropped' ? 'Dropped' : 'Deal Lost') : 'Rejected'
