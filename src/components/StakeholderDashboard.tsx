@@ -4,10 +4,24 @@ import { triggerMailer, formatDateTime, API_BASE_URL } from '../utils.ts';
 import { 
   Eye, CheckCircle2, XCircle, AlertTriangle, Clock, Building, Landmark, RefreshCcw, 
   User, Database, Mail, ArrowRight, Shield, MessageSquare, Search, Download, Loader2,
-  Award, Trophy, Star, Gift, Sparkles, ClipboardList, Check, Target, FileText, Handshake, ChevronUp, ChevronDown, Filter
+  Award, Trophy, Star, Gift, Sparkles, ClipboardList, Check, Target, FileText, Handshake, ChevronUp, ChevronDown, Filter, Medal
 } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { ROLE_MAP } from '../types.ts';
+
+const MedalIcon = ({ size = 18, color = 'currentColor', ...props }: { size?: number; color?: string; [key: string]: any }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" {...props}>
+    {/* Ribbon */}
+    <path d="M5.5 2.5 h3 L12 7 L15.5 2.5 h3 l-6 8 h-1 z" />
+    <path d="M12 7 L10.8 8.6" />
+    {/* Badge and Star */}
+    <g transform="translate(12, 16) scale(0.6) translate(-12, -12)">
+      <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" strokeWidth="2.5" />
+      <circle cx="12" cy="12" r="6.5" strokeWidth="2.5" />
+      <path d="M12 6.5 l1.2 3.5 h3.8 l-3 2.2 l1.2 3.8 l-3.2 -2.4 l-3.2 2.4 l1.2 -3.8 l-3 -2.2 h3.8 z" strokeWidth="2.5" />
+    </g>
+  </svg>
+);
 
 // Steps for the Lead Lifecycle Tracker
 const LIFECYCLE_STEPS = [
@@ -1178,7 +1192,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                         if (idx === 3 && (status === 'completed' || status === 'active')) return Check;
                         switch (idx) {
                           case 0: return Target;
-                          case 1: return Check;
+                          case 1: return MedalIcon;
                           case 2: return FileText;
                           case 3: return Trophy;
                           default: return Check;
@@ -1310,7 +1324,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                         </div>
                         <div className="flex flex-col gap-0.5">
                           <span className="text-amber-700 font-extrabold text-[10px] uppercase tracking-wider">Milestone Reached</span>
-                          <span className="text-amber-900 font-bold text-xs">Employee has achieved the first Reward + GEM Award.</span>
+                          <span className="text-amber-900 font-extrabold text-xs">🎉 Congratulations on reaching your first milestone!</span><span className="text-amber-800 font-medium text-[11px] leading-snug">Your valuable lead contribution has earned you your first Reward + GEM Award, marking the beginning of an impactful recognition journey.</span>
                         </div>
                       </div>
                     </div>
