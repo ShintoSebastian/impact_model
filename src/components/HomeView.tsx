@@ -53,10 +53,12 @@ const getStepStatus = (sub: Submission, stepIndex: number): 'completed' | 'activ
   const isOnHold = s === 'on hold';
 
   let currentStageIndex = -1;
-  if (s === 'Opportunity Accepted' || s === 'clarification requested' || s === 'under review') {
+  if (s === 'opportunity accepted' || s === 'clarification requested' || s === 'under review') {
+    // Newly submitted lead — Lead Registered step is active
     currentStageIndex = 0;
   }
-  else if (s === 'closed - not valid' || s === 'validated' || s === 'lead registered' || s === 'lead rejected' || s === 'rfp received') {
+  else if (s === 'closed - not valid' || s === 'validated' || s === 'lead registered' || s === 'lead accepted' || s === 'lead rejected' || s === 'rfp received') {
+    // Lead has been registered in CRM — Opportunity Accepted step is active
     currentStageIndex = 1;
   }
   else if (isProposalPhase(status)) {
@@ -751,7 +753,7 @@ export function HomeView({
                           <div className={`relative w-10 h-10 rounded-full text-white flex items-center justify-center ring-4 ${
                             status === 'on_hold' ? 'bg-amber-500 shadow-[0_4px_16px_rgba(245,158,11,0.4)] ring-amber-50' : 'bg-emerald-600 shadow-[0_4px_16px_rgba(5,150,105,0.4)] ring-emerald-50'
                           }`}>
-                            {isCompletedOrActive ? <MedalIcon size={18} color="white" /> : <StepIcon size={18} strokeWidth={2.5} />}
+                            <StepIcon size={18} strokeWidth={2.5} />
                           </div>
                         </div>
                       );
@@ -796,7 +798,7 @@ export function HomeView({
 
                         {/* Title Label */}
                         <span className={`text-[10.5px] font-extrabold text-center leading-tight mt-2.5 px-0.5 break-words max-w-[85px] z-10 ${
-                          (status === 'completed' || status === 'active') ? 'text-slate-700 font-extrabold' : (status === 'failed' ? 'text-rose-600 font-extrabold' : (status === 'on_hold' ? 'text-amber-600 font-extrabold' : 'text-slate-400'))
+                          (status === 'completed' || status === 'active') ? 'text-slate-700 font-extrabold' : (status === 'failed' ? 'text-rose-600 font-extrabold' : (status === 'on_hold' ? 'text-slate-700 font-extrabold' : 'text-slate-400'))
                         }`}>
                           {status === 'failed' ? (
                             step === 'Deal Won' ? (selectedSub.status === 'Dropped' || selectedSub.status === 'Lead Dropped' ? 'Dropped' : 'Deal Lost') : 'Rejected'
