@@ -1214,6 +1214,11 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                       } else if (status === 'completed' || status === 'active' || status === 'on_hold') {
                         circleMarkup = (
                           <div className="relative flex items-center justify-center z-10">
+                            {idx === 1 && (
+                              <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-amber-100/90 text-amber-700 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-sm whitespace-nowrap animate-bounce border border-amber-200">
+                                <span className="text-xs">🏅</span> GEM Award
+                              </div>
+                            )}
                             {status === 'active' && <div className="absolute w-10 h-10 rounded-full bg-emerald-500/30 animate-pulse" />}
                             {status === 'on_hold' && <div className="absolute w-10 h-10 rounded-full bg-amber-500/30 animate-pulse" />}
                             <div className={`relative w-8 h-8 rounded-full text-white flex items-center justify-center shadow-lg ring-2 ${
