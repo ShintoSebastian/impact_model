@@ -810,7 +810,7 @@ export function HomeView({
                           ) : status === 'on_hold' ? (
                             'On Hold'
                           ) : step === 'Proposal In Progress' ? (
-                            <>Proposal<br/><span className={status === 'future' ? "" : "text-amber-500"}>In progress</span></>
+                            status === 'completed' ? 'Proposal' : <>Proposal<br/><span className={status === 'future' ? "" : "text-amber-500"}>In progress</span></>
                           ) : step}
                         </span>
                       </div>
