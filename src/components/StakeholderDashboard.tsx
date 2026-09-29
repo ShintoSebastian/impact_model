@@ -115,6 +115,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
+  const [showGemBanner, setShowGemBanner] = useState(false);
 
   // Auto-open requested opportunity when deep linked via /review/:id
   useEffect(() => {
@@ -125,6 +126,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
       }
     }
   }, [initialSubId, submissions]);
+  
+  useEffect(() => {
+    setShowGemBanner(false);
+  }, [selectedSub]);
   
   // Rejection sub-flow states
   const [showRejectForm, setShowRejectForm] = useState(false);
@@ -1215,7 +1220,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                         circleMarkup = (
                           <div className="relative flex items-center justify-center z-10">
                             {idx === 1 && (
-                              <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-amber-100/90 text-amber-700 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-sm whitespace-nowrap animate-bounce border border-amber-200">
+                              <div 
+                                className="absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-amber-100/90 text-amber-700 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-sm whitespace-nowrap animate-bounce border border-amber-200 cursor-pointer"
+                                onClick={() => setShowGemBanner(!showGemBanner)}
+                              >
                                 <span className="text-xs">🏅</span> GEM Award
                               </div>
                             )}
@@ -1323,7 +1331,7 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                   </div>
 
                   {/* GEM Award Banner for Opportunity Accepted */}
-                  {(getStepStatus(selectedSub, 1) === 'completed' || getStepStatus(selectedSub, 1) === 'active' || getStepStatus(selectedSub, 1) === 'on_hold') && (
+                  {showGemBanner && (getStepStatus(selectedSub, 1) === 'completed' || getStepStatus(selectedSub, 1) === 'active' || getStepStatus(selectedSub, 1) === 'on_hold') && (
                     <div className="mt-6 flex items-center bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 p-4 rounded-xl shadow-sm animate-fadeIn">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-amber-200/50 text-amber-600 flex items-center justify-center text-xl border border-amber-300">
