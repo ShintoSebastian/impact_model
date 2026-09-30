@@ -237,3 +237,21 @@ body {
   background-color: rgba(27, 42, 107, 0.03);
   border-left-color: #C0152A; /* Red left border when selected */
 }
+
+/* Trophy Animation for Deal Won */
+.trophy-icon {
+  animation: trophyGlow 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes trophyGlow {
+  0% {
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.4));
+    transform: scale(1);
+  }
+  100% {
+    /* Soft golden-white radiant bloom */
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.95))
+            drop-shadow(0 0 12px rgba(255, 255, 255, 0.6));
+    transform: scale(1.15);
+  }
+}

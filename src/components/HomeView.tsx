@@ -712,11 +712,15 @@ export function HomeView({
               {(() => {
                 const sub = mySubmissions.find(s => s.intelligenceId === selectedSubId) || submissions.find(s => s.intelligenceId === selectedSubId);
                 if (!sub) return '0%';
-                if (sub.status.startsWith('Closed') || sub.status === 'Deal Lost' || sub.status === 'Lead Dropped' || sub.status === 'Lead Rejected') return '100% Complete';
-                if (isProposalPhase(sub.status)) return '55% Complete';
-                if (sub.status === 'Lead Registered') return '40% Complete';
-                if (sub.status === 'Validated') return '25% Complete';
-                if (sub.status === 'Opportunity Accepted' || sub.status === 'Clarification Requested' || sub.status === 'Under Review') return '10% Complete';
+                const s = sub.status.toLowerCase();
+                
+                if (s.startsWith('closed') || s === 'deal won' || s === 'deal lost' || s === 'lead dropped' || s === 'lead rejected' || s === 'dropped') return '100% Complete';
+                if (isProposalPhase(sub.status) || s === 'rfp received') return '55% Complete';
+                if (s === 'lead registered') return '40% Complete';
+                if (s === 'validated') return '25% Complete';
+                if (s === 'opportunity accepted' || s === 'clarification requested' || s === 'under review') return '10% Complete';
+                if (s === 'on hold') return 'Paused (On Hold)';
+                
                 return '0% Complete';
               })()}
             </span>
@@ -766,7 +770,11 @@ export function HomeView({
                             <div className={`relative w-10 h-10 rounded-full text-white flex items-center justify-center ring-4 ${
                               status === 'on_hold' ? 'bg-amber-500 shadow-[0_4px_16px_rgba(245,158,11,0.4)] ring-amber-50' : 'bg-emerald-600 shadow-[0_4px_16px_rgba(5,150,105,0.4)] ring-emerald-50'
                             }`}>
-                              <StepIcon size={18} strokeWidth={2.5} />
+                              <StepIcon 
+                                size={idx === 3 && status === 'completed' ? 24 : 18} 
+                                strokeWidth={2.5} 
+                                className={idx === 3 && status === 'completed' ? 'trophy-icon' : ''} 
+                              />
                             </div>
                           </div>
                         );
