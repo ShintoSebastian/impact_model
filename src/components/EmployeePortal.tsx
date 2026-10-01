@@ -98,7 +98,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       contactPhone: hasContact ? contactPhone.trim() : undefined,
       contactEmail: hasContact ? contactEmail.trim() : undefined,
       clientName: clientName.trim(),
-      status: 'Opportunity Accepted',
+      status: 'Lead Accepted',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       reportingManager: loggedInUser.reportingManager || 'Not Specified',
@@ -107,7 +107,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       hrbp: loggedInUser.hrbp || 'Not Specified',
       salesPerson: loggedInUser.salesPerson || 'Not Specified',
       statusHistory: [
-        { status: 'Opportunity Accepted', changedBy: 'System', timestamp: new Date().toISOString(), comment: 'Submission recorded' }
+        { status: 'Lead Accepted', changedBy: 'System', timestamp: new Date().toISOString(), comment: 'Submission recorded' }
       ]
     };
 
@@ -124,7 +124,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       setSubmittedData(pendingSubmission);
       setPendingSubmission(null);
     } else {
-      setErrors({ submit: 'Failed to submit opportunity. Please check if the server is running and try again.' });
+      setErrors({ submit: 'Failed to submit lead. Please check if the server is running and try again.' });
     }
   };
 
@@ -239,7 +239,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
           />
-          <span className="text-[10px] text-slate-400 font-normal">Enter the organization or company you have identified this business opportunity with.</span>
+          <span className="text-[10px] text-slate-400 font-normal">Enter the organization or company you have identified this business lead with.</span>
           {errors.clientName && <span className="text-[10px] text-red-600 font-bold mt-0.5">⚠️ {errors.clientName}</span>}
         </div>
 
@@ -449,13 +449,13 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-extrabold text-brand-navy tracking-tight">Confirm Opportunity Submission?</h3>
+              <h3 className="text-lg font-extrabold text-brand-navy tracking-tight">Confirm Lead Submission?</h3>
               <p className="text-xs text-slate-500 font-medium mt-1">
-                Are you sure you want to submit this opportunity lead to the review workflow?
+                Are you sure you want to submit this lead to the review workflow?
               </p>
             </div>
 
-            {/* Opportunity Brief Box */}
+            {/* Lead Brief Box */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col gap-2 text-left text-xs">
               <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
                 <span className="text-slate-400 font-bold uppercase text-[10px]">Client / Account:</span>
@@ -516,9 +516,9 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
 
             {/* Modal Title */}
             <div>
-              <h2 className="text-xl font-extrabold text-brand-navy tracking-tight">Opportunity Submitted!</h2>
+              <h2 className="text-xl font-extrabold text-brand-navy tracking-tight">Lead Submitted!</h2>
               <p className="text-xs text-slate-500 font-medium mt-1">
-                Your opportunity lead has been registered and assigned an Intelligence ID.
+                Your lead has been registered and assigned an Intelligence ID.
               </p>
             </div>
 
@@ -569,7 +569,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                 }}
                 className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer border-none"
               >
-                + Submit Another Opportunity
+                + Submit Another Lead
               </button>
             </div>
 
