@@ -262,6 +262,21 @@ export function DashboardLayout({
             {/* Quick Start Steps based on User Role */}
             <div className="flex flex-col gap-5 text-xs text-slate-600 leading-relaxed">
               
+              {/* Guidelines Video Placeholder */}
+              <div className="flex flex-col gap-2 w-full">
+                <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block">🎥 Video Guidelines</span>
+                <div className="relative w-full rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100 shadow-sm aspect-video flex items-center justify-center">
+                  <video 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                    controls 
+                    poster="https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop"
+                  >
+                    <source src="/Impact Model Demo V3.0.mp4" type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              </div>
+
               {loggedInUser?.role === 'reviewer' ? (
                 // Reviewer / Manager Help Content
                 <>
@@ -300,42 +315,42 @@ export function DashboardLayout({
                     <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block">🚀 Submitter Guide Checklist</span>
                     <ul className="list-disc pl-4 flex flex-col gap-1.5 font-medium text-slate-600">
                       <li><strong>Submit a Lead:</strong> Click <strong>"+ Submit Lead"</strong> to register an opportunity with client details and project scope.</li>
-                      <li><strong>Track Progress:</strong> View your opportunity card to monitor the <strong>7-Stage Lead Lifecycle Stepper</strong> in real-time.</li>
+                      <li><strong>Track Progress:</strong> View your opportunity card to monitor the <strong>4-Stage Lead Lifecycle Stepper</strong> in real-time.</li>
                       <li><strong>Outbox Logs:</strong> Check the <strong>Outbox Logs</strong> tab to see all automated email alerts sent to managers and stakeholders.</li>
                       <li><strong>Clarifications:</strong> If a manager requests information, open your opportunity row and submit your response.</li>
                     </ul>
                   </div>
 
                   <div className="flex flex-col gap-2.5">
-                    <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block border-b border-slate-100 pb-1">📈 7-Stage Lead Lifecycle Stepper</span>
+                    <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block border-b border-slate-100 pb-1">📈 4-Stage Lead Lifecycle Stepper</span>
                     <div className="flex flex-col gap-2.5 pl-1">
                       <div>
-                        <strong className="text-brand-navy font-bold">1. Opportunity Accepted (10%):</strong> 
-                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity submitted on portal by employee.</p>
+                        <strong className="text-brand-navy font-bold">1. Lead Registered (10%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity submitted on portal by employee and under review.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy font-bold">2. Validated (25%):</strong> 
-                        <p className="text-[11px] text-slate-500 mt-0.5">Approved by Reviewer on the Review Board.</p>
+                        <strong className="text-brand-navy font-bold">2. Opportunity Accepted (40%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Approved by Reviewer and synced with the CRM system.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy font-bold">3. Lead Registered (40%):</strong> 
-                        <p className="text-[11px] text-slate-500 mt-0.5">Pushed to CRM API & assigned a CRM Reference ID.</p>
+                        <strong className="text-brand-navy font-bold">3. Proposal In Progress (55%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity is moving through various proposal & negotiation stages.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy font-bold">4. Proposal In Progress (55%):</strong> 
-                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity under various proposal stages in the CRM.</p>
-                      </div>
-                      <div>
-                        <strong className="text-brand-navy font-bold">5. Proposal (70%):</strong> 
-                        <p className="text-[11px] text-slate-500 mt-0.5">Formal proposal submitted to the client.</p>
-                      </div>
-                      <div>
-                        <strong className="text-brand-navy font-bold">6. Negotiation (85%):</strong> 
-                        <p className="text-[11px] text-slate-500 mt-0.5">Commercial proposal & contract terms under negotiation.</p>
-                      </div>
-                      <div>
-                        <strong className="text-brand-navy font-bold">7. Deal Won (100% 🏆):</strong> 
+                        <strong className="text-brand-navy font-bold">4. Deal Won (100% 🏆):</strong> 
                         <p className="text-[11px] text-slate-500 mt-0.5">Opportunity successfully closed & deal won!</p>
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block border-b border-slate-100 pb-1 mt-2">🛑 Other Statuses</span>
+                    <div className="flex flex-col gap-2.5 pl-1">
+                      <div>
+                        <strong className="text-brand-red font-bold">Deal Lost / Rejected (100%):</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity was dropped, rejected, or lost to competition.</p>
+                      </div>
+                      <div>
+                        <strong className="text-amber-600 font-bold">On Hold:</strong> 
+                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity tracking is temporarily suspended.</p>
                       </div>
                     </div>
                   </div>
