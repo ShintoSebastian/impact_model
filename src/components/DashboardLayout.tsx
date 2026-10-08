@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import { ROLE_MAP } from '../types.ts';
@@ -32,6 +32,21 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [helpExpanded, setHelpExpanded] = useState(true);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setHelpExpanded(false);
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = setTimeout(() => setHelpExpanded(true), 1500);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    };
+  }, []);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -224,17 +239,24 @@ export function DashboardLayout({
       </header>
 
       {/* Nested Page Container */}
-      <main className="flex-1 mt-16 px-6 py-8 max-w-7xl w-full mx-auto flex flex-col gap-6">
+      <main className="flex-1 mt-16 px-6 py-8 pb-24 max-w-7xl w-full mx-auto flex flex-col gap-6">
         <Outlet />
       </main>
 
-      {/* Floating "?" Help Center Button */}
+      {/* Floating Help Button — shrinks on scroll, expands after idle */}
       <button 
         onClick={() => setShowHelp(true)}
-        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-brand-navy hover:bg-[#121E52] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 cursor-pointer z-[999] transition-all border border-slate-700"
+        className="fixed bottom-[120px] right-[80px] flex items-center gap-2 bg-brand-navy hover:bg-[#121E52] text-white text-sm font-semibold py-3 rounded-full shadow-lg hover:scale-105 active:scale-95 cursor-pointer z-[999] transition-all duration-300 border border-slate-700"
+        style={{ paddingLeft: helpExpanded ? '1.25rem' : '0.75rem', paddingRight: helpExpanded ? '1.25rem' : '0.75rem' }}
         title="Impact Help Center & Guide"
       >
-        <HelpCircle size={22} />
+        <HelpCircle size={18} className="flex-shrink-0" />
+        <span
+          className="overflow-hidden whitespace-nowrap transition-all duration-300"
+          style={{ maxWidth: helpExpanded ? '300px' : '0px', opacity: helpExpanded ? 1 : 0 }}
+        >
+          Need help? Click here for guidance
+        </span>
       </button>
 
       {/* Slide-over Help Drawer */}
@@ -269,6 +291,8 @@ export function DashboardLayout({
                   <video 
                     className="absolute inset-0 w-full h-full object-cover" 
                     controls 
+                    autoPlay
+                    muted
                     poster="https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop"
                   >
                     <source src="/Impact Model Demo V3.0.mp4" type="video/mp4" />
@@ -314,10 +338,10 @@ export function DashboardLayout({
                   <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col gap-2">
                     <span className="text-[10px] font-extrabold text-brand-navy tracking-wider uppercase block">🚀 Submitter Guide Checklist</span>
                     <ul className="list-disc pl-4 flex flex-col gap-1.5 font-medium text-slate-600">
-                      <li><strong>Submit a Lead:</strong> Click <strong>"+ Submit Lead"</strong> to register an opportunity with client details and project scope.</li>
-                      <li><strong>Track Progress:</strong> View your opportunity card to monitor the <strong>4-Stage Lead Lifecycle Stepper</strong> in real-time.</li>
-                      <li><strong>Outbox Logs:</strong> Check the <strong>Outbox Logs</strong> tab to see all automated email alerts sent to managers and stakeholders.</li>
-                      <li><strong>Clarifications:</strong> If a manager requests information, open your opportunity row and submit your response.</li>
+                      <li><strong>Submit a Lead:</strong> Click <strong>"+ Submit Lead"</strong> to register a lead with client details and project scope.</li>
+                      <li><strong>Track Progress:</strong> View your lead card to monitor the <strong>4-Stage Lead Lifecycle Stepper</strong> in real-time.</li>
+                      <li><strong>Outbox Logs:</strong> Check the <strong>Outbox Logs</strong> tab to see all automated email alerts sent.</li>
+                      <li><strong>Clarifications:</strong> If a manager requests information, open your lead row and submit your response.</li>
                     </ul>
                   </div>
 
@@ -326,14 +350,14 @@ export function DashboardLayout({
                     <div className="flex flex-col gap-2.5 pl-1">
                       <div>
                         <strong className="text-brand-navy font-bold">1. Lead Registered (10%):</strong> 
-                        <p className="text-[11px] text-slate-500 mt-0.5">Opportunity submitted on portal by employee and under review.</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Lead submitted on portal by employee and under review.</p>
                       </div>
                       <div>
                         <strong className="text-brand-navy font-bold">2. Opportunity Accepted (40%):</strong> 
                         <p className="text-[11px] text-slate-500 mt-0.5">Approved by Reviewer and synced with the CRM system.</p>
                       </div>
                       <div>
-                        <strong className="text-brand-navy font-bold">3. Proposal In Progress (55%):</strong> 
+                        <strong className="text-brand-navy font-bold">3. Proposal (55%):</strong> 
                         <p className="text-[11px] text-slate-500 mt-0.5">Opportunity is moving through various proposal & negotiation stages.</p>
                       </div>
                       <div>
