@@ -21,6 +21,7 @@ interface AuthContextType {
   setLoginPassword: (password: string) => void;
   loginError: string;
   setLoginError: (err: string) => void;
+  syncProfile: () => Promise<Employee | null>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -99,10 +100,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate('/login');
   };
 
+  const syncProfile = async (): Promise<Employee | null> => {
+    const token = sessionStorage.getItem('impact_token');
+    if (!token) return null;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/sync-profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          sessionStorage.setItem('impact_user', JSON.stringify(data.user));
+          setLoggedInUser(data.user);
+          return data.user;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync profile from HRMS API:', err);
+    }
+    return null;
+  };
+
+  // Automatically refresh profile and Project Manager details from HRMS on startup in background
+  React.useEffect(() => {
+    const token = sessionStorage.getItem('impact_token');
+    if (token) {
+      syncProfile();
+    }
+  }, []);
+
   return (
     <AuthContext.Provider value={{
       loggedInUser, isConnecting, setIsConnecting, connectingMsg, setConnectingMsg,
-      showSandbox, setShowSandbox, executeSsoFlow: executeLogin, handleLogout, loginUsername, setLoginUsername, loginPassword, setLoginPassword, loginError, setLoginError
+      showSandbox, setShowSandbox, executeSsoFlow: executeLogin, handleLogout, loginUsername, setLoginUsername, loginPassword, setLoginPassword, loginError, setLoginError,
+      syncProfile
     }}>
       {children}
     </AuthContext.Provider>

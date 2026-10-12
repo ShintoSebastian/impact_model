@@ -3,6 +3,7 @@ import type { Submission, Employee, EmailLog } from '../types.ts';
 import { ROLE_MAP } from '../types.ts';
 import { Database, RefreshCcw, ShieldCheck, Shield, Sparkles, Mail, PhoneCall, Clock, Download, Loader2, ClipboardList, Check, Target, FileText, Handshake, Trophy, ChevronDown, ChevronUp, User, Briefcase, BarChart3, Users, UserCheck, Contact, Globe, Medal } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
+import { useAuth } from '../context/AuthContext.tsx';
 
 const MedalIcon = ({ size = 18, color = 'currentColor', ...props }: { size?: number; color?: string; [key: string]: any }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -101,8 +102,8 @@ const isOverdue = (createdAtStr: string, status: string): boolean => {
 };
 
 // Helper to parse manager strings like "Arun Kumar (arun.kumar@nestdigital.com)"
-const parseManagerInfo = (rawStr?: string, defaultName = 'Not Available', defaultEmail = '') => {
-  if (!rawStr || rawStr === 'Not Specified' || rawStr === 'None') {
+const parseManagerInfo = (rawStr?: string, defaultName = 'Not Specified', defaultEmail = '') => {
+  if (!rawStr || rawStr === 'Not Specified' || rawStr === 'Not Available' || rawStr === 'None') {
     return { name: defaultName, email: defaultEmail };
   }
   const match = rawStr.match(/^(.*?)\s*\((.*?)\)$/);
@@ -110,6 +111,21 @@ const parseManagerInfo = (rawStr?: string, defaultName = 'Not Available', defaul
     return { name: match[1].trim(), email: match[2].trim() };
   }
   return { name: rawStr.trim(), email: defaultEmail };
+};
+
+const parseManagerList = (rawStr?: string, defaultName = 'Not Specified', defaultEmail = '') => {
+  if (!rawStr || rawStr === 'Not Specified' || rawStr === 'Not Available' || rawStr === 'None') {
+    return [{ name: defaultName, email: defaultEmail }];
+  }
+  const parts = rawStr.split(/,\s*(?=[^)]*(?:\(|$))/).map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) return [{ name: defaultName, email: defaultEmail }];
+  return parts.map(part => {
+    const match = part.match(/^(.*?)\s*\((.*?)\)$/);
+    if (match) {
+      return { name: match[1].trim(), email: match[2].trim() };
+    }
+    return { name: part.trim(), email: defaultEmail };
+  });
 };
 
 // ----------------------------------------------------
@@ -216,6 +232,12 @@ export function HomeView({
   };
   const [isProfileExpanded, setIsProfileExpanded] = React.useState(false);
   const [showQuickInsights, setShowQuickInsights] = React.useState(false);
+  const { syncProfile } = useAuth();
+
+  // Automatically refresh profile and Project Manager details from HRMS on load
+  React.useEffect(() => {
+    syncProfile();
+  }, []);
 
   React.useEffect(() => {
     if (!showModal) {
@@ -335,6 +357,7 @@ export function HomeView({
 
   const reportingMgr = parseManagerInfo(loggedInUser.reportingManager);
   const projectMgr = parseManagerInfo(loggedInUser.projectManager);
+  const projectMgrList = parseManagerList(loggedInUser.projectManager);
   const buHead = parseManagerInfo(loggedInUser.buHead);
   const salesPerson = parseManagerInfo(loggedInUser.salesPerson);
 
@@ -421,7 +444,7 @@ export function HomeView({
             {/* Left Column (lg:col-span-8): EMPLOYEE DETAILS */}
             <div className="lg:col-span-8">
               {!isProfileExpanded ? (
-                /* Collapsed Button (Aligned Directly Below Profile Picture Area) */
+                /* Collapsed Button */
                 <button
                   type="button"
                   onClick={() => setIsProfileExpanded(true)}
@@ -488,13 +511,19 @@ export function HomeView({
                       <div className="flex items-start gap-2.5">
                         <Briefcase className="w-4.5 h-4.5 text-blue-400 flex-shrink-0 mt-0.5" />
                         <div className="flex flex-col min-w-0">
-                          <span className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase">PROJECT MANAGER</span>
-                          <span className="text-xs font-extrabold text-white mt-0.5 leading-tight">{projectMgr.name}</span>
-                          {projectMgr.email && (
-                            <a href={`mailto:${projectMgr.email}`} className="text-[10px] text-slate-400 hover:text-blue-300 font-medium transition-colors mt-0.5 truncate block">
-                              {projectMgr.email}
-                            </a>
-                          )}
+                          <span className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase">
+                            {projectMgrList.length > 1 ? 'PROJECT MANAGERS' : 'PROJECT MANAGER'}
+                          </span>
+                          {projectMgrList.map((pm, idx) => (
+                            <div key={idx} className={idx > 0 ? "mt-1.5 pt-1.5 border-t border-slate-800/60" : "mt-0.5"}>
+                              <span className="text-xs font-extrabold text-white leading-tight block">{pm.name}</span>
+                              {pm.email && (
+                                <a href={`mailto:${pm.email}`} className="text-[10px] text-slate-400 hover:text-blue-300 font-medium transition-colors mt-0.5 truncate block" title={pm.email}>
+                                  {pm.email}
+                                </a>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -505,7 +534,7 @@ export function HomeView({
                         <Briefcase className="w-4.5 h-4.5 text-blue-400 flex-shrink-0 mt-0.5" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase">JOB ROLE</span>
-                          <span className="text-xs font-bold text-slate-200 mt-0.5">{loggedInUser.jobRole || 'Not Available'}</span>
+                          <span className="text-xs font-bold text-slate-200 mt-0.5">{loggedInUser.jobRole || 'Not Specified'}</span>
                         </div>
                       </div>
                       <div className="flex items-start gap-2.5">
@@ -528,7 +557,7 @@ export function HomeView({
                         <PhoneCall className="w-4.5 h-4.5 text-blue-400 flex-shrink-0 mt-0.5" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase">PHONE NUMBER</span>
-                          <span className="text-xs font-bold text-slate-200 mt-0.5">{loggedInUser.phoneNumber || 'Not Available'}</span>
+                          <span className="text-xs font-bold text-slate-200 mt-0.5">{loggedInUser.phoneNumber || 'Not Specified'}</span>
                         </div>
                       </div>
                       <div className="flex items-start gap-2.5">

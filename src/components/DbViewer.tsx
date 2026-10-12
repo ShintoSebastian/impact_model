@@ -113,6 +113,7 @@ export const DbViewer: React.FC<DbViewerProps> = ({ submissions, resetDb }) => {
                 <th className="px-4 py-3">email</th>
                 <th className="px-4 py-3">business_unit</th>
                 <th className="px-4 py-3">reporting_manager</th>
+                <th className="px-4 py-3">project_manager</th>
                 <th className="px-4 py-3">sales_person</th>
               </tr>
             </thead>
@@ -124,6 +125,7 @@ export const DbViewer: React.FC<DbViewerProps> = ({ submissions, resetDb }) => {
                   <td className="px-4 py-3 text-slate-500">{emp.email}</td>
                   <td className="px-4 py-3">{emp.businessUnit}</td>
                   <td className="px-4 py-3 text-slate-500">{emp.reportingManager.split(' (')[0]}</td>
+                  <td className="px-4 py-3 text-slate-500">{emp.projectManager ? emp.projectManager.split(' (')[0] : 'None'}</td>
                   <td className="px-4 py-3 text-slate-500">{emp.salesPerson.split(' (')[0]}</td>
                 </tr>
               ))}

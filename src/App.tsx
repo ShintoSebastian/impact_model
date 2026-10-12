@@ -298,8 +298,28 @@ function AppContent() {
   const currentUserRole = loggedInUser ? getRole(loggedInUser) : 'Submitter (Employee)';
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      await fetchWithAuth(`${API_BASE_URL}/api/notifications/read`, {
+        method: 'POST'
+      });
+    } catch (err) {
+      console.error('Failed to mark notifications read on server:', err);
+    }
+  };
+
+  const markNotificationAsRead = async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    try {
+      await fetchWithAuth(`${API_BASE_URL}/api/notifications/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+    } catch (err) {
+      console.error('Failed to mark notification read on server:', err);
+    }
   };
 
   return (
@@ -313,6 +333,7 @@ function AppContent() {
               unreadCount={unreadCount} 
               notifications={notifications} 
               markAllAsRead={markAllAsRead} 
+              markNotificationAsRead={markNotificationAsRead}
               loggedInUser={loggedInUser} 
               currentUserRole={currentUserRole}
               handleLogout={handleLogout}
