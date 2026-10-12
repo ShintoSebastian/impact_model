@@ -15,6 +15,7 @@ export interface DashboardLayoutProps {
   unreadCount: number;
   notifications: any[];
   markAllAsRead: () => void;
+  markNotificationAsRead?: (id: string) => void;
   loggedInUser: Employee | null;
   currentUserRole: string;
   handleLogout: () => void;
@@ -25,6 +26,7 @@ export function DashboardLayout({
   unreadCount,
   notifications,
   markAllAsRead,
+  markNotificationAsRead,
   loggedInUser,
   currentUserRole,
   handleLogout,
@@ -52,7 +54,16 @@ export function DashboardLayout({
 
   const currentPath = location.pathname;
   const isOnReviewBoard = currentPath === '/reviewer';
-  const hasReviewAccess = reviewCount > 0;
+  const hasReviewAccess = reviewCount > 0 || 
+    currentUserRole === 'reviewer' || 
+    currentUserRole === 'admin' ||
+    Boolean(loggedInUser?.designation?.toLowerCase().includes('manager')) ||
+    Boolean(loggedInUser?.designation?.toLowerCase().includes('head')) ||
+    Boolean(loggedInUser?.designation?.toLowerCase().includes('lead')) ||
+    Boolean(loggedInUser?.email?.toLowerCase().includes('jayasankar')) ||
+    Boolean(loggedInUser?.email?.toLowerCase().includes('amina.rashad')) ||
+    Boolean(loggedInUser?.email?.toLowerCase().includes('kiran.j')) ||
+    Boolean(loggedInUser?.email?.toLowerCase().includes('anoop.chandran'));
 
   return (
     <div className="flex flex-col min-h-screen bg-brand-bg font-sans">
@@ -166,8 +177,8 @@ export function DashboardLayout({
           >
             <Bell size={20} />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-brand-red text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center border border-white animate-pulse">
-                {unreadCount}
+              <span className="absolute -top-1 -right-1 bg-brand-red text-white text-[9px] font-black rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center border border-white animate-pulse">
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
@@ -191,10 +202,15 @@ export function DashboardLayout({
                   </div>
                 ) : (
                   notifications.map(notif => (
-                    <div key={notif.id} className={`p-4 flex gap-3 items-start transition-colors ${notif.read ? 'bg-white' : 'bg-red-50/5'}`}>
+                    <div 
+                      key={notif.id} 
+                      onClick={() => !notif.read && markNotificationAsRead?.(notif.id)}
+                      className={`p-4 flex gap-3 items-start transition-colors ${!notif.read ? 'bg-red-50/25 hover:bg-red-50/50 cursor-pointer' : 'bg-white'}`}
+                      title={!notif.read ? 'Click to mark as read' : undefined}
+                    >
                       <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${notif.read ? 'bg-slate-300' : 'bg-brand-red'}`} />
                       <div className="flex flex-col gap-0.5">
-                        <span className={`text-xs text-slate-700 leading-normal ${notif.read ? 'font-medium' : 'font-bold'}`}>
+                        <span className={`text-xs leading-normal ${notif.read ? 'font-normal text-slate-500' : 'font-bold text-slate-800'}`}>
                           {notif.message}
                         </span>
                         <span className="text-[9px] text-slate-400">

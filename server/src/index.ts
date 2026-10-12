@@ -13,7 +13,7 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 7000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
-const CORPORATE_API_URL = process.env.CORPORATE_API_URL || '';
+const CORPORATE_API_URL = process.env.CORPORATE_API_URL || 'https://hrapps.nestdigital.com:8089';
 
 const allowedOrigins = process.env.IMPACT_BASE_URL ? [process.env.IMPACT_BASE_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'] : '*';
 app.use(cors({
@@ -40,36 +40,72 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Jayasankar',
       'Reporting Manager Email': 'jayasankar.j@nestgroup.net',
+      'Project Manager': 'Kiran Joseph',
+      'Project Manager Email': 'kiran.j@nestdigital.com',
       'Business Unit Head': 'Amina Rashad',
       'Business Unit Head Email': 'amina.rashad@nestgroup.net',
       'role': 'employee',
       'Designation': 'Software Engineer'
     };
   }
-  if (normEmail === 'jayasankar.j@nestgroup.net' || normEmail === 'dummy.manager@nestdigital.com' || normEmail === 'jayashankar@nestdigital.com' || normEmail === 'jayasankar.j@nestdigital.com') {
+  if (normEmail === 'dummy2.employee@nestdigital.com' || normEmail === 'dummy2.eployee@nestdigital.com' || normEmail === 'dummy2.employee' || normEmail === 'dummy2.eployee') {
+    return {
+      'Employee ID': 'DUMMY-EMP-02',
+      'Employee Name': 'Dummy2 Employee',
+      'Business Unit': 'Engineering',
+      'Reporting Manager': 'Jayasankar',
+      'Reporting Manager Email': 'jayasankar.j@nestgroup.net',
+      'Project Manager': 'Kiran Joseph',
+      'Project Manager Email': 'kiran.j@nestdigital.com',
+      'Business Unit Head': 'Not Specified',
+      'Business Unit Head Email': '',
+      'role': 'employee',
+      'Designation': 'Software Engineer'
+    };
+  }
+  if (normEmail === 'dummy.manager@nestdigital.com') {
     return {
       'Employee ID': 'DUMMY-MGR-01',
       'Employee Name': 'Jayasankar',
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Amina Rashad',
       'Reporting Manager Email': 'amina.rashad@nestgroup.net',
+      'Project Manager': 'Kiran Joseph',
+      'Project Manager Email': 'kiran.j@nestdigital.com',
       'Business Unit Head': 'Amina Rashad',
       'Business Unit Head Email': 'amina.rashad@nestgroup.net',
       'role': 'employee',
       'Designation': 'Reporting Manager'
     };
   }
-  if (normEmail === 'dummy.buhead@nestdigital.com' || normEmail === 'amina.rashad@nestgroup.net') {
+  if (normEmail === 'dummy.buhead@nestdigital.com') {
     return {
       'Employee ID': 'DUMMY-BU-01',
       'Employee Name': 'Amina Rashad',
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Not Specified',
       'Reporting Manager Email': '',
+      'Project Manager': 'Kiran Joseph',
+      'Project Manager Email': 'kiran.j@nestdigital.com',
+      'Business Unit Head': 'Amina Rashad',
+      'Business Unit Head Email': 'amina.rashad@nestgroup.net',
+      'role': 'reviewer',
+      'Designation': 'PMO / BU Reviewer'
+    };
+  }
+  if (normEmail === 'dummy.pm@nestdigital.com') {
+    return {
+      'Employee ID': 'DUMMY-PM-01',
+      'Employee Name': 'Kiran Joseph',
+      'Business Unit': 'Engineering',
+      'Reporting Manager': 'Amina Rashad',
+      'Reporting Manager Email': 'amina.rashad@nestgroup.net',
+      'Project Manager': 'Kiran Joseph',
+      'Project Manager Email': 'kiran.j@nestdigital.com',
       'Business Unit Head': 'Amina Rashad',
       'Business Unit Head Email': 'amina.rashad@nestgroup.net',
       'role': 'employee',
-      'Designation': 'Business Unit Head'
+      'Designation': 'Project Manager'
     };
   }
 
@@ -163,15 +199,22 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
 // Helper: Role Mapping for fallback Auto-Provisioning
 const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
   'dummy.employee@nestdigital.com': { role: 'employee', designation: 'Software Engineer' },
+  'dummy2.employee@nestdigital.com': { role: 'employee', designation: 'Software Engineer' },
+  'dummy2.eployee@nestdigital.com': { role: 'employee', designation: 'Software Engineer' },
   'jayasankar.j@nestgroup.net': { role: 'employee', designation: 'Reporting Manager' },
   'jayasankar.j@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
   'dummy.manager@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
-  'dummy.buhead@nestdigital.com': { role: 'employee', designation: 'Business Unit Head' },
+  'dummy.buhead@nestdigital.com': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
+  'dummy.pm@nestdigital.com': { role: 'employee', designation: 'Project Manager' },
+  'kiran.j@nestdigital.com': { role: 'employee', designation: 'Project Manager' },
+  'anoop.chandran@nestgroup.net': { role: 'reviewer', designation: 'Vice President' },
+  'anoop.chandran@nestdigital.com': { role: 'reviewer', designation: 'Vice President' },
   'jayashankar@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
   'employees@nestdigital.com': { role: 'employee', designation: 'Senior Consultant' },
   'shinto.s@nestdigital.com': { role: 'employee', designation: 'Tech Lead' },
   'arun.kumar@nestdigital.com': { role: 'reviewer', designation: 'Delivery Head' },
-  'amina.rashad@nestgroup.net': { role: 'employee', designation: 'Business Unit Head' },
+  'amina.rashad@nestgroup.net': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
+  'amina.rashad@nestdigital.com': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
   'jacob.varghese@nestdigital.com': { role: 'reviewer', designation: 'Sales' },
   'sony.k@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - HBU' },
   'jobins.jose@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - BFS' },
@@ -193,18 +236,30 @@ const BU_REVIEWERS: Record<string, string> = {
   'geographic information service': 'jose.george@nestgroup.net',
   'ins': 'madhusudhanan.c@nestgroup.net',
   'insurance service': 'madhusudhanan.c@nestgroup.net',
+  'engineering': 'amina.rashad@nestgroup.net',
+  'eng': 'amina.rashad@nestgroup.net',
 };
 
 // Helper to get BU assigned to a reviewer email
 function getAssignedBUsForReviewer(email: string): string[] {
   const normalizedEmail = email.toLowerCase().trim();
+  const searchEmails = [normalizedEmail];
+  if (normalizedEmail === 'dummy.buhead@nestdigital.com' || normalizedEmail === 'amina.rashad@nestgroup.net' || normalizedEmail === 'amina.rashad@nestdigital.com') {
+    searchEmails.push('dummy.buhead@nestdigital.com', 'amina.rashad@nestgroup.net', 'amina.rashad@nestdigital.com');
+  }
+  if (normalizedEmail.includes('anoop.chandran') || normalizedEmail.includes('anoop')) {
+    searchEmails.push('jobins.jose@nestgroup.net', 'anoop.chandran@nestgroup.net', 'anoop.chandran@nestdigital.com');
+  }
   const assignedBUs: string[] = [];
   for (const [bu, revEmail] of Object.entries(BU_REVIEWERS)) {
-    if (revEmail === normalizedEmail) {
+    if (searchEmails.includes(revEmail.toLowerCase())) {
       assignedBUs.push(bu);
     }
   }
-  return assignedBUs;
+  if (normalizedEmail.includes('anoop.chandran') || normalizedEmail.includes('anoop')) {
+    assignedBUs.push('bfs', 'banking financial services', 'banking');
+  }
+  return Array.from(new Set(assignedBUs));
 }
 
 // ----------------------------------------------------
@@ -491,46 +546,267 @@ async function authLdap(username: string, userPassword?: string) {
   }
 
   const cleanUser = username.split('@')[0].toLowerCase();
-  if (['dummy.employee', 'dummy.manager', 'dummy.buhead', 'jayashankar', 'jayasankar', 'jayasankar.j', 'amina.rashad'].includes(cleanUser) && userPassword === 'dummy') {
+  if (['dummy.employee', 'dummy2.employee', 'dummy2.eployee', 'dummy.manager', 'dummy.buhead', 'dummy.pm'].includes(cleanUser) && userPassword === 'dummy') {
     return { success: true };
   }
 
   let cleanUsername = username;
-  let bindDn = username;
-
   if (username.includes('\\')) {
     cleanUsername = username.split('\\')[1];
   } else if (username.includes('@')) {
     cleanUsername = username.split('@')[0];
-  } else {
-    // If just "username" is typed, try formatting as userPrincipalName
-    bindDn = `${username}@nestgroup.net`;
   }
 
-  try {
-    let options = {
-      ldapOpts: {
-        url: 'ldap://10.15.0.25:389',
-      },
-      adminDn: bindDn,
-      adminPassword: userPassword,
-      userPassword: userPassword,
-      userSearchBase: 'DC=chn,DC=nestgroup,DC=net',
-      usernameAttribute: 'sAMAccountName',
-      username: cleanUsername,
-    };
+  // Common Active Directory bind formats for NeST corporate network (DC=chn,DC=nestgroup,DC=net)
+  const bindCandidates = [
+    username.includes('@') || username.includes('\\') ? username : `${cleanUsername}@nestgroup.net`,
+    `${cleanUsername}@nestgroup.net`,
+    `CHN\\${cleanUsername}`,
+    `${cleanUsername}@nestdigital.com`
+  ];
+  const uniqueBinds = [...new Set(bindCandidates)];
 
-    let user = await authenticate(options);
-    return { success: true };
-  } catch (err: any) {
-    console.warn(`[LDAP Auth] Failed for user ${username}:`, err.message);
-    return { success: false, error: err.message };
+  let lastError = 'Invalid credentials';
+
+  for (const candidateDn of uniqueBinds) {
+    try {
+      let options = {
+        ldapOpts: {
+          url: 'ldap://10.15.0.25:389',
+        },
+        adminDn: candidateDn,
+        adminPassword: userPassword,
+        userPassword: userPassword,
+        userSearchBase: 'DC=chn,DC=nestgroup,DC=net',
+        usernameAttribute: 'sAMAccountName',
+        username: cleanUsername,
+      };
+
+      await authenticate(options);
+      console.log(`[LDAP Auth] ✅ Authenticated successfully for ${username} using bindDn: ${candidateDn}`);
+      return { success: true };
+    } catch (err: any) {
+      lastError = err.message || 'Authentication failed';
+      // If error is connection timeout or network unreachable, no need to retry other DN formats
+      if (lastError.includes('timeout') || lastError.includes('ETIMEDOUT') || lastError.includes('ECONNREFUSED')) {
+        break;
+      }
+    }
   }
+
+  console.warn(`[LDAP Auth] ⚠️ Failed for user ${username}:`, lastError);
+
+  // Parse human-readable error messages for Active Directory codes
+  let userFriendlyError = lastError;
+  if (lastError.includes('52e')) {
+    userFriendlyError = 'Invalid username or password. Please verify your corporate Windows/domain logon password and try again.';
+  } else if (lastError.includes('532') || lastError.includes('773')) {
+    userFriendlyError = 'Your corporate password has expired. Please reset it.';
+  } else if (lastError.includes('775')) {
+    userFriendlyError = 'Your corporate domain account is locked out. Please contact IT Helpdesk.';
+  } else if (lastError.includes('533')) {
+    userFriendlyError = 'Your corporate domain account is disabled.';
+  } else if (lastError.includes('timeout') || lastError.includes('ETIMEDOUT')) {
+    userFriendlyError = 'Connection to corporate network timed out. Please ensure you are connected to the office network or NeST VPN.';
+  }
+
+  return { success: false, error: userFriendlyError };
 }
 
 // ----------------------------------------------------
 // AUTH ENDPOINTS
 // ----------------------------------------------------
+
+// Helper: Safely map corporate HRMS data payload to our Employee schema
+function mapCorporateEmployeeData(corporateData: any, normalizedEmail: string) {
+  const empId = corporateData['Employee ID'] || corporateData.employeeId || corporateData.employee_id || corporateData.empId || corporateData.emp_code || `ND-${Math.floor(10000 + Math.random() * 90000)}`;
+
+  const empName = corporateData['Employee Name'] || corporateData.name || corporateData.employeeName || corporateData.employee_name || corporateData.fullName || corporateData.full_name || normalizedEmail.split('@')[0].split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+
+  const empBU = corporateData['Business Unit'] || corporateData['Department'] || corporateData.businessUnit || corporateData.business_unit || corporateData.department || corporateData.bu || 'Not Specified';
+
+  // For managers, prefer combining name + email if both exist
+  const rmName = corporateData['Reporting Manager'] || corporateData.reportingManager || corporateData.reporting_manager || corporateData.manager || corporateData.reportingManagerName || 'Not Specified';
+  const rmEmail = corporateData['Reporting Manager Email'] && !String(rmName).includes(corporateData['Reporting Manager Email']) ? ` (${corporateData['Reporting Manager Email']})` : '';
+  const empRM = rmName !== 'Not Specified' ? `${rmName}${rmEmail}` : rmName;
+
+  // Helper to format known email or derive clean name from email
+  const formatEmployeeNameFromEmail = (email: string) => {
+    const clean = email.trim().toLowerCase();
+    const knownNames: Record<string, string> = {
+      'harikrishnan.kr@nestgroup.net': 'Harikrishnan K R',
+      'roshine.andrews@nestgroup.net': 'Roshine Andrews',
+      'kiran.j@nestdigital.com': 'Kiran Joseph',
+      'jayasankar.j@nestgroup.net': 'Jayasankar J',
+      'amina.rashad@nestgroup.net': 'Amina Rashad',
+      'anil.george@nestgroup.net': 'Anil K George',
+      'jobins.jose@nestgroup.net': 'Jobins Jose',
+      'sony.k@nestgroup.net': 'Sony John K',
+      'anoop.chandran@nestgroup.net': 'Anoop Chandran',
+      'shaju.u@nestgroup.net': 'Shaju P Unni'
+    };
+    if (knownNames[clean]) return knownNames[clean];
+    const username = clean.split('@')[0];
+    return username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+  };
+
+  // 1. Support "Project Manager Email List" (e.g. "harikrishnan.kr@nestgroup.net,roshine.andrews@nestgroup.net")
+  const pmEmailListRaw = corporateData['Project Manager Email List']
+    || corporateData['ProjectManagerEmailList']
+    || corporateData['projectManagerEmailList']
+    || corporateData['Project Manager Email list']
+    || corporateData['Project Manager Emails']
+    || corporateData['Project Manager List']
+    || corporateData['ProjectManagerList']
+    || corporateData['projectManagerList']
+    || '';
+
+  const pmNamesRaw = corporateData['Project Manager Names']
+    || corporateData['Project Manager Name List']
+    || corporateData['ProjectManagerNameList']
+    || corporateData['projectManagerNameList']
+    || '';
+
+  let pmListFormatted = '';
+  if (pmEmailListRaw) {
+    let emailArray: string[] = [];
+    if (Array.isArray(pmEmailListRaw)) {
+      emailArray = pmEmailListRaw;
+    } else if (typeof pmEmailListRaw === 'string') {
+      emailArray = pmEmailListRaw.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    let namesArray: string[] = [];
+    if (Array.isArray(pmNamesRaw)) {
+      namesArray = pmNamesRaw;
+    } else if (typeof pmNamesRaw === 'string' && pmNamesRaw) {
+      namesArray = pmNamesRaw.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    if (emailArray.length > 0) {
+      pmListFormatted = emailArray.map((email, idx) => {
+        const cleanEmail = email.trim();
+        const providedName = namesArray[idx]?.trim();
+        const displayName = providedName || formatEmployeeNameFromEmail(cleanEmail);
+        return `${displayName} (${cleanEmail})`;
+      }).join(', ');
+    }
+  }
+
+  // 2. Single Project Manager fallback extraction
+  let pmRaw = corporateData['Project Manager']
+    || corporateData['Project Manager Name']
+    || corporateData['ProjectManager']
+    || corporateData.projectManager
+    || corporateData.project_manager
+    || corporateData.projectManagerName
+    || corporateData.pm
+    || corporateData.pmName
+    || corporateData.pm_name
+    || 'Not Specified';
+
+  let pmRawEmail = corporateData['Project Manager Email']
+    || corporateData['ProjectManagerEmail']
+    || corporateData.projectManagerEmail
+    || corporateData.project_manager_email
+    || corporateData.pmEmail
+    || corporateData.pm_email
+    || '';
+
+  // Handle nested object structure if Project Manager is returned as { name, email }
+  if (typeof pmRaw === 'object' && pmRaw !== null) {
+    const obj = pmRaw as any;
+    pmRawEmail = pmRawEmail || obj['Email'] || obj.email || obj['Project Manager Email'] || '';
+    pmRaw = obj['Employee Name'] || obj.name || obj.fullName || obj.employeeName || 'Not Specified';
+  }
+
+  const pmNameStr = String(pmRaw).trim();
+  const pmEmailStr = String(pmRawEmail).trim();
+
+  let empPM = 'Not Specified';
+  if (pmListFormatted) {
+    empPM = pmListFormatted;
+  } else if (pmNameStr !== 'Not Specified' && pmNameStr !== '' && pmNameStr.toLowerCase() !== 'null' && pmNameStr.toLowerCase() !== 'undefined') {
+    if (pmEmailStr && !pmNameStr.includes(pmEmailStr)) {
+      empPM = `${pmNameStr} (${pmEmailStr})`;
+    } else {
+      empPM = pmNameStr;
+    }
+  } else if (pmEmailStr) {
+    empPM = `${formatEmployeeNameFromEmail(pmEmailStr)} (${pmEmailStr})`;
+  } else {
+    empPM = 'Not Specified';
+  }
+
+  const buHeadName = corporateData['Business Unit Head'] || corporateData.buHead || corporateData.bu_head || corporateData.businessUnitHead || 'Not Specified';
+  const buHeadEmail = corporateData['Business Unit Head Email'] && !String(buHeadName).includes(corporateData['Business Unit Head Email']) ? ` (${corporateData['Business Unit Head Email']})` : '';
+  let empBUHead = buHeadName !== 'Not Specified' ? `${buHeadName}${buHeadEmail}` : buHeadName;
+
+  // BFS Department BU Head rule: for all employees in Banking and Financial Services (BFS), BU Head is Anoop Chandran
+  // Exception: Anoop Chandran is the BU Head himself, so there is no BU Head for him
+  const isAnoop = normalizedEmail.includes('anoop.chandran') || 
+                  normalizedEmail.includes('anoop') || 
+                  String(empName).toLowerCase().includes('anoop chandran');
+
+  const isBFS = String(empBU).toLowerCase().includes('banking') || 
+                String(empBU).toLowerCase().includes('bfs') || 
+                String(corporateData['Department'] || '').toLowerCase().includes('banking') ||
+                String(corporateData['Department'] || '').toLowerCase().includes('bfs');
+
+  if (isAnoop) {
+    // Anoop Chandran is the BU Head himself / user requested Not Specified for his BU Head
+    empBUHead = 'Not Specified';
+  } else if (isBFS) {
+    empBUHead = 'Anoop Chandran (Anoop.Chandran@nestgroup.net)';
+  }
+
+  const empHRBP = corporateData['HRBP'] || corporateData.hrbp || corporateData.hrBusinessPartner || corporateData.hr_bp || 'Not Specified';
+
+  // Sales Person mapping by Business Unit:
+  // BFS -> Shaju P Unni (shaju.u@nestgroup.net) [Employee ID: 11244]
+  // HBU -> Sudipta Mukherjee (sudipta.mukherjee@nestgroup.net) [Employee ID: 51535]
+  // Rest -> Use corporate API data if present, otherwise default to 'Not Specified'
+  const rawSales = corporateData['Sales Person'] || corporateData.salesPerson || corporateData.sales_person || corporateData.salesOwner || '';
+  let empSales = 'Not Specified';
+
+  const buStr = String(empBU || '').toLowerCase();
+  const deptStr = String(corporateData['Department'] || '').toLowerCase();
+
+  if (buStr.includes('bfs') || buStr.includes('banking') || deptStr.includes('bfs') || deptStr.includes('banking')) {
+    empSales = 'Shaju P Unni (shaju.u@nestgroup.net)';
+  } else if (buStr.includes('hbu') || buStr.includes('healthcare') || deptStr.includes('hbu') || deptStr.includes('healthcare')) {
+    empSales = 'Sudipta Mukherjee (sudipta.mukherjee@nestgroup.net)';
+  } else if (rawSales && rawSales !== 'Not Specified' && rawSales !== 'Not Available' && rawSales.toLowerCase() !== 'null' && rawSales.toLowerCase() !== 'undefined') {
+    empSales = String(rawSales).trim();
+  } else {
+    empSales = 'Not Specified';
+  }
+
+  const empDesignation = corporateData['Designation'] || corporateData.designation || corporateData.title || corporateData.jobTitle || corporateData.job_title || 'Employee';
+
+  const empJobRole = corporateData['Jobrole'] || corporateData.jobRole || corporateData.job_role || 'Not Specified';
+
+  const empPhone = corporateData['Phone Number'] || corporateData.phoneNumber || corporateData.phone_number || corporateData.phone || 'Not Specified';
+
+  // Determine role from corporate data or fall back to ROLE_MAP
+  const mapping = ROLE_MAP[normalizedEmail];
+  const empRole = corporateData.role || (mapping ? mapping.role : 'employee');
+
+  return {
+    employeeId: String(empId),
+    name: String(empName),
+    businessUnit: String(empBU),
+    reportingManager: String(empRM),
+    projectManager: String(empPM),
+    buHead: String(empBUHead),
+    hrbp: String(empHRBP),
+    salesPerson: String(empSales),
+    role: String(empRole),
+    designation: String(empDesignation),
+    jobRole: String(empJobRole),
+    phoneNumber: String(empPhone)
+  };
+}
 
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
@@ -555,9 +831,19 @@ app.post('/api/auth/login', async (req, res) => {
   // Ensure we have an email format for the local database and ROLE_MAP
   let normalizedEmail = normalizedInput.includes('@') ? normalizedInput : `${normalizedInput}@nestdigital.com`;
   if (normalizedInput === 'dummy.buhead' || normalizedInput === 'dummy.buhead@nestdigital.com') {
-    normalizedEmail = 'amina.rashad@nestgroup.net';
-  } else if (['dummy.manager', 'dummy.manager@nestdigital.com', 'jayashankar', 'jayasankar', 'jayasankar.j', 'jayasankar.j@nestgroup.net', 'jayasankar.j@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy.buhead@nestdigital.com';
+  } else if (['dummy.manager', 'dummy.manager@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy.manager@nestdigital.com';
+  } else if (['dummy.pm', 'dummy.pm@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy.pm@nestdigital.com';
+  } else if (['kiran.j', 'kiran.j@nestdigital.com', 'kiran.joseph'].includes(normalizedInput)) {
+    normalizedEmail = 'kiran.j@nestdigital.com';
+  } else if (['dummy2.employee', 'dummy2.eployee', 'dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy2.employee@nestdigital.com';
+  } else if (['jayasankar', 'jayasankar.j', 'jayashankar', 'jayasankar.j@nestgroup.net', 'jayasankar.j@nestdigital.com'].includes(normalizedInput)) {
     normalizedEmail = 'jayasankar.j@nestgroup.net';
+  } else if (['amina.rashad', 'amina.rashad@nestgroup.net', 'amina.rashad@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'amina.rashad@nestgroup.net';
   }
 
   try {
@@ -567,52 +853,9 @@ app.post('/api/auth/login', async (req, res) => {
     let employee: any = null;
 
     if (corporateData) {
-      // Corporate API returned real employee data — map it to our schema
-      const empId = corporateData['Employee ID'] || corporateData.employeeId || corporateData.employee_id || corporateData.empId || corporateData.emp_code || `ND-${Math.floor(10000 + Math.random() * 90000)}`;
-
-      const empName = corporateData['Employee Name'] || corporateData.name || corporateData.employeeName || corporateData.employee_name || corporateData.fullName || corporateData.full_name || normalizedEmail.split('@')[0].split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-
-      const empBU = corporateData['Business Unit'] || corporateData['Department'] || corporateData.businessUnit || corporateData.business_unit || corporateData.department || corporateData.bu || 'Not Specified';
-
-      // For managers, prefer combining name + email if both exist
-      const rmName = corporateData['Reporting Manager'] || corporateData.reportingManager || corporateData.reporting_manager || corporateData.manager || corporateData.reportingManagerName || 'Not Specified';
-      const rmEmail = corporateData['Reporting Manager Email'] ? ` (${corporateData['Reporting Manager Email']})` : '';
-      const empRM = rmName !== 'Not Specified' ? `${rmName}${rmEmail}` : rmName;
-
-      const empPM = corporateData['Project Manager'] || corporateData.projectManager || corporateData.project_manager || corporateData.pm || 'Not Specified';
-
-      const buHeadName = corporateData['Business Unit Head'] || corporateData.buHead || corporateData.bu_head || corporateData.businessUnitHead || 'Not Specified';
-      const buHeadEmail = corporateData['Business Unit Head Email'] ? ` (${corporateData['Business Unit Head Email']})` : '';
-      const empBUHead = buHeadName !== 'Not Specified' ? `${buHeadName}${buHeadEmail}` : buHeadName;
-
-      const empHRBP = corporateData['HRBP'] || corporateData.hrbp || corporateData.hrBusinessPartner || corporateData.hr_bp || 'Not Specified';
-
-      const empSales = corporateData['Sales Person'] || corporateData.salesPerson || corporateData.sales_person || corporateData.salesOwner || 'Not Specified';
-
-      const empDesignation = corporateData['Designation'] || corporateData.designation || corporateData.title || corporateData.jobTitle || corporateData.job_title || 'Employee';
-
-      const empJobRole = corporateData['Jobrole'] || corporateData.jobRole || corporateData.job_role || 'Not Specified';
-
-      const empPhone = corporateData['Phone Number'] || corporateData.phoneNumber || corporateData.phone_number || corporateData.phone || 'Not Specified';
-
-      // Determine role from corporate data or fall back to ROLE_MAP
-      const mapping = ROLE_MAP[normalizedEmail];
-      const empRole = corporateData.role || (mapping ? mapping.role : 'employee');
-
-      const freshData = {
-        employeeId: String(empId),
-        name: String(empName),
-        businessUnit: String(empBU),
-        reportingManager: String(empRM),
-        projectManager: String(empPM),
-        buHead: String(empBUHead),
-        hrbp: String(empHRBP),
-        salesPerson: String(empSales),
-        role: String(empRole),
-        designation: String(empDesignation),
-        jobRole: String(empJobRole),
-        phoneNumber: String(empPhone)
-      };
+      // Corporate API returned real employee data — map it to our schema using unified parser
+      const freshData = mapCorporateEmployeeData(corporateData, normalizedEmail);
+      console.log(`[Login] 📋 HRMS Parsed -> RM: "${freshData.reportingManager}", PM: "${freshData.projectManager}", BU Head: "${freshData.buHead}"`);
 
       try {
         // Upsert: update existing local record with fresh API data, or create if new
@@ -697,6 +940,70 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// POST /api/auth/sync-profile
+// On-demand refresh of logged-in user profile from Corporate HRMS API (including latest Project Manager details)
+app.post('/api/auth/sync-profile', authenticateToken, async (req: any, res) => {
+  const userEmail = req.user.email;
+  if (!userEmail) {
+    return res.status(400).json({ error: 'User email not found in token' });
+  }
+
+  try {
+    const corporateData = await fetchCorporateEmployee(userEmail);
+    if (!corporateData) {
+      const currentEmp = await prisma.employee.findUnique({ where: { email: userEmail } });
+      return res.json({
+        message: 'No new data returned from Corporate HRMS API. Existing profile preserved.',
+        user: currentEmp
+      });
+    }
+
+    const freshData = mapCorporateEmployeeData(corporateData, userEmail);
+
+    let updatedEmployee: any = null;
+    try {
+      updatedEmployee = await prisma.employee.upsert({
+        where: { email: userEmail },
+        update: freshData,
+        create: {
+          ...freshData,
+          email: userEmail
+        }
+      });
+    } catch (upsertErr) {
+      const { employeeId: _skipId, ...updateWithoutId } = freshData;
+      updatedEmployee = await prisma.employee.update({
+        where: { email: userEmail },
+        data: updateWithoutId
+      });
+    }
+
+    console.log(`[Sync Profile] ✅ Successfully refreshed HRMS profile for ${userEmail}: PM="${updatedEmployee.projectManager}"`);
+
+    res.json({
+      message: 'Profile and Project Manager details successfully synchronized from HRMS API',
+      user: {
+        employeeId: updatedEmployee.employeeId,
+        name: updatedEmployee.name,
+        email: updatedEmployee.email,
+        businessUnit: updatedEmployee.businessUnit,
+        reportingManager: updatedEmployee.reportingManager,
+        projectManager: updatedEmployee.projectManager,
+        buHead: updatedEmployee.buHead,
+        hrbp: updatedEmployee.hrbp,
+        salesPerson: updatedEmployee.salesPerson,
+        role: updatedEmployee.role,
+        designation: updatedEmployee.designation,
+        jobRole: updatedEmployee.jobRole,
+        phoneNumber: updatedEmployee.phoneNumber
+      }
+    });
+  } catch (error: any) {
+    console.error('[Sync Profile Error]:', error);
+    res.status(500).json({ error: 'Failed to sync profile from HRMS API: ' + error.message });
+  }
+});
+
 // GET /api/employees
 app.get('/api/employees', authenticateToken, async (req: any, res) => {
   try {
@@ -723,7 +1030,7 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
   try {
     let whereClause: any = {};
     const assignedBUs = getAssignedBUsForReviewer(userEmail);
-    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('jayasankar') && !userEmail.includes('amina.rashad') && !userEmail.includes('dummy')) || userRole === 'admin' || userEmail.includes('arun.kumar');
+    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('jayasankar') && !userEmail.includes('amina.rashad') && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin' || userEmail.includes('arun.kumar');
 
     if (isGlobalReviewer) {
       whereClause = {}; // Global Reviewers/admins see all submissions to review
@@ -753,7 +1060,32 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
       if (userEmail.includes('dummy.manager') || userEmail.includes('jayasankar')) {
         orConditions.push(
           { reportingManager: { contains: 'jayasankar' } },
+          { reportingManager: { contains: 'Jayasankar' } },
           { reportingManager: { contains: 'dummy.manager' } }
+        );
+      }
+      if (userEmail.includes('dummy.buhead') || userEmail.includes('amina.rashad')) {
+        orConditions.push(
+          { buHead: { contains: 'amina' } },
+          { buHead: { contains: 'Amina' } },
+          { buHead: { contains: 'dummy.buhead' } },
+          { buHead: { contains: 'Dummy BU Head' } }
+        );
+      }
+      if (userEmail.includes('dummy.pm') || userEmail.includes('kiran.j')) {
+        orConditions.push(
+          { projectManager: { contains: 'kiran' } },
+          { projectManager: { contains: 'Kiran' } },
+          { projectManager: { contains: 'dummy.pm' } }
+        );
+      }
+      if (userEmail.includes('anoop.chandran') || userEmail.includes('anoop')) {
+        orConditions.push(
+          { buHead: { contains: 'anoop' } },
+          { buHead: { contains: 'Anoop' } },
+          { buHead: { contains: 'Anoop Chandran' } },
+          { employee: { businessUnit: { contains: 'bfs' } } },
+          { employee: { businessUnit: { contains: 'Banking' } } }
         );
       }
 
@@ -791,7 +1123,7 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
     } else if (mode === 'review') {
       // Review mode: show all for reviewers/admins or submissions where user is stakeholder
       const assignedBUs = getAssignedBUsForReviewer(userEmail);
-      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('jayasankar') && !userEmail.includes('amina.rashad') && !userEmail.includes('dummy')) || userRole === 'admin' || userEmail.includes('arun.kumar');
+      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('jayasankar') && !userEmail.includes('amina.rashad') && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin' || userEmail.includes('arun.kumar');
 
       if (isGlobalReviewer) {
         whereClause = {};
@@ -821,7 +1153,32 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
         if (userEmail.includes('dummy.manager') || userEmail.includes('jayasankar')) {
           orConditions.push(
             { reportingManager: { contains: 'jayasankar' } },
+            { reportingManager: { contains: 'Jayasankar' } },
             { reportingManager: { contains: 'dummy.manager' } }
+          );
+        }
+        if (userEmail.includes('dummy.buhead') || userEmail.includes('amina.rashad')) {
+          orConditions.push(
+            { buHead: { contains: 'amina' } },
+            { buHead: { contains: 'Amina' } },
+            { buHead: { contains: 'dummy.buhead' } },
+            { buHead: { contains: 'Dummy BU Head' } }
+          );
+        }
+        if (userEmail.includes('dummy.pm') || userEmail.includes('kiran.j')) {
+          orConditions.push(
+            { projectManager: { contains: 'kiran' } },
+            { projectManager: { contains: 'Kiran' } },
+            { projectManager: { contains: 'dummy.pm' } }
+          );
+        }
+        if (userEmail.includes('anoop.chandran') || userEmail.includes('anoop')) {
+          orConditions.push(
+            { buHead: { contains: 'anoop' } },
+            { buHead: { contains: 'Anoop' } },
+            { buHead: { contains: 'Anoop Chandran' } },
+            { employee: { businessUnit: { contains: 'bfs' } } },
+            { employee: { businessUnit: { contains: 'Banking' } } }
           );
         }
 
@@ -2172,11 +2529,36 @@ app.post('/api/submissions/:id/reward', authenticateToken, async (req: any, res)
 // GET /api/notifications
 app.get('/api/notifications', authenticateToken, async (req: any, res) => {
   try {
+    const rawEmail = (req.user?.email || '').trim();
+    const userEmail = rawEmail.toLowerCase();
+    const possibleEmails = Array.from(new Set([
+      rawEmail,
+      userEmail,
+      rawEmail.replace(/@nestgroup\.net$/i, '@nestdigital.com'),
+      rawEmail.replace(/@nestdigital\.com$/i, '@nestgroup.net'),
+      userEmail.replace('@nestgroup.net', '@nestdigital.com'),
+      userEmail.replace('@nestdigital.com', '@nestgroup.net')
+    ])).filter(Boolean);
+
+    if (userEmail === 'amina.rashad@nestgroup.net' || userEmail === 'amina.rashad@nestdigital.com') {
+      possibleEmails.push('dummy.buhead@nestdigital.com');
+    }
+    if (userEmail === 'jayasankar.j@nestgroup.net' || userEmail === 'jayasankar.j@nestdigital.com') {
+      possibleEmails.push('dummy.manager@nestdigital.com');
+    }
+    if (userEmail === 'dummy2.employee@nestdigital.com' || userEmail === 'dummy2.eployee@nestdigital.com') {
+      possibleEmails.push('dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com');
+    }
+
     const notifications = await prisma.notification.findMany({
       where: {
-        recipientEmail: req.user.email
+        OR: [
+          { recipientEmail: { in: possibleEmails } },
+          { recipientEmail: null }
+        ]
       },
-      orderBy: { timestamp: 'desc' }
+      orderBy: { timestamp: 'desc' },
+      take: 60
     });
     res.json(notifications);
   } catch (error) {
@@ -2187,11 +2569,46 @@ app.get('/api/notifications', authenticateToken, async (req: any, res) => {
 
 // POST /api/notifications/read
 app.post('/api/notifications/read', authenticateToken, async (req: any, res) => {
+  const { id } = req.body || {};
   try {
-    await prisma.notification.updateMany({
-      where: { read: false, recipientEmail: req.user.email },
-      data: { read: true }
-    });
+    const rawEmail = (req.user?.email || '').trim();
+    const userEmail = rawEmail.toLowerCase();
+    const possibleEmails = Array.from(new Set([
+      rawEmail,
+      userEmail,
+      rawEmail.replace(/@nestgroup\.net$/i, '@nestdigital.com'),
+      rawEmail.replace(/@nestdigital\.com$/i, '@nestgroup.net'),
+      userEmail.replace('@nestgroup.net', '@nestdigital.com'),
+      userEmail.replace('@nestdigital.com', '@nestgroup.net')
+    ])).filter(Boolean);
+
+    if (userEmail === 'amina.rashad@nestgroup.net' || userEmail === 'amina.rashad@nestdigital.com') {
+      possibleEmails.push('dummy.buhead@nestdigital.com');
+    }
+    if (userEmail === 'jayasankar.j@nestgroup.net' || userEmail === 'jayasankar.j@nestdigital.com') {
+      possibleEmails.push('dummy.manager@nestdigital.com');
+    }
+    if (userEmail === 'dummy2.employee@nestdigital.com' || userEmail === 'dummy2.eployee@nestdigital.com') {
+      possibleEmails.push('dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com');
+    }
+
+    if (id) {
+      await prisma.notification.updateMany({
+        where: { id },
+        data: { read: true }
+      });
+    } else {
+      await prisma.notification.updateMany({
+        where: {
+          read: false,
+          OR: [
+            { recipientEmail: { in: possibleEmails } },
+            { recipientEmail: null }
+          ]
+        },
+        data: { read: true }
+      });
+    }
     res.json({ success: true });
   } catch (error) {
     console.error('Mark notifications read error:', error);
