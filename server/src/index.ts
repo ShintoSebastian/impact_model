@@ -38,10 +38,10 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Employee ID': 'DUMMY-EMP-01',
       'Employee Name': 'Dummy Employee',
       'Business Unit': 'Engineering',
-      'Reporting Manager': 'Jayasankar',
-      'Reporting Manager Email': 'jayasankar.j@nestgroup.net',
-      'Project Manager': 'Kiran Joseph',
-      'Project Manager Email': 'kiran.j@nestdigital.com',
+      'Reporting Manager': 'Dummy Manager',
+      'Reporting Manager Email': 'dummy.manager@nestdigital.com',
+      'Project Manager': 'Dummy PM',
+      'Project Manager Email': 'dummy.pm@nestdigital.com',
       'Business Unit Head': 'Amina Rashad',
       'Business Unit Head Email': 'amina.rashad@nestgroup.net',
       'role': 'employee',
@@ -53,10 +53,10 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Employee ID': 'DUMMY-EMP-02',
       'Employee Name': 'Dummy2 Employee',
       'Business Unit': 'Engineering',
-      'Reporting Manager': 'Jayasankar',
-      'Reporting Manager Email': 'jayasankar.j@nestgroup.net',
-      'Project Manager': 'Kiran Joseph',
-      'Project Manager Email': 'kiran.j@nestdigital.com',
+      'Reporting Manager': 'Dummy Manager',
+      'Reporting Manager Email': 'dummy.manager@nestdigital.com',
+      'Project Manager': 'Dummy PM',
+      'Project Manager Email': 'dummy.pm@nestdigital.com',
       'Business Unit Head': 'Not Specified',
       'Business Unit Head Email': '',
       'role': 'employee',
@@ -66,12 +66,12 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
   if (normEmail === 'dummy.manager@nestdigital.com') {
     return {
       'Employee ID': 'DUMMY-MGR-01',
-      'Employee Name': 'Jayasankar',
+      'Employee Name': 'Dummy Manager',
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Amina Rashad',
       'Reporting Manager Email': 'amina.rashad@nestgroup.net',
-      'Project Manager': 'Kiran Joseph',
-      'Project Manager Email': 'kiran.j@nestdigital.com',
+      'Project Manager': 'Dummy PM',
+      'Project Manager Email': 'dummy.pm@nestdigital.com',
       'Business Unit Head': 'Amina Rashad',
       'Business Unit Head Email': 'amina.rashad@nestgroup.net',
       'role': 'employee',
@@ -85,8 +85,8 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Not Specified',
       'Reporting Manager Email': '',
-      'Project Manager': 'Kiran Joseph',
-      'Project Manager Email': 'kiran.j@nestdigital.com',
+      'Project Manager': 'Dummy PM',
+      'Project Manager Email': 'dummy.pm@nestdigital.com',
       'Business Unit Head': 'Amina Rashad',
       'Business Unit Head Email': 'amina.rashad@nestgroup.net',
       'role': 'reviewer',
@@ -96,12 +96,12 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
   if (normEmail === 'dummy.pm@nestdigital.com') {
     return {
       'Employee ID': 'DUMMY-PM-01',
-      'Employee Name': 'Kiran Joseph',
+      'Employee Name': 'Dummy PM',
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Amina Rashad',
       'Reporting Manager Email': 'amina.rashad@nestgroup.net',
-      'Project Manager': 'Kiran Joseph',
-      'Project Manager Email': 'kiran.j@nestdigital.com',
+      'Project Manager': 'Not Specified',
+      'Project Manager Email': '',
       'Business Unit Head': 'Amina Rashad',
       'Business Unit Head Email': 'amina.rashad@nestgroup.net',
       'role': 'employee',
@@ -201,26 +201,21 @@ const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
   'dummy.employee@nestdigital.com': { role: 'employee', designation: 'Software Engineer' },
   'dummy2.employee@nestdigital.com': { role: 'employee', designation: 'Software Engineer' },
   'dummy2.eployee@nestdigital.com': { role: 'employee', designation: 'Software Engineer' },
-  'jayasankar.j@nestgroup.net': { role: 'employee', designation: 'Reporting Manager' },
-  'jayasankar.j@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
   'dummy.manager@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
   'dummy.buhead@nestdigital.com': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
   'dummy.pm@nestdigital.com': { role: 'employee', designation: 'Project Manager' },
-  'kiran.j@nestdigital.com': { role: 'employee', designation: 'Project Manager' },
   'anoop.chandran@nestgroup.net': { role: 'reviewer', designation: 'Vice President' },
   'anoop.chandran@nestdigital.com': { role: 'reviewer', designation: 'Vice President' },
-  'jayashankar@nestdigital.com': { role: 'employee', designation: 'Reporting Manager' },
   'employees@nestdigital.com': { role: 'employee', designation: 'Senior Consultant' },
-  'shinto.s@nestdigital.com': { role: 'employee', designation: 'Tech Lead' },
-  'arun.kumar@nestdigital.com': { role: 'reviewer', designation: 'Delivery Head' },
   'amina.rashad@nestgroup.net': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
   'amina.rashad@nestdigital.com': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
-  'jacob.varghese@nestdigital.com': { role: 'reviewer', designation: 'Sales' },
   'sony.k@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - HBU' },
   'jobins.jose@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - BFS' },
   'jonathan.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - MBU/IBU' },
   'jose.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - GIS' },
-  'madhusudhanan.c@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - INS' }
+  'madhusudhanan.c@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - INS' },
+  'nishant.unnikrishnan@nestgroup.net': { role: 'reviewer', designation: 'Sales - MBU' },
+  'nishant.unnikrishnan@nestdigital.com': { role: 'reviewer', designation: 'Sales - MBU' }
 };
 
 const BU_REVIEWERS: Record<string, string> = {
@@ -250,6 +245,9 @@ function getAssignedBUsForReviewer(email: string): string[] {
   if (normalizedEmail.includes('anoop.chandran') || normalizedEmail.includes('anoop')) {
     searchEmails.push('jobins.jose@nestgroup.net', 'anoop.chandran@nestgroup.net', 'anoop.chandran@nestdigital.com');
   }
+  if (normalizedEmail.includes('nishant.unnikrishnan') || normalizedEmail.includes('nishant')) {
+    searchEmails.push('nishant.unnikrishnan@nestgroup.net', 'nishant.unnikrishnan@nestdigital.com');
+  }
   const assignedBUs: string[] = [];
   for (const [bu, revEmail] of Object.entries(BU_REVIEWERS)) {
     if (searchEmails.includes(revEmail.toLowerCase())) {
@@ -258,6 +256,9 @@ function getAssignedBUsForReviewer(email: string): string[] {
   }
   if (normalizedEmail.includes('anoop.chandran') || normalizedEmail.includes('anoop')) {
     assignedBUs.push('bfs', 'banking financial services', 'banking');
+  }
+  if (normalizedEmail.includes('nishant.unnikrishnan') || normalizedEmail.includes('nishant')) {
+    assignedBUs.push('mbu', 'mobility business unit', 'mobility');
   }
   return Array.from(new Set(assignedBUs));
 }
@@ -353,14 +354,14 @@ app.get('/api/test-crm-api', async (req, res) => {
       phone: '+1 (555) 999-0000'
     },
     sourceDetails: {
-      submittedByEmployeeId: 'ND-10042',
-      submittedByEmployeeName: 'Shinto Sebastian',
+      submittedByEmployeeId: 'DUMMY-EMP-01',
+      submittedByEmployeeName: 'Test Employee',
       employeeBusinessUnit: 'Digital Transformation Unit (DTU)'
     },
     stakeholderMapping: {
-      assignedSalesPerson: 'Jacob Varghese (jacob.varghese@nestdigital.com)',
-      businessUnitHead: 'Suresh Nair (suresh.n@nestdigital.com)',
-      projectManager: 'Kiran Joseph (kiran.j@nestdigital.com)'
+      assignedSalesPerson: 'Not Specified',
+      businessUnitHead: 'Dummy BU Head (dummy.buhead@nestdigital.com)',
+      projectManager: 'Dummy PM (dummy.pm@nestdigital.com)'
     },
     submittedAt: new Date().toISOString(),
     approvedAt: new Date().toISOString()
@@ -636,14 +637,15 @@ function mapCorporateEmployeeData(corporateData: any, normalizedEmail: string) {
     const knownNames: Record<string, string> = {
       'harikrishnan.kr@nestgroup.net': 'Harikrishnan K R',
       'roshine.andrews@nestgroup.net': 'Roshine Andrews',
-      'kiran.j@nestdigital.com': 'Kiran Joseph',
       'jayasankar.j@nestgroup.net': 'Jayasankar J',
       'amina.rashad@nestgroup.net': 'Amina Rashad',
       'anil.george@nestgroup.net': 'Anil K George',
       'jobins.jose@nestgroup.net': 'Jobins Jose',
       'sony.k@nestgroup.net': 'Sony John K',
       'anoop.chandran@nestgroup.net': 'Anoop Chandran',
-      'shaju.u@nestgroup.net': 'Shaju P Unni'
+      'shaju.u@nestgroup.net': 'Shaju P Unni',
+      'sudipta.mukherjee@nestgroup.net': 'Sudipta Mukherjee',
+      'nishant.unnikrishnan@nestgroup.net': 'Nishant Unnikrishnan'
     };
     if (knownNames[clean]) return knownNames[clean];
     const username = clean.split('@')[0];
@@ -765,6 +767,7 @@ function mapCorporateEmployeeData(corporateData: any, normalizedEmail: string) {
   // Sales Person mapping by Business Unit:
   // BFS -> Shaju P Unni (shaju.u@nestgroup.net) [Employee ID: 11244]
   // HBU -> Sudipta Mukherjee (sudipta.mukherjee@nestgroup.net) [Employee ID: 51535]
+  // MBU -> Nishant Unnikrishnan (nishant.unnikrishnan@nestgroup.net)
   // Rest -> Use corporate API data if present, otherwise default to 'Not Specified'
   const rawSales = corporateData['Sales Person'] || corporateData.salesPerson || corporateData.sales_person || corporateData.salesOwner || '';
   let empSales = 'Not Specified';
@@ -776,6 +779,8 @@ function mapCorporateEmployeeData(corporateData: any, normalizedEmail: string) {
     empSales = 'Shaju P Unni (shaju.u@nestgroup.net)';
   } else if (buStr.includes('hbu') || buStr.includes('healthcare') || deptStr.includes('hbu') || deptStr.includes('healthcare')) {
     empSales = 'Sudipta Mukherjee (sudipta.mukherjee@nestgroup.net)';
+  } else if (buStr.includes('mbu') || buStr.includes('mobility') || deptStr.includes('mbu') || deptStr.includes('mobility')) {
+    empSales = 'Nishant Unnikrishnan (nishant.unnikrishnan@nestgroup.net)';
   } else if (rawSales && rawSales !== 'Not Specified' && rawSales !== 'Not Available' && rawSales.toLowerCase() !== 'null' && rawSales.toLowerCase() !== 'undefined') {
     empSales = String(rawSales).trim();
   } else {
@@ -836,14 +841,12 @@ app.post('/api/auth/login', async (req, res) => {
     normalizedEmail = 'dummy.manager@nestdigital.com';
   } else if (['dummy.pm', 'dummy.pm@nestdigital.com'].includes(normalizedInput)) {
     normalizedEmail = 'dummy.pm@nestdigital.com';
-  } else if (['kiran.j', 'kiran.j@nestdigital.com', 'kiran.joseph'].includes(normalizedInput)) {
-    normalizedEmail = 'kiran.j@nestdigital.com';
   } else if (['dummy2.employee', 'dummy2.eployee', 'dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com'].includes(normalizedInput)) {
     normalizedEmail = 'dummy2.employee@nestdigital.com';
-  } else if (['jayasankar', 'jayasankar.j', 'jayashankar', 'jayasankar.j@nestgroup.net', 'jayasankar.j@nestdigital.com'].includes(normalizedInput)) {
-    normalizedEmail = 'jayasankar.j@nestgroup.net';
   } else if (['amina.rashad', 'amina.rashad@nestgroup.net', 'amina.rashad@nestdigital.com'].includes(normalizedInput)) {
     normalizedEmail = 'amina.rashad@nestgroup.net';
+  } else if (['nishant.unnikrishnan', 'nishant.unnikrishnan@nestgroup.net', 'nishant.unnikrishnan@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'nishant.unnikrishnan@nestgroup.net';
   }
 
   try {
@@ -1030,7 +1033,7 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
   try {
     let whereClause: any = {};
     const assignedBUs = getAssignedBUsForReviewer(userEmail);
-    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('jayasankar') && !userEmail.includes('amina.rashad') && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin' || userEmail.includes('arun.kumar');
+    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('amina.rashad') && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin';
 
     if (isGlobalReviewer) {
       whereClause = {}; // Global Reviewers/admins see all submissions to review
@@ -1056,12 +1059,11 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
         { salesPerson: { contains: nameParts } },
       ];
 
-      // Alias handling: Ensure dummy manager / Jayasankar matches both tags
-      if (userEmail.includes('dummy.manager') || userEmail.includes('jayasankar')) {
+      // Alias handling: Ensure dummy manager matches both tags
+      if (userEmail.includes('dummy.manager')) {
         orConditions.push(
-          { reportingManager: { contains: 'jayasankar' } },
-          { reportingManager: { contains: 'Jayasankar' } },
-          { reportingManager: { contains: 'dummy.manager' } }
+          { reportingManager: { contains: 'dummy.manager' } },
+          { reportingManager: { contains: 'Dummy Manager' } }
         );
       }
       if (userEmail.includes('dummy.buhead') || userEmail.includes('amina.rashad')) {
@@ -1072,11 +1074,10 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
           { buHead: { contains: 'Dummy BU Head' } }
         );
       }
-      if (userEmail.includes('dummy.pm') || userEmail.includes('kiran.j')) {
+      if (userEmail.includes('dummy.pm')) {
         orConditions.push(
-          { projectManager: { contains: 'kiran' } },
-          { projectManager: { contains: 'Kiran' } },
-          { projectManager: { contains: 'dummy.pm' } }
+          { projectManager: { contains: 'dummy.pm' } },
+          { projectManager: { contains: 'Dummy PM' } }
         );
       }
       if (userEmail.includes('anoop.chandran') || userEmail.includes('anoop')) {
@@ -1086,6 +1087,14 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
           { buHead: { contains: 'Anoop Chandran' } },
           { employee: { businessUnit: { contains: 'bfs' } } },
           { employee: { businessUnit: { contains: 'Banking' } } }
+        );
+      }
+      if (userEmail.includes('nishant.unnikrishnan') || userEmail.includes('nishant')) {
+        orConditions.push(
+          { salesPerson: { contains: 'nishant.unnikrishnan' } },
+          { salesPerson: { contains: 'Nishant Unnikrishnan' } },
+          { employee: { businessUnit: { contains: 'mbu' } } },
+          { employee: { businessUnit: { contains: 'Mobility' } } }
         );
       }
 
@@ -1123,7 +1132,7 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
     } else if (mode === 'review') {
       // Review mode: show all for reviewers/admins or submissions where user is stakeholder
       const assignedBUs = getAssignedBUsForReviewer(userEmail);
-      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('jayasankar') && !userEmail.includes('amina.rashad') && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin' || userEmail.includes('arun.kumar');
+      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('amina.rashad') && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin';
 
       if (isGlobalReviewer) {
         whereClause = {};
@@ -1149,12 +1158,11 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
           { salesPerson: { contains: nameParts } },
         ];
 
-        // Alias handling: Ensure dummy manager / Jayasankar matches both tags
-        if (userEmail.includes('dummy.manager') || userEmail.includes('jayasankar')) {
+        // Alias handling: Ensure dummy manager matches both tags
+        if (userEmail.includes('dummy.manager')) {
           orConditions.push(
-            { reportingManager: { contains: 'jayasankar' } },
-            { reportingManager: { contains: 'Jayasankar' } },
-            { reportingManager: { contains: 'dummy.manager' } }
+            { reportingManager: { contains: 'dummy.manager' } },
+            { reportingManager: { contains: 'Dummy Manager' } }
           );
         }
         if (userEmail.includes('dummy.buhead') || userEmail.includes('amina.rashad')) {
@@ -1165,11 +1173,10 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
             { buHead: { contains: 'Dummy BU Head' } }
           );
         }
-        if (userEmail.includes('dummy.pm') || userEmail.includes('kiran.j')) {
+        if (userEmail.includes('dummy.pm')) {
           orConditions.push(
-            { projectManager: { contains: 'kiran' } },
-            { projectManager: { contains: 'Kiran' } },
-            { projectManager: { contains: 'dummy.pm' } }
+            { projectManager: { contains: 'dummy.pm' } },
+            { projectManager: { contains: 'Dummy PM' } }
           );
         }
         if (userEmail.includes('anoop.chandran') || userEmail.includes('anoop')) {
@@ -1179,6 +1186,14 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
             { buHead: { contains: 'Anoop Chandran' } },
             { employee: { businessUnit: { contains: 'bfs' } } },
             { employee: { businessUnit: { contains: 'Banking' } } }
+          );
+        }
+        if (userEmail.includes('nishant.unnikrishnan') || userEmail.includes('nishant')) {
+          orConditions.push(
+            { salesPerson: { contains: 'nishant.unnikrishnan' } },
+            { salesPerson: { contains: 'Nishant Unnikrishnan' } },
+            { employee: { businessUnit: { contains: 'mbu' } } },
+            { employee: { businessUnit: { contains: 'Mobility' } } }
           );
         }
 
@@ -2341,13 +2356,13 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
 
     const userEmail = req.user.email || '';
     const userRole = req.user.role || '';
-    const isGlobalReviewer = userRole === 'admin' || userEmail.includes('arun.kumar');
+    const isGlobalReviewer = userRole === 'admin';
     const isStakeholder = 
       (existing.reportingManager && existing.reportingManager.includes(userEmail)) ||
       (existing.projectManager && existing.projectManager.includes(userEmail)) ||
       (existing.buHead && existing.buHead.includes(userEmail)) ||
       (existing.hrbp && existing.hrbp.includes(userEmail)) ||
-      (existing.salesPerson && existing.salesPerson.includes(userEmail));
+      (existing.salesPerson && (existing.salesPerson.includes(userEmail) || (userEmail.includes('nishant') && existing.salesPerson.includes('Nishant'))));
     
     const isSubmitter = existing.employeeId === req.user.employeeId;
 
@@ -2543,9 +2558,6 @@ app.get('/api/notifications', authenticateToken, async (req: any, res) => {
     if (userEmail === 'amina.rashad@nestgroup.net' || userEmail === 'amina.rashad@nestdigital.com') {
       possibleEmails.push('dummy.buhead@nestdigital.com');
     }
-    if (userEmail === 'jayasankar.j@nestgroup.net' || userEmail === 'jayasankar.j@nestdigital.com') {
-      possibleEmails.push('dummy.manager@nestdigital.com');
-    }
     if (userEmail === 'dummy2.employee@nestdigital.com' || userEmail === 'dummy2.eployee@nestdigital.com') {
       possibleEmails.push('dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com');
     }
@@ -2584,9 +2596,6 @@ app.post('/api/notifications/read', authenticateToken, async (req: any, res) => 
 
     if (userEmail === 'amina.rashad@nestgroup.net' || userEmail === 'amina.rashad@nestdigital.com') {
       possibleEmails.push('dummy.buhead@nestdigital.com');
-    }
-    if (userEmail === 'jayasankar.j@nestgroup.net' || userEmail === 'jayasankar.j@nestdigital.com') {
-      possibleEmails.push('dummy.manager@nestdigital.com');
     }
     if (userEmail === 'dummy2.employee@nestdigital.com' || userEmail === 'dummy2.eployee@nestdigital.com') {
       possibleEmails.push('dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com');
@@ -2701,11 +2710,11 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         contactEmail: "contact@mrf.com",
         clientName: "MRF",
         status: "Opportunity Accepted",
-        reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-        projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-        buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-        hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-        salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+        reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+        projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+        buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
         createdAt: new Date("2026-07-01T09:30:00Z"),
         updatedAt: new Date("2026-07-01T09:30:00Z"),
       },
@@ -2717,11 +2726,11 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         hasContact: false,
         clientName: "Horizon Mutual Bank",
         status: "Opportunity Accepted",
-        reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-        projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-        buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-        hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-        salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+        reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+        projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+        buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
         createdAt: new Date("2026-06-29T14:45:00Z"),
         updatedAt: new Date("2026-06-29T14:45:00Z"),
       },
@@ -2738,11 +2747,11 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         clientName: "Apex Retail Solutions",
         status: "Validated",
         crmLeadId: "CRM-LEAD-78912",
-        reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-        projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-        buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-        hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-        salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+        reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+        projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+        buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
         createdAt: new Date("2026-06-28T10:00:00Z"),
         updatedAt: new Date("2026-06-30T14:00:00Z"),
       },
@@ -2758,11 +2767,11 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         contactEmail: "it.buyer@apexretail.com",
         clientName: "Apex Retail Solutions Inc.",
         status: "Opportunity Accepted",
-        reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-        projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-        buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-        hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-        salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+        reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+        projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+        buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
         createdAt: new Date("2026-06-25T09:30:00Z"),
         updatedAt: new Date("2026-06-25T09:30:00Z"),
       },
@@ -2780,11 +2789,11 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
         status: "Deal Won",
         crmLeadId: "CRM-LEAD-80512",
         reason: "Successfully closed and converted to opportunity account with $120k ARR.",
-        reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-        projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-        buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-        hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-        salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+        reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+        projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+        buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
         createdAt: new Date("2026-06-24T08:00:00Z"),
         updatedAt: new Date("2026-06-26T16:30:00Z"),
       }
@@ -2794,10 +2803,10 @@ app.post('/api/db/reset', authenticateToken, async (req, res) => {
       { id: "IM-20260701-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-07-01T09:30:00Z") },
       { id: "IM-20260629-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-29T14:45:00Z") },
       { id: "IM-20260628-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-28T10:00:00Z") },
-      { id: "IM-20260628-001", status: "Validated", changedBy: "Arun Kumar", comment: "Approved — CRM Lead created", timestamp: new Date("2026-06-30T14:00:00Z") },
+      { id: "IM-20260628-001", status: "Validated", changedBy: "Delivery Head", comment: "Approved — CRM Lead created", timestamp: new Date("2026-06-30T14:00:00Z") },
       { id: "IM-20260625-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-25T09:30:00Z") },
       { id: "IM-20260624-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-24T08:00:00Z") },
-      { id: "IM-20260624-001", status: "Validated", changedBy: "Arun Kumar", comment: "Approved by Delivery Head", timestamp: new Date("2026-06-24T16:00:00Z") },
+      { id: "IM-20260624-001", status: "Validated", changedBy: "Delivery Head", comment: "Approved by Delivery Head", timestamp: new Date("2026-06-24T16:00:00Z") },
       { id: "IM-20260624-001", status: "Lead Registered", changedBy: "CRM Sync", comment: "CRM Lead created", timestamp: new Date("2026-06-24T16:01:00Z") },
       { id: "IM-20260624-001", status: "Lead Accepted", changedBy: "CRM Sync", comment: "Sales accepted the lead", timestamp: new Date("2026-06-25T10:00:00Z") },
       { id: "IM-20260624-001", status: "Opportunity Accepted", changedBy: "CRM Sync", comment: "Opportunity created in CRM", timestamp: new Date("2026-06-25T14:00:00Z") },
