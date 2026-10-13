@@ -42,8 +42,8 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Reporting Manager Email': 'dummy.manager@nestdigital.com',
       'Project Manager': 'Dummy PM',
       'Project Manager Email': 'dummy.pm@nestdigital.com',
-      'Business Unit Head': 'Amina Rashad',
-      'Business Unit Head Email': 'amina.rashad@nestgroup.net',
+      'Business Unit Head': 'Dummy BU Head',
+      'Business Unit Head Email': 'dummy.buhead@nestdigital.com',
       'role': 'employee',
       'Designation': 'Software Engineer'
     };
@@ -68,12 +68,12 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Employee ID': 'DUMMY-MGR-01',
       'Employee Name': 'Dummy Manager',
       'Business Unit': 'Engineering',
-      'Reporting Manager': 'Amina Rashad',
-      'Reporting Manager Email': 'amina.rashad@nestgroup.net',
+      'Reporting Manager': 'Dummy BU Head',
+      'Reporting Manager Email': 'dummy.buhead@nestdigital.com',
       'Project Manager': 'Dummy PM',
       'Project Manager Email': 'dummy.pm@nestdigital.com',
-      'Business Unit Head': 'Amina Rashad',
-      'Business Unit Head Email': 'amina.rashad@nestgroup.net',
+      'Business Unit Head': 'Dummy BU Head',
+      'Business Unit Head Email': 'dummy.buhead@nestdigital.com',
       'role': 'employee',
       'Designation': 'Reporting Manager'
     };
@@ -81,14 +81,14 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
   if (normEmail === 'dummy.buhead@nestdigital.com') {
     return {
       'Employee ID': 'DUMMY-BU-01',
-      'Employee Name': 'Amina Rashad',
+      'Employee Name': 'Dummy BU Head',
       'Business Unit': 'Engineering',
       'Reporting Manager': 'Not Specified',
       'Reporting Manager Email': '',
       'Project Manager': 'Dummy PM',
       'Project Manager Email': 'dummy.pm@nestdigital.com',
-      'Business Unit Head': 'Amina Rashad',
-      'Business Unit Head Email': 'amina.rashad@nestgroup.net',
+      'Business Unit Head': 'Dummy BU Head',
+      'Business Unit Head Email': 'dummy.buhead@nestdigital.com',
       'role': 'reviewer',
       'Designation': 'PMO / BU Reviewer'
     };
@@ -98,12 +98,12 @@ async function fetchCorporateEmployee(email: string): Promise<any | null> {
       'Employee ID': 'DUMMY-PM-01',
       'Employee Name': 'Dummy PM',
       'Business Unit': 'Engineering',
-      'Reporting Manager': 'Amina Rashad',
-      'Reporting Manager Email': 'amina.rashad@nestgroup.net',
+      'Reporting Manager': 'Dummy BU Head',
+      'Reporting Manager Email': 'dummy.buhead@nestdigital.com',
       'Project Manager': 'Not Specified',
       'Project Manager Email': '',
-      'Business Unit Head': 'Amina Rashad',
-      'Business Unit Head Email': 'amina.rashad@nestgroup.net',
+      'Business Unit Head': 'Dummy BU Head',
+      'Business Unit Head Email': 'dummy.buhead@nestdigital.com',
       'role': 'employee',
       'Designation': 'Project Manager'
     };
@@ -207,8 +207,6 @@ const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
   'anoop.chandran@nestgroup.net': { role: 'reviewer', designation: 'Vice President' },
   'anoop.chandran@nestdigital.com': { role: 'reviewer', designation: 'Vice President' },
   'employees@nestdigital.com': { role: 'employee', designation: 'Senior Consultant' },
-  'amina.rashad@nestgroup.net': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
-  'amina.rashad@nestdigital.com': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
   'sony.k@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - HBU' },
   'jobins.jose@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - BFS' },
   'jonathan.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - MBU/IBU' },
@@ -231,16 +229,16 @@ const BU_REVIEWERS: Record<string, string> = {
   'geographic information service': 'jose.george@nestgroup.net',
   'ins': 'madhusudhanan.c@nestgroup.net',
   'insurance service': 'madhusudhanan.c@nestgroup.net',
-  'engineering': 'amina.rashad@nestgroup.net',
-  'eng': 'amina.rashad@nestgroup.net',
+  'engineering': 'dummy.buhead@nestdigital.com',
+  'eng': 'dummy.buhead@nestdigital.com',
 };
 
 // Helper to get BU assigned to a reviewer email
 function getAssignedBUsForReviewer(email: string): string[] {
   const normalizedEmail = email.toLowerCase().trim();
   const searchEmails = [normalizedEmail];
-  if (normalizedEmail === 'dummy.buhead@nestdigital.com' || normalizedEmail === 'amina.rashad@nestgroup.net' || normalizedEmail === 'amina.rashad@nestdigital.com') {
-    searchEmails.push('dummy.buhead@nestdigital.com', 'amina.rashad@nestgroup.net', 'amina.rashad@nestdigital.com');
+  if (normalizedEmail === 'dummy.buhead@nestdigital.com') {
+    searchEmails.push('dummy.buhead@nestdigital.com');
   }
   if (normalizedEmail.includes('anoop.chandran') || normalizedEmail.includes('anoop')) {
     searchEmails.push('jobins.jose@nestgroup.net', 'anoop.chandran@nestgroup.net', 'anoop.chandran@nestdigital.com');
@@ -872,19 +870,29 @@ app.post('/api/auth/login', async (req, res) => {
         });
         console.log(`[Login] ✅ Upserted employee from corporate API: ${freshData.name} (${freshData.employeeId})`);
       } catch (upsertErr: any) {
-        // If upsert fails due to unique constraint on employeeId (different employee with same ID), 
-        // try updating by email only without changing employeeId
-        console.warn(`[Login] ⚠️ Upsert failed: ${upsertErr.message}. Trying update without employeeId change...`);
+        console.warn(`[Login] ⚠️ Upsert failed: ${upsertErr.message}. Resolving employeeId...`);
         try {
           const existingByEmail = await prisma.employee.findUnique({ where: { email: normalizedEmail } });
           const existingById = await prisma.employee.findUnique({ where: { employeeId: freshData.employeeId } });
+          if (existingById && existingByEmail && existingById.id !== existingByEmail.id && existingById.email.includes('dummy')) {
+            console.log(`[Login] 🧹 Cleaning up duplicate dummy employee record ${existingById.employeeId} (${existingById.email})`);
+            await prisma.employee.delete({ where: { id: existingById.id } });
+          }
           if (existingByEmail) {
-            const { employeeId: _skipId, ...updateWithoutId } = freshData;
-            employee = await prisma.employee.update({
-              where: { email: normalizedEmail },
-              data: updateWithoutId
-            });
-            console.log(`[Login] ✅ Updated employee profile (kept existing ID): ${employee.name}`);
+            try {
+              employee = await prisma.employee.update({
+                where: { email: normalizedEmail },
+                data: freshData
+              });
+              console.log(`[Login] ✅ Updated employee profile with real HRMS ID: ${employee.name} (${employee.employeeId})`);
+            } catch {
+              const { employeeId: _skipId, ...updateWithoutId } = freshData;
+              employee = await prisma.employee.update({
+                where: { email: normalizedEmail },
+                data: updateWithoutId
+              });
+              console.log(`[Login] ✅ Updated employee profile (kept existing ID): ${employee.name}`);
+            }
           } else if (existingById) {
             employee = await prisma.employee.update({
               where: { employeeId: freshData.employeeId },
@@ -974,11 +982,24 @@ app.post('/api/auth/sync-profile', authenticateToken, async (req: any, res) => {
         }
       });
     } catch (upsertErr) {
-      const { employeeId: _skipId, ...updateWithoutId } = freshData;
-      updatedEmployee = await prisma.employee.update({
-        where: { email: userEmail },
-        data: updateWithoutId
-      });
+      console.warn(`[Sync Profile] ⚠️ Upsert failed, resolving:`, upsertErr);
+      const existingByEmail = await prisma.employee.findUnique({ where: { email: userEmail } });
+      const existingById = await prisma.employee.findUnique({ where: { employeeId: freshData.employeeId } });
+      if (existingById && existingByEmail && existingById.id !== existingByEmail.id && existingById.email.includes('dummy')) {
+        await prisma.employee.delete({ where: { id: existingById.id } });
+      }
+      try {
+        updatedEmployee = await prisma.employee.update({
+          where: { email: userEmail },
+          data: freshData
+        });
+      } catch {
+        const { employeeId: _skipId, ...updateWithoutId } = freshData;
+        updatedEmployee = await prisma.employee.update({
+          where: { email: userEmail },
+          data: updateWithoutId
+        });
+      }
     }
 
     console.log(`[Sync Profile] ✅ Successfully refreshed HRMS profile for ${userEmail}: PM="${updatedEmployee.projectManager}"`);
@@ -1033,7 +1054,7 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
   try {
     let whereClause: any = {};
     const assignedBUs = getAssignedBUsForReviewer(userEmail);
-    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('amina.rashad') && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin';
+    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin';
 
     if (isGlobalReviewer) {
       whereClause = {}; // Global Reviewers/admins see all submissions to review
@@ -1066,10 +1087,8 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
           { reportingManager: { contains: 'Dummy Manager' } }
         );
       }
-      if (userEmail.includes('dummy.buhead') || userEmail.includes('amina.rashad')) {
+      if (userEmail.includes('dummy.buhead')) {
         orConditions.push(
-          { buHead: { contains: 'amina' } },
-          { buHead: { contains: 'Amina' } },
           { buHead: { contains: 'dummy.buhead' } },
           { buHead: { contains: 'Dummy BU Head' } }
         );
@@ -1132,7 +1151,7 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
     } else if (mode === 'review') {
       // Review mode: show all for reviewers/admins or submissions where user is stakeholder
       const assignedBUs = getAssignedBUsForReviewer(userEmail);
-      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('amina.rashad') && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin';
+      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin';
 
       if (isGlobalReviewer) {
         whereClause = {};
@@ -1165,10 +1184,8 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
             { reportingManager: { contains: 'Dummy Manager' } }
           );
         }
-        if (userEmail.includes('dummy.buhead') || userEmail.includes('amina.rashad')) {
+        if (userEmail.includes('dummy.buhead')) {
           orConditions.push(
-            { buHead: { contains: 'amina' } },
-            { buHead: { contains: 'Amina' } },
             { buHead: { contains: 'dummy.buhead' } },
             { buHead: { contains: 'Dummy BU Head' } }
           );
@@ -2555,9 +2572,6 @@ app.get('/api/notifications', authenticateToken, async (req: any, res) => {
       userEmail.replace('@nestdigital.com', '@nestgroup.net')
     ])).filter(Boolean);
 
-    if (userEmail === 'amina.rashad@nestgroup.net' || userEmail === 'amina.rashad@nestdigital.com') {
-      possibleEmails.push('dummy.buhead@nestdigital.com');
-    }
     if (userEmail === 'dummy2.employee@nestdigital.com' || userEmail === 'dummy2.eployee@nestdigital.com') {
       possibleEmails.push('dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com');
     }
@@ -2594,9 +2608,6 @@ app.post('/api/notifications/read', authenticateToken, async (req: any, res) => 
       userEmail.replace('@nestdigital.com', '@nestgroup.net')
     ])).filter(Boolean);
 
-    if (userEmail === 'amina.rashad@nestgroup.net' || userEmail === 'amina.rashad@nestdigital.com') {
-      possibleEmails.push('dummy.buhead@nestdigital.com');
-    }
     if (userEmail === 'dummy2.employee@nestdigital.com' || userEmail === 'dummy2.eployee@nestdigital.com') {
       possibleEmails.push('dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com');
     }

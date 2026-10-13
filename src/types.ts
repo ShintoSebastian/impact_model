@@ -79,7 +79,6 @@ export const ROLE_MAP: Record<string, { role: string; designation?: string }> = 
   'madhusudhanan.c@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - INS' },
   'nishant.unnikrishnan@nestgroup.net': { role: 'reviewer', designation: 'Sales - MBU' },
   'nishant.unnikrishnan@nestdigital.com': { role: 'reviewer', designation: 'Sales - MBU' },
-  'amina.rashad@nestgroup.net': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
   'dummy.buhead@nestdigital.com': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' }
 };
 
