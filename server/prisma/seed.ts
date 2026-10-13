@@ -4,45 +4,6 @@ const prisma = new PrismaClient();
 
 const MOCK_EMPLOYEES = [
   {
-    employeeId: "ND-20001",
-    name: "Arun Kumar (Delivery Head)",
-    email: "arun.kumar@nestdigital.com",
-    businessUnit: "Delivery Operations",
-    reportingManager: "Suresh Nair (suresh.n@nestdigital.com)",
-    projectManager: "None",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
-    designation: "Delivery Head",
-    role: "reviewer"
-  },
-  {
-    employeeId: "ND-20002",
-    name: "Suresh Nair (BU Head)",
-    email: "suresh.n@nestdigital.com",
-    businessUnit: "Management Board",
-    reportingManager: "Board",
-    projectManager: "None",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
-    designation: "BU Head",
-    role: "reviewer"
-  },
-  {
-    employeeId: "ND-30001",
-    name: "Jacob Varghese (Sales Owner)",
-    email: "jacob.varghese@nestdigital.com",
-    businessUnit: "Global Business Development",
-    reportingManager: "Suresh Nair (suresh.n@nestdigital.com)",
-    projectManager: "None",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
-    designation: "Sales",
-    role: "reviewer"
-  },
-  {
     employeeId: "ND-99999",
     name: "System Administrator",
     email: "admin@nestdigital.com",
@@ -71,11 +32,11 @@ const INITIAL_SUBMISSIONS = [
     status: "Opportunity Accepted",
     createdAt: new Date("2026-07-01T09:30:00Z"),
     updatedAt: new Date("2026-07-01T09:30:00Z"),
-    reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-    projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+    reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+    projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+    buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+    hrbp: "Not Specified",
+    salesPerson: "Not Specified",
     statusHistory: [
       { status: "Opportunity Accepted", changedBy: "System", timestamp: new Date("2026-07-01T09:30:00Z"), comment: "Submission recorded" }
     ]
@@ -90,11 +51,11 @@ const INITIAL_SUBMISSIONS = [
     status: "Opportunity Accepted",
     createdAt: new Date("2026-06-29T14:45:00Z"),
     updatedAt: new Date("2026-06-29T14:45:00Z"),
-    reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-    projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+    reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+    projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+    buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+    hrbp: "Not Specified",
+    salesPerson: "Not Specified",
     statusHistory: [
       { status: "Under Review", changedBy: "System", timestamp: new Date("2026-06-29T14:45:00Z"), comment: "Submission recorded" }
     ]
@@ -114,14 +75,14 @@ const INITIAL_SUBMISSIONS = [
     crmLeadId: "CRM-LEAD-78912",
     createdAt: new Date("2026-06-28T10:00:00Z"),
     updatedAt: new Date("2026-06-30T14:00:00Z"),
-    reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-    projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+    reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+    projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+    buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+    hrbp: "Not Specified",
+    salesPerson: "Not Specified",
     statusHistory: [
       { status: "Under Review", changedBy: "System", timestamp: new Date("2026-06-28T10:00:00Z"), comment: "Submission recorded" },
-      { status: "Validated", changedBy: "Arun Kumar", timestamp: new Date("2026-06-30T14:00:00Z"), comment: "Approved — CRM Lead created" }
+      { status: "Validated", changedBy: "Delivery Head", timestamp: new Date("2026-06-30T14:00:00Z"), comment: "Approved — CRM Lead created" }
     ]
   },
   {
@@ -138,11 +99,11 @@ const INITIAL_SUBMISSIONS = [
     status: "Under Review",
     createdAt: new Date("2026-06-25T09:30:00Z"),
     updatedAt: new Date("2026-06-25T09:30:00Z"),
-    reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-    projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+    reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+    projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+    buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+    hrbp: "Not Specified",
+    salesPerson: "Not Specified",
     statusHistory: [
       { status: "Under Review", changedBy: "System", timestamp: new Date("2026-06-25T09:30:00Z"), comment: "Submission recorded" }
     ]
@@ -163,14 +124,14 @@ const INITIAL_SUBMISSIONS = [
     updatedAt: new Date("2026-06-26T16:30:00Z"),
     crmLeadId: "CRM-LEAD-80512",
     reason: "Successfully closed and converted to opportunity account with $120k ARR.",
-    reportingManager: "Arun Kumar (arun.kumar@nestdigital.com)",
-    projectManager: "Kiran Joseph (kiran.j@nestdigital.com)",
-    buHead: "Suresh Nair (suresh.n@nestdigital.com)",
-    hrbp: "Deepa Menon (deepa.m@nestdigital.com)",
-    salesPerson: "Jacob Varghese (jacob.varghese@nestdigital.com)",
+    reportingManager: "Dummy Manager (dummy.manager@nestdigital.com)",
+    projectManager: "Dummy PM (dummy.pm@nestdigital.com)",
+    buHead: "Dummy BU Head (dummy.buhead@nestdigital.com)",
+    hrbp: "Not Specified",
+    salesPerson: "Not Specified",
     statusHistory: [
       { status: "Under Review", changedBy: "System", timestamp: new Date("2026-06-24T08:00:00Z"), comment: "Submission recorded" },
-      { status: "Validated", changedBy: "Arun Kumar", timestamp: new Date("2026-06-24T16:00:00Z"), comment: "Approved by Delivery Head" },
+      { status: "Validated", changedBy: "Delivery Head", timestamp: new Date("2026-06-24T16:00:00Z"), comment: "Approved by Delivery Head" },
       { status: "Lead Registered", changedBy: "CRM Sync", timestamp: new Date("2026-06-24T16:01:00Z"), comment: "CRM Lead created" },
       { status: "Lead Accepted", changedBy: "CRM Sync", timestamp: new Date("2026-06-25T10:00:00Z"), comment: "Sales accepted the lead" },
       { status: "Opportunity Accepted", changedBy: "CRM Sync", timestamp: new Date("2026-06-25T14:00:00Z"), comment: "Opportunity created in CRM" },

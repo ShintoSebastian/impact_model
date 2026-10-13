@@ -101,7 +101,7 @@ const isOverdue = (createdAtStr: string, status: string): boolean => {
   return count > 7;
 };
 
-// Helper to parse manager strings like "Arun Kumar (arun.kumar@nestdigital.com)"
+// Helper to parse manager strings like "Manager Name (manager@nestdigital.com)"
 const parseManagerInfo = (rawStr?: string, defaultName = 'Not Specified', defaultEmail = '') => {
   if (!rawStr || rawStr === 'Not Specified' || rawStr === 'Not Available' || rawStr === 'None') {
     return { name: defaultName, email: defaultEmail };

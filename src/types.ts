@@ -72,14 +72,13 @@ export interface EmailLog {
 // Azure AD role mapping simulation configuration
 export const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
   'employees@nestdigital.com': { role: 'employee', designation: 'Senior Consultant' },
-  'shinto.s@nestdigital.com': { role: 'employee', designation: 'Tech Lead' },
-  'arun.kumar@nestdigital.com': { role: 'reviewer', designation: 'Delivery Head' },
-  'jacob.varghese@nestdigital.com': { role: 'reviewer', designation: 'Sales' },
   'sony.k@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - HBU' },
   'jobins.jose@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - BFS' },
   'jonathan.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - MBU/IBU' },
   'jose.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - GIS' },
   'madhusudhanan.c@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - INS' },
+  'nishant.unnikrishnan@nestgroup.net': { role: 'reviewer', designation: 'Sales - MBU' },
+  'nishant.unnikrishnan@nestdigital.com': { role: 'reviewer', designation: 'Sales - MBU' },
   'amina.rashad@nestgroup.net': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
   'dummy.buhead@nestdigital.com': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' }
 };
