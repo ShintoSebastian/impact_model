@@ -60,7 +60,6 @@ export function DashboardLayout({
     Boolean(loggedInUser?.designation?.toLowerCase().includes('manager')) ||
     Boolean(loggedInUser?.designation?.toLowerCase().includes('head')) ||
     Boolean(loggedInUser?.designation?.toLowerCase().includes('lead')) ||
-    Boolean(loggedInUser?.email?.toLowerCase().includes('amina.rashad')) ||
     Boolean(loggedInUser?.email?.toLowerCase().includes('anoop.chandran'));
 
   return (
