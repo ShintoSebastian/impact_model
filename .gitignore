@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 *.db
 *.db-journal
+
+# Deployment packages
+release/

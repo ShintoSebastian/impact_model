@@ -41,23 +41,29 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
     if (!matchesSearch) return false;
     
     if (filterType === 'All') return true;
-    if (filterType === 'Reviewer Mailer') {
-      return log.type === 'Reviewer Mailer' || log.subject.includes('Action Required: Review Opportunity');
+    if (filterType === 'Clarification Needed') {
+      return log.subject.includes('Clarification') || log.subject.includes('Needed') || log.body.toLowerCase().includes('clarification');
     }
-    if (filterType === 'Submitter Mailer') {
-      return log.type === 'Submitter Mailer' || log.subject.includes('[IMPACT] Opportunity Update');
+    if (filterType === 'Closed Not Valid') {
+      return log.subject.includes('Closed') || log.subject.includes('Rejected');
     }
     if (filterType === 'Lead Submitted') {
-      return log.subject.includes('Received') || log.subject.includes('Submitted') || log.type === 'Reviewer Mailer';
-    }
-    if (filterType === 'Status Changed') {
-      return log.subject.includes('Progress') || log.subject.includes('Moved to') || log.subject.includes('Stage') || log.type === 'Submitter Mailer';
+      return log.subject.includes('Submission Confirmed') || log.subject.includes('Registered') || log.subject.includes('Submitted') || log.subject.includes('Received') || log.type === 'Reviewer Mailer';
     }
     if (filterType === 'Validated') {
       return log.subject.includes('Validated') || log.subject.includes('Approved');
     }
-    if (filterType === 'Rejected') {
-      return log.subject.includes('Closed') || log.subject.includes('Rejected');
+    if (filterType === 'Deal Won') {
+      return log.subject.includes('Deal Won');
+    }
+    if (filterType === 'Deal Lost') {
+      return log.subject.includes('Deal Lost');
+    }
+    if (filterType === 'Reviewer Mailer') {
+      return log.type === 'Reviewer Mailer' || log.subject.includes('Review Lead') || log.subject.includes('Review Opportunity');
+    }
+    if (filterType === 'Submitter Mailer') {
+      return log.type === 'Submitter Mailer' || log.subject.includes('[IMPACT] Lead') || log.subject.includes('[IMPACT] Opportunity');
     }
     return true;
   });
@@ -72,23 +78,30 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
 
   // Determines badge style based on email type or subject (muted neutral style)
   const getBadgeStyle = (log: EmailLog) => {
-    if (log.type === 'Reviewer Mailer' || log.subject.includes('Action Required: Review Opportunity')) {
+    const s = log.subject || '';
+    if (s.includes('Clarification') || s.includes('Needed')) {
+      return { label: 'Clarification Needed' };
+    }
+    if (s.includes('Closed') || s.includes('Rejected')) {
+      return { label: 'Lead Closed (Not Valid)' };
+    }
+    if (s.includes('Validated') || s.includes('Approved')) {
+      return { label: 'Lead Validated' };
+    }
+    if (s.includes('Submission Confirmed') || s.includes('Lead Registered')) {
+      return { label: 'Lead Submitted (Confirmation)' };
+    }
+    if (log.type === 'Reviewer Mailer' || s.includes('Review Lead') || s.includes('Review Opportunity')) {
       return { label: 'Reviewer Mailer' };
     }
-    if (log.type === 'Submitter Mailer' || log.subject.includes('[IMPACT] Opportunity Update')) {
+    if (s.includes('Deal Won')) {
+      return { label: 'Deal Won' };
+    }
+    if (s.includes('Deal Lost')) {
+      return { label: 'Deal Lost' };
+    }
+    if (log.type === 'Submitter Mailer') {
       return { label: 'Submitter Mailer' };
-    }
-    if (log.subject.includes('Validated') || log.subject.includes('Approved')) {
-      return { label: 'Validated & CRM Synced' };
-    }
-    if (log.subject.includes('Progress') || log.subject.includes('Moved')) {
-      return { label: 'Stage Progression' };
-    }
-    if (log.subject.includes('Closed') || log.subject.includes('Rejected')) {
-      return { label: 'Lead Closed' };
-    }
-    if (log.subject.includes('Clarification') || log.subject.includes('Needed')) {
-      return { label: 'Clarification Needed' };
     }
     return { label: log.type || 'Notification' };
   };
@@ -114,55 +127,66 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
   // Parses email body into concise key data
   const parseEmailSummary = (log: EmailLog) => {
     const body = log.body || '';
-    const isReviewer = log.type === 'Reviewer Mailer' || log.subject.includes('Action Required: Review Opportunity');
-    const isSubmitter = log.type === 'Submitter Mailer' || log.subject.includes('[IMPACT] Opportunity Update');
+    const subject = log.subject || '';
 
     // Extract action deep link
     const urlMatch = body.match(/https?:\/\/[^\s]+/);
     const actionUrl = urlMatch ? urlMatch[0] : null;
 
-    if (isReviewer) {
-      const clientMatch = body.match(/• Client:\s*(.+)/) || body.match(/Client:\s*(.+)/);
-      const oppMatch = body.match(/• Opportunity:\s*(.+)/) || body.match(/Opportunity:\s*(.+)/);
-      const dueDateMatch = body.match(/• Review due date:\s*(.+)/) || body.match(/Review due date:\s*(.+)/);
+    const isConfirmation = subject.includes('Submission Confirmed') || subject.includes('Lead Registered');
+    const isReviewer = log.type === 'Reviewer Mailer' || subject.includes('Review Lead') || subject.includes('Review Opportunity');
+    const isClarification = subject.includes('Clarification') || subject.includes('Needed');
+    const isOpportunityAction = subject.includes('Deal Won') || subject.includes('Deal Lost') || subject.includes('Opportunity Update');
 
-      return {
-        client: clientMatch ? clientMatch[1].trim() : null,
-        opportunity: oppMatch ? oppMatch[1].trim() : null,
-        dueDate: dueDateMatch ? dueDateMatch[1].trim() : null,
-        status: null,
-        comments: null,
-        actionUrl,
-        actionLabel: 'Assess & Review Lead'
-      };
+    // Extract client name
+    const clientMatch = body.match(/• Client:\s*(.+)/) || body.match(/Client:\s*(.+)/);
+
+    // Extract title (supporting Opportunity Title, Lead Title, Opportunity, Lead)
+    const titleMatch = body.match(/• Opportunity Title:\s*(.+)/) || 
+                       body.match(/Opportunity Title:\s*(.+)/) ||
+                       body.match(/• Opportunity:\s*(.+)/) || 
+                       body.match(/Opportunity:\s*(.+)/) ||
+                       body.match(/• Lead Title:\s*(.+)/) || 
+                       body.match(/Lead Title:\s*(.+)/) || 
+                       body.match(/• Lead:\s*(.+)/);
+
+    // Extract review due date
+    const dueDateMatch = body.match(/• Review due date:\s*(.+)/) || body.match(/Review due date:\s*(.+)/);
+
+    // Extract comments / reason / query
+    const commentsMatch = body.match(/(?:Clarification Query \/ Comments|Rejection \/ Closure Reason|Status Comments|Review Comments):\s*\n?"?([^"\n]+)"?/i);
+
+    // Extract status
+    let status: string | null = null;
+    const statusMatch = subject.match(/\|\s*([^|]+)$/);
+    if (statusMatch) {
+      status = statusMatch[1].trim();
+    } else {
+      const bodyStatusMatch = body.match(/Current Status:\s*(.+)/i);
+      if (bodyStatusMatch) status = bodyStatusMatch[1].trim();
     }
 
-    if (isSubmitter) {
-      const statusMatch = log.subject.match(/\|\s*([^|]+)$/);
-      const status = statusMatch ? statusMatch[1].trim() : null;
-      const clientMatch = body.match(/Client:\s*(.+)/);
-      const oppMatch = body.match(/Opportunity:\s*(.+)/);
-      const commentsMatch = body.match(/Status Comments:\s*\n?"?([^"\n]+)"?/);
-
-      return {
-        client: clientMatch ? clientMatch[1].trim() : null,
-        opportunity: oppMatch ? oppMatch[1].trim() : null,
-        dueDate: null,
-        status,
-        comments: commentsMatch ? commentsMatch[1].trim() : null,
-        actionUrl,
-        actionLabel: 'View Lead Status'
-      };
+    const entityLabel = isOpportunityAction ? 'Opportunity:' : 'Lead:';
+    let actionLabel = isOpportunityAction ? 'View Opportunity Status' : 'View Lead';
+    if (isReviewer) {
+      actionLabel = 'Assess & Review Lead';
+    } else if (isConfirmation) {
+      actionLabel = 'Track Lead Status';
+    } else if (isClarification) {
+      actionLabel = 'Provide Clarification for Lead';
+    } else if (status) {
+      actionLabel = isOpportunityAction ? 'View Opportunity Status' : 'View Lead Status';
     }
 
     return {
-      client: null,
-      opportunity: null,
-      dueDate: null,
-      status: null,
-      comments: null,
+      client: clientMatch ? clientMatch[1].trim() : null,
+      leadTitle: titleMatch ? titleMatch[1].trim() : null,
+      entityLabel,
+      dueDate: dueDateMatch ? dueDateMatch[1].trim() : null,
+      status,
+      comments: commentsMatch ? commentsMatch[1].trim() : null,
       actionUrl,
-      actionLabel: 'View Lead'
+      actionLabel
     };
   };
 
@@ -252,12 +276,14 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
             onChange={(e) => setFilterType(e.target.value)}
           >
             <option value="All">All Email Types</option>
+            <option value="Lead Submitted">Lead Submitted (Receipts)</option>
+            <option value="Clarification Needed">Clarification Needed</option>
+            <option value="Closed Not Valid">Closed (Not Valid)</option>
+            <option value="Validated">Lead Validated</option>
+            <option value="Deal Won">Deal Won (Opportunity)</option>
+            <option value="Deal Lost">Deal Lost (Opportunity)</option>
             <option value="Reviewer Mailer">Reviewer Mailer</option>
             <option value="Submitter Mailer">Submitter Mailer</option>
-            <option value="Lead Submitted">Submission Receipts</option>
-            <option value="Validated">Validated & Approved</option>
-            <option value="Status Changed">CRM Stage Updates</option>
-            <option value="Rejected">Closed / Rejected</option>
           </select>
           <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
@@ -340,7 +366,7 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                   </div>
 
                   {/* Concise Key Details Row (Clean subtle slate text) */}
-                  {(summary.client || summary.opportunity || summary.status || summary.dueDate) && (
+                  {(summary.client || summary.leadTitle || summary.status || summary.dueDate) && (
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
                       {summary.client && (
                         <div className="flex items-center gap-1">
@@ -348,10 +374,10 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                           <span className="font-medium text-slate-700">{summary.client}</span>
                         </div>
                       )}
-                      {summary.opportunity && (
+                      {summary.leadTitle && (
                         <div className="flex items-center gap-1">
-                          <span className="text-slate-400">Lead:</span>
-                          <span className="font-medium text-slate-700">{summary.opportunity}</span>
+                          <span className="text-slate-400">{summary.entityLabel || 'Lead:'}</span>
+                          <span className="font-medium text-slate-700">{summary.leadTitle}</span>
                         </div>
                       )}
                       {summary.status && (
@@ -399,10 +425,9 @@ export const EmailSimulator: React.FC<EmailSimulatorProps> = ({ emailLogs }) => 
                             }
                             if (targetPath.startsWith('/status/') || targetPath.startsWith('/review/')) {
                               const impactId = targetPath.split('/').pop();
-                              // Reviewers clicking "View Lead Status" on a Submitter Mailer
-                              // should go to the review board so they see the right submission
+                              // Reviewers clicking actions on a Submitter Mailer should go to review board
                               if (
-                                summary.actionLabel === 'View Lead Status' &&
+                                (summary.actionLabel === 'View Lead Status' || summary.actionLabel === 'View Opportunity Status' || summary.actionLabel === 'Provide Clarification for Lead' || summary.actionLabel === 'Track Lead Status') &&
                                 impactId &&
                                 loggedInUser?.email?.toLowerCase() !== log.recipient.toLowerCase()
                               ) {

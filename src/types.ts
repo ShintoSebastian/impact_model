@@ -79,6 +79,10 @@ export const ROLE_MAP: Record<string, { role: string; designation?: string }> = 
   'madhusudhanan.c@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - INS' },
   'nishant.unnikrishnan@nestgroup.net': { role: 'reviewer', designation: 'Sales - MBU' },
   'nishant.unnikrishnan@nestdigital.com': { role: 'reviewer', designation: 'Sales - MBU' },
+  'ajish@nestgroup.net': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
+  'ajish@nestdigital.com': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
+  'ajish.mj@nestgroup.net': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
+  'ajish.mj@nestdigital.com': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
   'dummy.buhead@nestdigital.com': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' }
 };
 
@@ -86,5 +90,10 @@ export const getRoleByEmail = (email: string): string => {
   const normalized = email.toLowerCase().trim();
   const entry = ROLE_MAP[normalized];
   if (entry) return entry.role;
+  const alternate = normalized.endsWith('@nestgroup.net')
+    ? normalized.replace('@nestgroup.net', '@nestdigital.com')
+    : normalized.replace('@nestdigital.com', '@nestgroup.net');
+  const altEntry = ROLE_MAP[alternate];
+  if (altEntry) return altEntry.role;
   return 'employee'; // All other employees default to employee role
 };
