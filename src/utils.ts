@@ -12,11 +12,11 @@ export function generateIntelligenceId(existingSubmissions: Submission[]): strin
   const dateStr = `${year}${month}${day}`;
 
   const prefix = `IM-${dateStr}-`;
-  
+
   // Count matching entries for today
   const todaysSubmissions = existingSubmissions.filter(s => s.intelligenceId.startsWith(prefix));
   let maxSerial = 0;
-  
+
   todaysSubmissions.forEach(s => {
     const parts = s.intelligenceId.split('-');
     if (parts.length === 3) {
@@ -52,7 +52,7 @@ export function triggerMailer(
 ): EmailLog[] {
   const emails: EmailLog[] = [];
   const timestamp = new Date().toISOString();
-  
+
   const formattedTime = formatDateTime(submission.createdAt);
 
   if (type === 'submission_ack') {
@@ -176,7 +176,7 @@ IMPACT Portal Governance System`,
       submission.hrbp,
       submission.salesPerson
     ];
-    
+
     const recipients = [
       { name: submission.employeeName, email: `${submission.employeeId}@nestdigital.com` }
     ];

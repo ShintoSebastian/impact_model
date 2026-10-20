@@ -15,9 +15,19 @@ const PORT = process.env.PORT || 7000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
 const CORPORATE_API_URL = process.env.CORPORATE_API_URL || 'https://hrapps.nestdigital.com:8089';
 
-const allowedOrigins = process.env.IMPACT_BASE_URL ? [process.env.IMPACT_BASE_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'] : '*';
+// Allowed frontend origins: IMPACT_BASE_URL + optional comma-separated CORS_ORIGINS
+// (e.g. live frontend at https://hrapps.nestdigital.com:8085)
+const configuredOrigins = [process.env.IMPACT_BASE_URL, ...(process.env.CORS_ORIGINS || '').split(',')]
+  .map(o => (o || '').trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+const devOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+const allowedOrigins = configuredOrigins.length === 0
+  ? '*'
+  : process.env.NODE_ENV === 'production'
+    ? configuredOrigins
+    : [...configuredOrigins, ...devOrigins];
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' && process.env.IMPACT_BASE_URL ? process.env.IMPACT_BASE_URL : allowedOrigins
+  origin: allowedOrigins
 }));
 app.use(express.json());
 
@@ -213,7 +223,11 @@ const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
   'jose.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - GIS' },
   'madhusudhanan.c@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - INS' },
   'nishant.unnikrishnan@nestgroup.net': { role: 'reviewer', designation: 'Sales - MBU' },
-  'nishant.unnikrishnan@nestdigital.com': { role: 'reviewer', designation: 'Sales - MBU' }
+  'nishant.unnikrishnan@nestdigital.com': { role: 'reviewer', designation: 'Sales - MBU' },
+  'ajish@nestgroup.net': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
+  'ajish@nestdigital.com': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
+  'ajish.mj@nestgroup.net': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
+  'ajish.mj@nestdigital.com': { role: 'reviewer', designation: 'Vice President - HR / BU Head' }
 };
 
 const BU_REVIEWERS: Record<string, string> = {
@@ -231,6 +245,10 @@ const BU_REVIEWERS: Record<string, string> = {
   'insurance service': 'madhusudhanan.c@nestgroup.net',
   'engineering': 'dummy.buhead@nestdigital.com',
   'eng': 'dummy.buhead@nestdigital.com',
+  'human resources group': 'ajish@nestgroup.net',
+  'human resources': 'ajish@nestgroup.net',
+  'hr': 'ajish@nestgroup.net',
+  'hrg': 'ajish@nestgroup.net',
 };
 
 // Helper to get BU assigned to a reviewer email
@@ -246,6 +264,9 @@ function getAssignedBUsForReviewer(email: string): string[] {
   if (normalizedEmail.includes('nishant.unnikrishnan') || normalizedEmail.includes('nishant')) {
     searchEmails.push('nishant.unnikrishnan@nestgroup.net', 'nishant.unnikrishnan@nestdigital.com');
   }
+  if (normalizedEmail.includes('ajish')) {
+    searchEmails.push('ajish@nestgroup.net', 'ajish@nestdigital.com', 'ajish.mj@nestgroup.net', 'ajish.mj@nestdigital.com');
+  }
   const assignedBUs: string[] = [];
   for (const [bu, revEmail] of Object.entries(BU_REVIEWERS)) {
     if (searchEmails.includes(revEmail.toLowerCase())) {
@@ -257,6 +278,9 @@ function getAssignedBUsForReviewer(email: string): string[] {
   }
   if (normalizedEmail.includes('nishant.unnikrishnan') || normalizedEmail.includes('nishant')) {
     assignedBUs.push('mbu', 'mobility business unit', 'mobility');
+  }
+  if (normalizedEmail.includes('ajish')) {
+    assignedBUs.push('human resources group', 'human resources', 'hr', 'hrg');
   }
   return Array.from(new Set(assignedBUs));
 }
@@ -643,7 +667,11 @@ function mapCorporateEmployeeData(corporateData: any, normalizedEmail: string) {
       'anoop.chandran@nestgroup.net': 'Anoop Chandran',
       'shaju.u@nestgroup.net': 'Shaju P Unni',
       'sudipta.mukherjee@nestgroup.net': 'Sudipta Mukherjee',
-      'nishant.unnikrishnan@nestgroup.net': 'Nishant Unnikrishnan'
+      'nishant.unnikrishnan@nestgroup.net': 'Nishant Unnikrishnan',
+      'ajish@nestgroup.net': 'Ajish M J',
+      'ajish@nestdigital.com': 'Ajish M J',
+      'ajish.mj@nestgroup.net': 'Ajish M J',
+      'ajish.mj@nestdigital.com': 'Ajish M J'
     };
     if (knownNames[clean]) return knownNames[clean];
     const username = clean.split('@')[0];
@@ -744,14 +772,14 @@ function mapCorporateEmployeeData(corporateData: any, normalizedEmail: string) {
 
   // BFS Department BU Head rule: for all employees in Banking and Financial Services (BFS), BU Head is Anoop Chandran
   // Exception: Anoop Chandran is the BU Head himself, so there is no BU Head for him
-  const isAnoop = normalizedEmail.includes('anoop.chandran') || 
-                  normalizedEmail.includes('anoop') || 
-                  String(empName).toLowerCase().includes('anoop chandran');
+  const isAnoop = normalizedEmail.includes('anoop.chandran') ||
+    normalizedEmail.includes('anoop') ||
+    String(empName).toLowerCase().includes('anoop chandran');
 
-  const isBFS = String(empBU).toLowerCase().includes('banking') || 
-                String(empBU).toLowerCase().includes('bfs') || 
-                String(corporateData['Department'] || '').toLowerCase().includes('banking') ||
-                String(corporateData['Department'] || '').toLowerCase().includes('bfs');
+  const isBFS = String(empBU).toLowerCase().includes('banking') ||
+    String(empBU).toLowerCase().includes('bfs') ||
+    String(corporateData['Department'] || '').toLowerCase().includes('banking') ||
+    String(corporateData['Department'] || '').toLowerCase().includes('bfs');
 
   if (isAnoop) {
     // Anoop Chandran is the BU Head himself / user requested Not Specified for his BU Head
@@ -791,9 +819,28 @@ function mapCorporateEmployeeData(corporateData: any, normalizedEmail: string) {
 
   const empPhone = corporateData['Phone Number'] || corporateData.phoneNumber || corporateData.phone_number || corporateData.phone || 'Not Specified';
 
-  // Determine role from corporate data or fall back to ROLE_MAP
-  const mapping = ROLE_MAP[normalizedEmail];
-  const empRole = corporateData.role || (mapping ? mapping.role : 'employee');
+  // Determine role:
+  // 1. Explicit role in corporate data
+  // 2. Direct mapping in ROLE_MAP (checking both @nestgroup.net and @nestdigital.com)
+  // 3. Heuristic: Automatically grant 'reviewer' role to anyone with managerial, VP, Head, or Director designation
+  const mapping = ROLE_MAP[normalizedEmail] || (
+    normalizedEmail.endsWith('@nestgroup.net')
+      ? ROLE_MAP[normalizedEmail.replace('@nestgroup.net', '@nestdigital.com')]
+      : ROLE_MAP[normalizedEmail.replace('@nestdigital.com', '@nestgroup.net')]
+  );
+
+  const desigLower = String(empDesignation).toLowerCase();
+  const jobLower = String(empJobRole).toLowerCase();
+  const isLeadership = 
+    desigLower.includes('bu head') ||
+    desigLower.includes('head hr') ||
+    desigLower.includes('vice president') ||
+    desigLower.includes('vp') ||
+    jobLower.includes('head hr') ||
+    jobLower.includes('bu head') ||
+    desigLower.includes('reviewer');
+
+  const empRole = corporateData.role || (mapping ? mapping.role : (isLeadership ? 'reviewer' : 'employee'));
 
   return {
     employeeId: String(empId),
@@ -845,6 +892,8 @@ app.post('/api/auth/login', async (req, res) => {
     normalizedEmail = 'amina.rashad@nestgroup.net';
   } else if (['nishant.unnikrishnan', 'nishant.unnikrishnan@nestgroup.net', 'nishant.unnikrishnan@nestdigital.com'].includes(normalizedInput)) {
     normalizedEmail = 'nishant.unnikrishnan@nestgroup.net';
+  } else if (['ajish', 'ajish@nestgroup.net', 'ajish@nestdigital.com', 'ajish.mj', 'ajish.mj@nestdigital.com', 'ajish.mj@nestgroup.net'].includes(normalizedInput)) {
+    normalizedEmail = 'ajish@nestgroup.net';
   }
 
   try {
@@ -1042,6 +1091,68 @@ app.get('/api/employees', authenticateToken, async (req: any, res) => {
 });
 
 // ----------------------------------------------------
+// DYNAMIC STAKEHOLDER RESOLUTION HELPERS
+// Generates all identity aliases (domains, usernames, name parts) for ANY user
+// ----------------------------------------------------
+function getStakeholderTokens(userEmail: string, employeeName?: string, employeeId?: string): string[] {
+  const tokens = new Set<string>();
+  const rawEmail = (userEmail || '').trim().toLowerCase();
+  
+  if (rawEmail) {
+    tokens.add(rawEmail);
+    // Cross-domain mapping (@nestgroup.net <-> @nestdigital.com)
+    if (rawEmail.endsWith('@nestgroup.net')) {
+      tokens.add(rawEmail.replace('@nestgroup.net', '@nestdigital.com'));
+    } else if (rawEmail.endsWith('@nestdigital.com')) {
+      tokens.add(rawEmail.replace('@nestdigital.com', '@nestgroup.net'));
+    }
+    
+    // Extract username (part before @)
+    const username = rawEmail.split('@')[0];
+    if (username && username.length >= 2) {
+      tokens.add(username);
+      // Dotted username e.g. "harikrishnan.kr" or "roshine.andrews"
+      const parts = username.split('.');
+      if (parts.length > 1) {
+        tokens.add(parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' '));
+        parts.forEach(p => {
+          if (p.length >= 3) {
+            tokens.add(p);
+            tokens.add(p.charAt(0).toUpperCase() + p.slice(1));
+          }
+        });
+      }
+    }
+  }
+
+  if (employeeName && employeeName.trim()) {
+    const cleanName = employeeName.trim();
+    tokens.add(cleanName);
+    const nameWords = cleanName.split(/\s+/).filter(w => w.length >= 3);
+    nameWords.forEach(w => tokens.add(w));
+  }
+
+  if (employeeId && employeeId.trim()) {
+    tokens.add(employeeId.trim());
+  }
+
+  return Array.from(tokens).filter(Boolean);
+}
+
+function checkIsUserStakeholder(submission: any, userEmail: string, employeeName?: string, employeeId?: string): boolean {
+  const tokens = getStakeholderTokens(userEmail, employeeName, employeeId);
+  const fields = [
+    submission.reportingManager || '',
+    submission.projectManager || '',
+    submission.buHead || '',
+    submission.hrbp || '',
+    submission.salesPerson || ''
+  ].join(' ').toLowerCase();
+
+  return tokens.some(token => fields.includes(token.toLowerCase()));
+}
+
+// ----------------------------------------------------
 // SUBMISSIONS ENDPOINTS
 // ----------------------------------------------------
 
@@ -1054,66 +1165,42 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
   try {
     let whereClause: any = {};
     const assignedBUs = getAssignedBUsForReviewer(userEmail);
-    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin';
+    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('anoop') && !userEmail.includes('dummy') && !userEmail.includes('ajish')) || userRole === 'admin';
+
+    const notSelfCondition = req.user.employeeId ? { employeeId: { not: req.user.employeeId } } : {};
 
     if (isGlobalReviewer) {
-      whereClause = {}; // Global Reviewers/admins see all submissions to review
+      whereClause = notSelfCondition; // Global Reviewers/admins see all submissions to review (excluding own)
     } else {
-      const username = userEmail.split('@')[0];
-      const nameParts = username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+      const tokens = getStakeholderTokens(userEmail, req.user.name, req.user.employeeId);
+      const orConditions: any[] = [];
 
-      const orConditions: any[] = [
-        { reportingManager: { contains: userEmail } },
-        { reportingManager: { contains: username } },
-        { reportingManager: { contains: nameParts } },
-        { projectManager: { contains: userEmail } },
-        { projectManager: { contains: username } },
-        { projectManager: { contains: nameParts } },
-        { buHead: { contains: userEmail } },
-        { buHead: { contains: username } },
-        { buHead: { contains: nameParts } },
-        { hrbp: { contains: userEmail } },
-        { hrbp: { contains: username } },
-        { hrbp: { contains: nameParts } },
-        { salesPerson: { contains: userEmail } },
-        { salesPerson: { contains: username } },
-        { salesPerson: { contains: nameParts } },
-      ];
+      tokens.forEach(tok => {
+        orConditions.push(
+          { reportingManager: { contains: tok } },
+          { projectManager: { contains: tok } },
+          { buHead: { contains: tok } },
+          { hrbp: { contains: tok } },
+          { salesPerson: { contains: tok } }
+        );
+      });
 
-      // Alias handling: Ensure dummy manager matches both tags
-      if (userEmail.includes('dummy.manager')) {
-        orConditions.push(
-          { reportingManager: { contains: 'dummy.manager' } },
-          { reportingManager: { contains: 'Dummy Manager' } }
-        );
-      }
-      if (userEmail.includes('dummy.buhead')) {
-        orConditions.push(
-          { buHead: { contains: 'dummy.buhead' } },
-          { buHead: { contains: 'Dummy BU Head' } }
-        );
-      }
-      if (userEmail.includes('dummy.pm')) {
-        orConditions.push(
-          { projectManager: { contains: 'dummy.pm' } },
-          { projectManager: { contains: 'Dummy PM' } }
-        );
-      }
       if (userEmail.includes('anoop.chandran') || userEmail.includes('anoop')) {
         orConditions.push(
-          { buHead: { contains: 'anoop' } },
-          { buHead: { contains: 'Anoop' } },
-          { buHead: { contains: 'Anoop Chandran' } },
           { employee: { businessUnit: { contains: 'bfs' } } },
           { employee: { businessUnit: { contains: 'Banking' } } }
         );
       }
       if (userEmail.includes('nishant.unnikrishnan') || userEmail.includes('nishant')) {
         orConditions.push(
-          { salesPerson: { contains: 'nishant.unnikrishnan' } },
-          { salesPerson: { contains: 'Nishant Unnikrishnan' } },
           { employee: { businessUnit: { contains: 'mbu' } } },
           { employee: { businessUnit: { contains: 'Mobility' } } }
+        );
+      }
+      if (userEmail.includes('ajish')) {
+        orConditions.push(
+          { employee: { businessUnit: { contains: 'Human Resources' } } },
+          { employee: { businessUnit: { contains: 'HR' } } }
         );
       }
 
@@ -1123,7 +1210,12 @@ app.get('/api/submissions/review-count', authenticateToken, async (req: any, res
         });
       }
 
-      whereClause = { OR: orConditions };
+      whereClause = {
+        AND: [
+          notSelfCondition,
+          { OR: orConditions }
+        ]
+      };
     }
 
     const count = await prisma.submission.count({ where: whereClause });
@@ -1151,66 +1243,41 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
     } else if (mode === 'review') {
       // Review mode: show all for reviewers/admins or submissions where user is stakeholder
       const assignedBUs = getAssignedBUsForReviewer(userEmail);
-      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('anoop') && !userEmail.includes('dummy')) || userRole === 'admin';
+      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('anoop') && !userEmail.includes('dummy') && !userEmail.includes('ajish')) || userRole === 'admin';
+      const notSelfCondition = req.user.employeeId ? { employeeId: { not: req.user.employeeId } } : {};
 
       if (isGlobalReviewer) {
-        whereClause = {};
+        whereClause = notSelfCondition;
       } else {
-        const username = userEmail.split('@')[0];
-        const nameParts = username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+        const tokens = getStakeholderTokens(userEmail, req.user.name, req.user.employeeId);
+        const orConditions: any[] = [];
 
-        const orConditions: any[] = [
-          { reportingManager: { contains: userEmail } },
-          { reportingManager: { contains: username } },
-          { reportingManager: { contains: nameParts } },
-          { projectManager: { contains: userEmail } },
-          { projectManager: { contains: username } },
-          { projectManager: { contains: nameParts } },
-          { buHead: { contains: userEmail } },
-          { buHead: { contains: username } },
-          { buHead: { contains: nameParts } },
-          { hrbp: { contains: userEmail } },
-          { hrbp: { contains: username } },
-          { hrbp: { contains: nameParts } },
-          { salesPerson: { contains: userEmail } },
-          { salesPerson: { contains: username } },
-          { salesPerson: { contains: nameParts } },
-        ];
+        tokens.forEach(tok => {
+          orConditions.push(
+            { reportingManager: { contains: tok } },
+            { projectManager: { contains: tok } },
+            { buHead: { contains: tok } },
+            { hrbp: { contains: tok } },
+            { salesPerson: { contains: tok } }
+          );
+        });
 
-        // Alias handling: Ensure dummy manager matches both tags
-        if (userEmail.includes('dummy.manager')) {
-          orConditions.push(
-            { reportingManager: { contains: 'dummy.manager' } },
-            { reportingManager: { contains: 'Dummy Manager' } }
-          );
-        }
-        if (userEmail.includes('dummy.buhead')) {
-          orConditions.push(
-            { buHead: { contains: 'dummy.buhead' } },
-            { buHead: { contains: 'Dummy BU Head' } }
-          );
-        }
-        if (userEmail.includes('dummy.pm')) {
-          orConditions.push(
-            { projectManager: { contains: 'dummy.pm' } },
-            { projectManager: { contains: 'Dummy PM' } }
-          );
-        }
         if (userEmail.includes('anoop.chandran') || userEmail.includes('anoop')) {
           orConditions.push(
-            { buHead: { contains: 'anoop' } },
-            { buHead: { contains: 'Anoop' } },
-            { buHead: { contains: 'Anoop Chandran' } },
             { employee: { businessUnit: { contains: 'bfs' } } },
             { employee: { businessUnit: { contains: 'Banking' } } }
           );
         }
         if (userEmail.includes('nishant.unnikrishnan') || userEmail.includes('nishant')) {
           orConditions.push(
-            { salesPerson: { contains: 'nishant.unnikrishnan' } },
-            { salesPerson: { contains: 'Nishant Unnikrishnan' } },
             { employee: { businessUnit: { contains: 'mbu' } } },
             { employee: { businessUnit: { contains: 'Mobility' } } }
+          );
+        }
+        if (userEmail.includes('ajish')) {
+          orConditions.push(
+            { employee: { businessUnit: { contains: 'Human Resources' } } },
+            { employee: { businessUnit: { contains: 'HR' } } }
           );
         }
 
@@ -1220,7 +1287,12 @@ app.get('/api/submissions', authenticateToken, async (req: any, res) => {
           });
         }
 
-        whereClause = { OR: orConditions };
+        whereClause = {
+          AND: [
+            notSelfCondition,
+            { OR: orConditions }
+          ]
+        };
       }
     } else {
       // Default: show the user's own submissions
@@ -1278,7 +1350,7 @@ app.get('/api/submissions/:id', authenticateToken, async (req: any, res) => {
 // PRODUCTION-HARDENED SMTP & NOTIFICATION AUTOMATION
 // Approved Corporate Relay: 10.45.0.12:25 (Unauthenticated internal corporate relay)
 // Approved Sender: peopleexperience@nestgroup.net / NeST People Experience Team
-// Target Production Base URL: http://10.15.0.191:8081
+// Target Production Base URL: https://hrapps.nestdigital.com:8085 (frontend); backend API on :7000
 // ----------------------------------------------------
 const SMTP_HOST = process.env.SMTP_HOST || '10.45.0.12';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '25', 10);
@@ -1287,7 +1359,7 @@ const SENDER_EMAIL = process.env.SMTP_FROM || process.env.SMTP_SENDER_EMAIL || '
 const SENDER_NAME = process.env.SMTP_FROM_NAME || process.env.SMTP_SENDER_NAME || 'NeST People Experience Team';
 const DEFAULT_REVIEWER_EMAIL = process.env.DEFAULT_REVIEWER_EMAIL || 'peopleexperience@nestgroup.net';
 const EMAIL_SEND_ENABLED = process.env.EMAIL_SEND_ENABLED === 'true';
-const IMPACT_BASE_URL = (process.env.IMPACT_BASE_URL || 'http://10.15.0.191:8081').replace(/\/+$/, '');
+const IMPACT_BASE_URL = (process.env.IMPACT_BASE_URL || 'https://hrapps.nestdigital.com:8085').replace(/\/+$/, '');
 
 console.log(`[SMTP Config] Relay: ${SMTP_HOST}:${SMTP_PORT}, From: "${SENDER_NAME}" <${SENDER_EMAIL}>, Live Send Enabled: ${EMAIL_SEND_ENABLED}, Base URL: ${IMPACT_BASE_URL}`);
 
@@ -1435,12 +1507,12 @@ function buildReviewerEmailContent(params: {
 
   const text = `Dear ${salutation},
 
-A new opportunity has been submitted by ${submitterName}. Please use the link below to assess the opportunity, record your decision, and track its current status.
+A new lead has been submitted by ${submitterName}. Please use the link below to assess the lead, record your decision, and track its current status.
 
-Opportunity Details:
+Lead Details:
 • Impact ID: ${impactId}
 • Client: ${clientName}
-• Opportunity: ${leadTitle}
+• Lead Title: ${leadTitle}
 • Submitted by: ${submitterName}, ${empId}, ${bu}
 • Submitted on: ${submissionDate}
 • Review due date: ${reviewDueDate}
@@ -1456,7 +1528,7 @@ NeST People Experience Team`;
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Action Required: Review Opportunity</title>
+  <title>Action Required: Review Lead</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 24px 0;">
@@ -1470,7 +1542,7 @@ NeST People Experience Team`;
                 <tr>
                   <td>
                     <span style="display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #14b8a6; margin-bottom: 6px;">IMPACT Model Portal</span>
-                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">Action Required: Review Opportunity</h1>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">Action Required: Review Lead</h1>
                   </td>
                 </tr>
               </table>
@@ -1482,14 +1554,14 @@ NeST People Experience Team`;
             <td style="padding: 32px;">
               <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${salutation}</strong>,</p>
               <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
-                A new opportunity has been submitted by <strong>${submitterName}</strong>. Please use the link below to assess the opportunity, record your decision, and track its current status.
+                A new lead has been submitted by <strong>${submitterName}</strong>. Please use the link below to assess the lead, record your decision, and track its current status.
               </p>
 
-              <!-- Opportunity Summary Card -->
+              <!-- Lead Summary Card -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 28px;">
                 <tr>
                   <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;">
-                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Opportunity Summary</span>
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Lead Summary</span>
                   </td>
                 </tr>
                 <tr>
@@ -1504,7 +1576,7 @@ NeST People Experience Team`;
                         <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
                       </tr>
                       <tr>
-                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Opportunity:</td>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Lead Title:</td>
                         <td style="color: #0f172a;">${leadTitle}</td>
                       </tr>
                       <tr>
@@ -1529,7 +1601,7 @@ NeST People Experience Team`;
                 <tr>
                   <td align="center">
                     <a href="${reviewLink}" target="_blank" style="display: inline-block; background-color: #008080; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 128, 128, 0.2);">
-                      Assess &amp; Review Opportunity &rarr;
+                      Assess &amp; Review Lead &rarr;
                     </a>
                   </td>
                 </tr>
@@ -1555,7 +1627,7 @@ NeST People Experience Team`;
           <tr>
             <td style="background-color: #f1f5f9; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #94a3b8;">
-                This is an automated notification from the NeST IMPACT Opportunity Portal. Please do not reply directly to this email.
+                This is an automated notification from the NeST IMPACT Portal. Please do not reply directly to this email.
               </p>
             </td>
           </tr>
@@ -1582,18 +1654,50 @@ function buildSubmitterEmailContent(params: {
   const { submitterName, impactId, clientName, leadTitle, newStatus, reason, statusLink } = params;
 
   const trimmedReason = reason && reason.trim() ? reason.trim() : null;
-  const commentsBlock = trimmedReason ? `\n\nStatus Comments:\n"${trimmedReason}"\n` : '';
+
+  // Context-aware dynamic titles and button labels based on specific stage
+  const isDealStatus = newStatus === 'Deal Won' || newStatus === 'Deal Lost';
+
+  let bannerTitle = isDealStatus ? `Opportunity Update: ${newStatus}` : 'Lead Status Update';
+  let introMessage = isDealStatus
+    ? 'There is an important update on the opportunity you submitted through the IMPACT Model Portal.'
+    : 'There is an important update on the lead you submitted through the IMPACT Model Portal.';
+  let commentsLabel = 'Review Comments:';
+  let actionButtonText = isDealStatus ? 'View Opportunity Details &rarr;' : 'View Lead Details &rarr;';
+  let itemTitleLabel = isDealStatus ? 'Opportunity Title:' : 'Lead Title:';
+
+  if (newStatus === 'Clarification Requested') {
+    bannerTitle = 'Clarification Needed: Lead Details Required';
+    introMessage = 'Clarification has been requested on the lead you submitted through the IMPACT Model Portal. Please review the query below and provide your clarification.';
+    commentsLabel = 'Clarification Query / Comments:';
+    actionButtonText = 'Provide Clarification for Lead &rarr;';
+    itemTitleLabel = 'Lead Title:';
+  } else if (newStatus === 'Closed - Not Valid') {
+    bannerTitle = 'Lead Closed (Not Valid)';
+    introMessage = 'Your lead has been reviewed and closed with the remarks recorded below.';
+    commentsLabel = 'Rejection / Closure Reason:';
+    actionButtonText = 'View Lead Details &rarr;';
+    itemTitleLabel = 'Lead Title:';
+  } else if (newStatus === 'Validated') {
+    bannerTitle = 'Lead Validated &amp; Approved';
+    introMessage = 'Your lead has been successfully validated and approved by the reviewer.';
+    commentsLabel = 'Review Comments:';
+    actionButtonText = 'View Lead Details &rarr;';
+    itemTitleLabel = 'Lead Title:';
+  }
+
+  const commentsBlock = trimmedReason ? `\n\n${commentsLabel}\n"${trimmedReason}"\n` : '';
 
   const text = `Dear ${submitterName},
 
-There is an important update on the opportunity you submitted through the IMPACT Model Portal.
+${introMessage}
 ${commentsBlock}
 Current Status: ${newStatus}
 Impact ID: ${impactId}
 Client: ${clientName}
-Opportunity: ${leadTitle}
+${itemTitleLabel} ${leadTitle}
 
-Check status:
+Check ${isDealStatus ? 'opportunity' : 'lead'} status:
 ${statusLink}
 
 Please use the link above to view the latest status and details of your submission.
@@ -1606,7 +1710,7 @@ NeST People Experience Team`;
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Opportunity Status Update</title>
+  <title>${bannerTitle}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 24px 0;">
@@ -1620,7 +1724,7 @@ NeST People Experience Team`;
                 <tr>
                   <td>
                     <span style="display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #14b8a6; margin-bottom: 6px;">IMPACT Model Portal</span>
-                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">Opportunity Status Update</h1>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">${bannerTitle}</h1>
                   </td>
                 </tr>
               </table>
@@ -1632,7 +1736,7 @@ NeST People Experience Team`;
             <td style="padding: 32px;">
               <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${submitterName}</strong>,</p>
               <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
-                There is an important update on the opportunity you submitted through the IMPACT Model Portal.
+                ${introMessage}
               </p>
 
               <!-- Status Badge Card -->
@@ -1658,12 +1762,12 @@ NeST People Experience Team`;
                         <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
                       </tr>
                       <tr>
-                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Opportunity:</td>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">${itemTitleLabel}</td>
                         <td style="color: #0f172a;">${leadTitle}</td>
                       </tr>
                       ${trimmedReason ? `
                       <tr>
-                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Review Comments:</td>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">${commentsLabel}</td>
                         <td style="color: #334155; background-color: #ffffff; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-style: italic;">
                           &ldquo;${trimmedReason}&rdquo;
                         </td>
@@ -1679,7 +1783,7 @@ NeST People Experience Team`;
                 <tr>
                   <td align="center">
                     <a href="${statusLink}" target="_blank" style="display: inline-block; background-color: #008080; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 128, 128, 0.2);">
-                      View Opportunity Details &rarr;
+                      ${actionButtonText}
                     </a>
                   </td>
                 </tr>
@@ -1705,7 +1809,156 @@ NeST People Experience Team`;
           <tr>
             <td style="background-color: #f1f5f9; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #94a3b8;">
-                This is an automated notification from the NeST IMPACT Opportunity Portal. Please do not reply directly to this email.
+                This is an automated notification from the NeST IMPACT Portal. Please do not reply directly to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { html, text };
+}
+
+// Outlook / Microsoft 365 friendly Multi-Part HTML + Text builder for Submitter Confirmation Mailer
+function buildSubmitterConfirmationEmailContent(params: {
+  submitterName: string;
+  empId: string;
+  bu: string;
+  impactId: string;
+  clientName: string;
+  leadTitle: string;
+  submissionDate: string;
+  statusLink: string;
+}): { html: string; text: string } {
+  const { submitterName, empId, bu, impactId, clientName, leadTitle, submissionDate, statusLink } = params;
+
+  const text = `Dear ${submitterName},
+
+Your lead has been successfully registered in the IMPACT Model Portal and submitted for review. Please use the link below to track its current status and timeline.
+
+Lead Details:
+• Impact ID: ${impactId}
+• Client: ${clientName}
+• Lead Title: ${leadTitle}
+• Submitted by: ${submitterName}, ${empId}, ${bu}
+• Submitted on: ${submissionDate}
+• Current Status: Lead Registered (Under Review)
+
+Track Lead Status:
+${statusLink}
+
+Regards,
+NeST People Experience Team`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submission Confirmed: Lead Registered</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px; border-bottom: 3px solid #008080;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <span style="display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #14b8a6; margin-bottom: 6px;">IMPACT Model Portal</span>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">Submission Confirmed: Lead Registered</h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${submitterName}</strong>,</p>
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                Your lead has been successfully registered in the IMPACT Model Portal and submitted for review. Please use the link below to track its current status and timeline.
+              </p>
+
+              <!-- Lead Summary Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 28px;">
+                <tr>
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Lead Summary</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 16px 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="font-size: 13px; line-height: 1.5;">
+                      <tr>
+                        <td width="35%" style="color: #64748b; font-weight: 600; vertical-align: top;">Impact ID:</td>
+                        <td width="65%" style="color: #0f172a; font-weight: 700; font-family: monospace;">${impactId}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Client:</td>
+                        <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Lead Title:</td>
+                        <td style="color: #0f172a;">${leadTitle}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Submitted By:</td>
+                        <td style="color: #0f172a;">${submitterName} (${empId}, ${bu})</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Submitted On:</td>
+                        <td style="color: #0f172a;">${submissionDate}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Current Status:</td>
+                        <td style="color: #008080; font-weight: 800;">Lead Registered (Under Review)</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action CTA Button -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${statusLink}" target="_blank" style="display: inline-block; background-color: #008080; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 128, 128, 0.2);">
+                      Track Lead Status &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748b; text-align: center;">
+                If the button above does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 12px; color: #0284c7; text-align: center; word-break: break-all;">
+                <a href="${statusLink}" style="color: #0284c7; text-decoration: underline;">${statusLink}</a>
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+
+              <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #475569;">
+                Best regards,<br>
+                <strong style="color: #0f172a;">NeST People Experience Team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f1f5f9; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                This is an automated notification from the NeST IMPACT Portal. Please do not reply directly to this email.
               </p>
             </td>
           </tr>
@@ -1823,7 +2076,7 @@ async function sendReviewerMailer(submission: any, employee: any, baseUrl?: stri
 
     const submitterName = employee.name || 'NeST Colleague';
     const clientName = submission.clientName || 'Valued Client';
-    const leadTitle = submission.shortDesc || 'Client Opportunity';
+    const leadTitle = submission.shortDesc || 'Client Lead';
     const empId = employee.employeeId || 'N/A';
     const bu = employee.businessUnit || 'NeST Digital';
 
@@ -1833,7 +2086,7 @@ async function sendReviewerMailer(submission: any, employee: any, baseUrl?: stri
 
     // Deep link routes via root /?redirect= so IIS default document serves index.html without 404
     const reviewLink = `${resolvedUrl}/?redirect=${encodeURIComponent(`/review/${impactId}`)}`;
-    const subject = `Action Required: Review Opportunity | ${submitterName} | ${impactId} | ${clientName}`;
+    const subject = `Action Required: Review Lead | ${submitterName} | ${impactId} | ${clientName}`;
 
     // Map to keep track of unique emails to names
     const reviewersMap = new Map<string, string>();
@@ -1843,11 +2096,18 @@ async function sendReviewerMailer(submission: any, employee: any, baseUrl?: stri
       const email = sanitizeEmail(rawCandidate);
       if (!email) return;
 
+      // Segregation of Duties: Do not send Reviewer Mailer to the submitter themselves
+      const submitterEmail = sanitizeEmail(employee.email || '');
+      if (submitterEmail && email.toLowerCase() === submitterEmail.toLowerCase()) {
+        console.log(`[Reviewer Mailer] ℹ️ Skipping submitter ${email} from reviewer notifications (Segregation of Duties).`);
+        return;
+      }
+
       if (!reviewersMap.has(email)) {
         let namePart = rawCandidate.includes('(') ? rawCandidate.split('(')[0].trim() : rawCandidate.split('<')[0].trim();
         // Fallback if the parsed name is basically just the email or generic
         if (namePart.includes('@') || namePart.toLowerCase() === 'not specified') {
-           namePart = fallbackName;
+          namePart = fallbackName;
         }
         reviewersMap.set(email, namePart || fallbackName);
       }
@@ -1926,14 +2186,13 @@ async function sendSubmitterMailer(submission: any, newStatus: string, reason: s
     const impactId = submission.intelligenceId;
     const resolvedUrl = baseUrl ? baseUrl.replace(/\/+$/, '') : IMPACT_BASE_URL;
 
-    // Material status filter
+    // Material status filter: Only Validated, Closed - Not Valid, Clarification Requested, Deal Won, Deal Lost
     const materialStatuses = [
       'Validated',
       'Closed - Not Valid',
+      'Clarification Requested',
       'Deal Won',
-      'Deal Lost',
-      'Lead Dropped',
-      'Clarification Requested'
+      'Deal Lost'
     ];
 
     if (!materialStatuses.includes(newStatus)) {
@@ -1958,7 +2217,7 @@ async function sendSubmitterMailer(submission: any, newStatus: string, reason: s
     const submitterEmail = employee.email;
     const submitterName = employee.name || 'Colleague';
     const clientName = submission.clientName || 'Valued Client';
-    const leadTitle = submission.shortDesc || 'Client Opportunity';
+    const leadTitle = submission.shortDesc || 'Client Lead';
 
     // CC candidates: RM, PM, BU Head, HRBP, Sales Person
     const ccCandidates = [
@@ -1971,7 +2230,16 @@ async function sendSubmitterMailer(submission: any, newStatus: string, reason: s
 
     const { toList, ccList } = resolveRecipients([submitterEmail], ccCandidates, submitterEmail);
 
-    const subject = `[IMPACT] Opportunity Update | ${impactId} | ${newStatus}`;
+    let subject = `[IMPACT] Lead Update | ${impactId} | ${newStatus}`;
+    if (newStatus === 'Clarification Requested') {
+      subject = `[IMPACT] Lead Clarification Needed | ${impactId} | ${newStatus}`;
+    } else if (newStatus === 'Closed - Not Valid') {
+      subject = `[IMPACT] Lead Closed (Not Valid) | ${impactId} | ${newStatus}`;
+    } else if (newStatus === 'Validated') {
+      subject = `[IMPACT] Lead Validated | ${impactId} | ${newStatus}`;
+    } else if (newStatus === 'Deal Won' || newStatus === 'Deal Lost') {
+      subject = `[IMPACT] Opportunity Update | ${impactId} | ${newStatus}`;
+    }
     // Deep link routes via root /?redirect= so IIS default document serves index.html without 404
     const statusLink = `${resolvedUrl}/?redirect=${encodeURIComponent(`/status/${impactId}`)}`;
 
@@ -2010,6 +2278,87 @@ async function sendSubmitterMailer(submission: any, newStatus: string, reason: s
     });
   } catch (err: any) {
     console.error(`[Submitter Mailer] ⚠️ Non-blocking error: ${err.message}`);
+  }
+}
+
+// 3. SUBMITTER CONFIRMATION MAILER
+// Trigger: Immediately when an opportunity is submitted by an employee.
+// TO: Submitter employee email
+// CC: null
+async function sendSubmitterConfirmationMailer(submission: any, employee: any, baseUrl?: string) {
+  try {
+    const impactId = submission.intelligenceId;
+    const resolvedUrl = baseUrl ? baseUrl.replace(/\/+$/, '') : IMPACT_BASE_URL;
+
+    // Duplicate protection
+    const existing = await prisma.emailLog.findFirst({
+      where: {
+        impactId,
+        type: 'Submitter Mailer',
+        subject: { contains: 'Submission Confirmed' }
+      }
+    });
+
+    if (existing) {
+      console.log(`[Submitter Confirmation Mailer] ⚠️ Duplicate confirmation mailer prevented for ${impactId}`);
+      return;
+    }
+
+    const submitterEmail = sanitizeEmail(employee.email);
+    if (!submitterEmail) {
+      console.warn(`[Submitter Confirmation Mailer] ⚠️ Invalid submitter email for employee ${employee.employeeId}`);
+      return;
+    }
+
+    const submitterName = employee.name || 'NeST Colleague';
+    const clientName = submission.clientName || 'Valued Client';
+    const leadTitle = submission.shortDesc || 'Client Lead';
+    const empId = employee.employeeId || 'N/A';
+    const bu = employee.businessUnit || 'NeST Digital';
+
+    const subDateObj = submission.createdAt ? new Date(submission.createdAt) : new Date();
+    const submissionDate = subDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    // Deep link to submitter status page
+    const statusLink = `${resolvedUrl}/?redirect=${encodeURIComponent(`/status/${impactId}`)}`;
+    const subject = `Submission Confirmed: Lead Registered | ${impactId}`;
+
+    const { html, text } = buildSubmitterConfirmationEmailContent({
+      submitterName,
+      empId,
+      bu,
+      impactId,
+      clientName,
+      leadTitle,
+      submissionDate,
+      statusLink
+    });
+
+    // Create log with initial QUEUED status
+    const createdLog = await prisma.emailLog.create({
+      data: {
+        recipient: submitterEmail,
+        cc: null,
+        subject,
+        body: text,
+        type: 'Submitter Mailer',
+        impactId,
+        status: 'QUEUED'
+      }
+    });
+
+    console.log(`[Submitter Confirmation Mailer] 📝 Queued for ${impactId} to submitter: ${submitterEmail}`);
+
+    // Dispatch via SMTP relay
+    await dispatchRealEmail(createdLog.id, {
+      to: submitterEmail,
+      cc: null,
+      subject,
+      text,
+      html
+    });
+  } catch (err: any) {
+    console.error(`[Submitter Confirmation Mailer] ⚠️ Non-blocking error: ${err.message}`);
   }
 }
 
@@ -2346,6 +2695,11 @@ app.post('/api/submissions', authenticateToken, async (req: any, res) => {
       console.error(`[POST /api/submissions] Non-blocking mailer failure: ${mailerErr.message}`);
     });
 
+    // Auto-trigger Submitter Confirmation Mailer upon submission
+    sendSubmitterConfirmationMailer(submission, employee, baseUrl).catch((mailerErr: any) => {
+      console.error(`[POST /api/submissions] Non-blocking submitter confirmation failure: ${mailerErr.message}`);
+    });
+
     res.status(201).json({
       ...submission,
       employeeName: employee.name
@@ -2374,17 +2728,26 @@ app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
     const userEmail = req.user.email || '';
     const userRole = req.user.role || '';
     const isGlobalReviewer = userRole === 'admin';
-    const isStakeholder = 
-      (existing.reportingManager && existing.reportingManager.includes(userEmail)) ||
-      (existing.projectManager && existing.projectManager.includes(userEmail)) ||
-      (existing.buHead && existing.buHead.includes(userEmail)) ||
-      (existing.hrbp && existing.hrbp.includes(userEmail)) ||
-      (existing.salesPerson && (existing.salesPerson.includes(userEmail) || (userEmail.includes('nishant') && existing.salesPerson.includes('Nishant'))));
-    
+    const isStakeholder = checkIsUserStakeholder(existing, userEmail, req.user.name, req.user.employeeId);
+    const assignedBUs = getAssignedBUsForReviewer(userEmail);
+    const submitterEmp = await prisma.employee.findUnique({ where: { employeeId: existing.employeeId } });
+    const submitterBU = (submitterEmp?.businessUnit || '').toLowerCase();
+    const isBUReviewer = assignedBUs.some(bu => submitterBU.includes(bu.toLowerCase()));
+    const isReviewer = userRole === 'reviewer' || isBUReviewer;
+
     const isSubmitter = existing.employeeId === req.user.employeeId;
 
-    if (!isGlobalReviewer && !isStakeholder && !isSubmitter) {
+    if (!isGlobalReviewer && !isReviewer && !isStakeholder && !isSubmitter) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to modify this submission.' });
+    }
+
+    // Strict Segregation of Duties Policy:
+    // A submitter is strictly prohibited from reviewing, approving, validating, requesting clarification, or rejecting their own submission.
+    const isReviewAction = status && ['Validated', 'Closed - Not Valid', 'Clarification Requested'].includes(status);
+    if (isSubmitter && isReviewAction) {
+      return res.status(403).json({
+        error: 'Segregation of Duties Policy: You cannot review, validate, or reject your own submission. Your reporting manager or an independent reviewer must perform the review.'
+      });
     }
 
     // Capture Reason validation (mandatory on rejection/closure)

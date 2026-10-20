@@ -279,7 +279,7 @@ export function HomeView({
           id: `email-${Math.random().toString(36).substr(2, 9)}`,
           recipient: reviewerRecipient,
           subject: `CLARIFICATION RESPONDED: ${sub.intelligenceId} — ${sub.clientName}`,
-          body: `Dear Reviewer,\n\nEmployee ${loggedInUser.name} has responded to your clarification request for opportunity ${sub.intelligenceId}.\n\nYour Clarification Request:\n"${sub.reason}"\n\nEmployee Response:\n"${replyText}"\n\nBest regards,\nIMPACT Portal Workflow Engine`,
+          body: `Dear Reviewer,\n\nEmployee ${loggedInUser.name} has responded to your clarification request for lead ${sub.intelligenceId}.\n\nYour Clarification Request:\n"${sub.reason}"\n\nEmployee Response:\n"${replyText}"\n\nBest regards,\nIMPACT Portal Workflow Engine`,
           timestamp: new Date().toISOString(),
           type: 'stakeholder'
         };

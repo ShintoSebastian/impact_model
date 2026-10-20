@@ -89,7 +89,7 @@ export function LoginScreen() {
               <input
                 type="text"
                 className="w-full border-b border-slate-300 focus:border-brand-navy outline-none py-2 text-xs transition-all bg-transparent"
-                placeholder="e.g., employee.name"
+                placeholder="Username"
                 value={loginUsername}
                 onChange={(e) => setLoginUsername(e.target.value)}
                 required

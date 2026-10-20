@@ -56,11 +56,7 @@ export function DashboardLayout({
   const isOnReviewBoard = currentPath === '/reviewer';
   const hasReviewAccess = reviewCount > 0 || 
     currentUserRole === 'reviewer' || 
-    currentUserRole === 'admin' ||
-    Boolean(loggedInUser?.designation?.toLowerCase().includes('manager')) ||
-    Boolean(loggedInUser?.designation?.toLowerCase().includes('head')) ||
-    Boolean(loggedInUser?.designation?.toLowerCase().includes('lead')) ||
-    Boolean(loggedInUser?.email?.toLowerCase().includes('anoop.chandran'));
+    currentUserRole === 'admin';
 
   return (
     <div className="flex flex-col min-h-screen bg-brand-bg font-sans">

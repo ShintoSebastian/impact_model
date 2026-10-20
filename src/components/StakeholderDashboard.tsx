@@ -119,10 +119,26 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 
   // Auto-open requested opportunity when deep linked via /review/:id
   useEffect(() => {
-    if (initialSubId && submissions.length > 0) {
+    if (initialSubId) {
       const match = submissions.find(s => s.intelligenceId === initialSubId);
       if (match) {
         setSelectedSub(match);
+      } else {
+        // Fallback: directly fetch the submission by ID from API
+        const token = sessionStorage.getItem('impact_token');
+        fetch(`${API_BASE_URL}/api/submissions/${initialSubId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data && data.intelligenceId) {
+              setSelectedSub(data);
+            }
+          })
+          .catch(err => console.warn('Could not fetch deep-linked submission:', err));
       }
     }
   }, [initialSubId, submissions]);
@@ -382,9 +398,32 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
     };
   };
 
-  // Dynamic Metrics calculations
-  const pendingSubmissions = submissions.filter(s => s.status === 'Opportunity Accepted' || s.status === 'Clarification Requested' || s.status === 'Under Review');
-  const reviewedSubmissions = submissions.filter(s => s.status !== 'Opportunity Accepted' && s.status !== 'Clarification Requested' && s.status !== 'Under Review');
+  // Segregation of Duties: Check if the logged-in user is the submitter
+  const isSelfSubmission = (sub?: Submission | null) => {
+    if (!sub || !loggedInUser) return false;
+    const userEmpId = (loggedInUser.employeeId || '').toLowerCase().trim();
+    const userEmail = (loggedInUser.email || '').toLowerCase().trim();
+    const userName = (loggedInUser.name || '').toLowerCase().trim();
+
+    const subEmpId = (sub.employeeId || '').toLowerCase().trim();
+    const subEmpName = (sub.employeeName || '').toLowerCase().trim();
+
+    return Boolean(
+      (userEmpId && subEmpId === userEmpId) ||
+      (userEmail && subEmpId === userEmail) ||
+      (userName && subEmpName === userName)
+    );
+  };
+
+  // Dynamic Metrics calculations (Excluding self-submissions per Segregation of Duties)
+  const pendingSubmissions = submissions.filter(s => 
+    (s.status === 'Opportunity Accepted' || s.status === 'Clarification Requested' || s.status === 'Under Review') &&
+    !isSelfSubmission(s)
+  );
+  const reviewedSubmissions = submissions.filter(s => 
+    s.status !== 'Opportunity Accepted' && s.status !== 'Clarification Requested' && s.status !== 'Under Review' &&
+    !isSelfSubmission(s)
+  );
 
   const pendingCount = pendingSubmissions.length;
   const validatedCount = reviewedSubmissions.filter(s => s.status === 'Validated' || s.status.startsWith('Lead') || s.status === 'Opportunity Accepted' || s.status === 'Proposal' || s.status === 'Negotiation' || s.status === 'Deal Won').length;
@@ -480,6 +519,11 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 
   // 1. Validate decision workflow
   const handleValidate = (sub: Submission) => {
+    if (isSelfSubmission(sub)) {
+      triggerToast('error', 'Segregation of Duties: You cannot validate your own submission.');
+      return;
+    }
+
     setConfirmModal({
       title: 'Confirm Opportunity Validation?',
       message: `Are you sure you want to validate opportunity "${sub.intelligenceId}" (${sub.clientName}) and push it to the live CRM Pipeline?`,
@@ -511,6 +555,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   // 2. Reject decision workflow
   const handleReject = (e: React.FormEvent, sub: Submission) => {
     e.preventDefault();
+    if (isSelfSubmission(sub)) {
+      triggerToast('error', 'Segregation of Duties: You cannot reject your own submission.');
+      return;
+    }
     if (rejectionReason.trim().length === 0) return;
 
     setConfirmModal({
@@ -541,6 +589,10 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
   // 3. Clarification decision workflow
   const handleClarify = (e: React.FormEvent, sub: Submission) => {
     e.preventDefault();
+    if (isSelfSubmission(sub)) {
+      triggerToast('error', 'Segregation of Duties: You cannot request clarification on your own submission.');
+      return;
+    }
     if (!clarifyComment.trim()) return;
 
     setConfirmModal({
@@ -1631,8 +1683,13 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                   {!showRejectForm && !showClarifyForm ? (
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button 
-                        onClick={() => handleValidate(selectedSub)}
-                        className="flex-1 py-3 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs border-none flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                        onClick={() => !isSelfSubmission(selectedSub) && handleValidate(selectedSub)}
+                        disabled={isSelfSubmission(selectedSub)}
+                        className={`flex-1 py-3 px-4 rounded-lg font-bold text-xs border-none flex items-center justify-center gap-1.5 transition-all shadow-sm ${
+                          isSelfSubmission(selectedSub)
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60 shadow-none'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                        }`}
                       >
                         <CheckCircle2 size={15} />
                         Validate
@@ -1640,10 +1697,16 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                       
                       <button 
                         onClick={() => {
+                          if (isSelfSubmission(selectedSub)) return;
                           setShowRejectForm(true);
                           setShowClarifyForm(false);
                         }}
-                        className="flex-1 py-3 px-4 rounded-lg bg-[#C0152A] hover:bg-[#a10e20] text-white font-bold text-xs border-none flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                        disabled={isSelfSubmission(selectedSub)}
+                        className={`flex-1 py-3 px-4 rounded-lg font-bold text-xs border-none flex items-center justify-center gap-1.5 transition-all shadow-sm ${
+                          isSelfSubmission(selectedSub)
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60 shadow-none'
+                            : 'bg-[#C0152A] hover:bg-[#a10e20] text-white cursor-pointer'
+                        }`}
                       >
                         <XCircle size={15} />
                         Reject
@@ -1651,10 +1714,16 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
 
                       <button 
                         onClick={() => {
+                          if (isSelfSubmission(selectedSub)) return;
                           setShowClarifyForm(true);
                           setShowRejectForm(false);
                         }}
-                        className="flex-1 py-3 px-4 rounded-lg border-2 border-brand-navy hover:bg-slate-50 text-brand-navy font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm bg-transparent"
+                        disabled={isSelfSubmission(selectedSub)}
+                        className={`flex-1 py-3 px-4 rounded-lg border-2 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm bg-transparent ${
+                          isSelfSubmission(selectedSub)
+                            ? 'border-slate-200 text-slate-300 cursor-not-allowed opacity-60 shadow-none'
+                            : 'border-brand-navy hover:bg-slate-50 text-brand-navy cursor-pointer'
+                        }`}
                       >
                         <MessageSquare size={15} />
                         Request Clarification
@@ -1662,86 +1731,86 @@ export const StakeholderDashboard: React.FC<StakeholderDashboardProps> = ({
                     </div>
                   ) : null}
 
-                {/* Rejection Sub-flow Form */}
-                {showRejectForm && (
-                  <form onSubmit={(e) => handleReject(e, selectedSub)} className="bg-red-50/15 border border-red-200 p-4 rounded-xl flex flex-col gap-3 animate-fadeIn">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-[#C0152A] uppercase flex items-center gap-1">
-                        ❌ Rejection Reason <span className="text-[10px] text-slate-400 font-normal italic lowercase">(mandatory)</span>
+                  {/* Rejection Sub-flow Form */}
+                  {showRejectForm && (
+                    <form onSubmit={(e) => handleReject(e, selectedSub)} className="bg-red-50/15 border border-red-200 p-4 rounded-xl flex flex-col gap-3 animate-fadeIn">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-[#C0152A] uppercase flex items-center gap-1">
+                          ❌ Rejection Reason <span className="text-[10px] text-slate-400 font-normal italic lowercase">(mandatory)</span>
+                        </span>
+                      </div>
+
+                      <textarea
+                        rows={4}
+                        placeholder="Provide a clear and specific reason for rejection. This will be shared with the employee and all stakeholders."
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        className="w-full p-3 rounded-lg border border-red-300 focus:outline-none focus:ring-1 focus:ring-[#C0152A]/20 focus:border-[#C0152A] text-xs font-sans leading-relaxed"
+                        required
+                      />
+
+                      <div className="flex items-center gap-3.5 justify-end mt-1 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowRejectForm(false);
+                            setRejectionReason('');
+                          }}
+                          className="bg-transparent border-none text-slate-400 hover:text-slate-600 font-bold hover:underline cursor-pointer transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={rejectionReason.trim().length === 0}
+                          className={`px-4 py-2 rounded-lg font-bold text-white border-none transition-all shadow-sm ${
+                            rejectionReason.trim().length === 0
+                              ? 'bg-slate-300 cursor-not-allowed'
+                              : 'bg-red-600 hover:bg-red-700 cursor-pointer'
+                          }`}
+                        >
+                          Confirm Rejection
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Clarification Sub-flow Form */}
+                  {showClarifyForm && (
+                    <form onSubmit={(e) => handleClarify(e, selectedSub)} className="bg-blue-50/15 border border-blue-200 p-4 rounded-xl flex flex-col gap-3 animate-fadeIn">
+                      <span className="text-xs font-bold text-brand-navy uppercase flex items-center gap-1">
+                        💬 Clarification Message
                       </span>
-                    </div>
 
-                    <textarea
-                      rows={4}
-                      placeholder="Provide a clear and specific reason for rejection. This will be shared with the employee and all stakeholders."
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      className="w-full p-3 rounded-lg border border-red-300 focus:outline-none focus:ring-1 focus:ring-[#C0152A]/20 focus:border-[#C0152A] text-xs font-sans leading-relaxed"
-                      required
-                    />
+                      <textarea
+                        rows={4}
+                        placeholder="Describe what additional information or context is needed from the employee."
+                        value={clarifyComment}
+                        onChange={(e) => setClarifyComment(e.target.value)}
+                        className="w-full p-3 rounded-lg border border-blue-300 focus:outline-none focus:ring-1 focus:ring-brand-navy/20 focus:border-brand-navy text-xs font-sans leading-relaxed"
+                        required
+                      />
 
-                    <div className="flex items-center gap-3.5 justify-end mt-1 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowRejectForm(false);
-                          setRejectionReason('');
-                        }}
-                        className="bg-transparent border-none text-slate-400 hover:text-slate-600 font-bold hover:underline cursor-pointer transition-all"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={rejectionReason.trim().length === 0}
-                        className={`px-4 py-2 rounded-lg font-bold text-white border-none transition-all shadow-sm ${
-                          rejectionReason.trim().length === 0
-                            ? 'bg-slate-300 cursor-not-allowed'
-                            : 'bg-red-600 hover:bg-red-700 cursor-pointer'
-                        }`}
-                      >
-                        Confirm Rejection
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {/* Clarification Sub-flow Form */}
-                {showClarifyForm && (
-                  <form onSubmit={(e) => handleClarify(e, selectedSub)} className="bg-blue-50/15 border border-blue-200 p-4 rounded-xl flex flex-col gap-3 animate-fadeIn">
-                    <span className="text-xs font-bold text-brand-navy uppercase flex items-center gap-1">
-                      💬 Clarification Message
-                    </span>
-
-                    <textarea
-                      rows={4}
-                      placeholder="Describe what additional information or context is needed from the employee."
-                      value={clarifyComment}
-                      onChange={(e) => setClarifyComment(e.target.value)}
-                      className="w-full p-3 rounded-lg border border-blue-300 focus:outline-none focus:ring-1 focus:ring-brand-navy/20 focus:border-brand-navy text-xs font-sans leading-relaxed"
-                      required
-                    />
-
-                    <div className="flex items-center gap-3.5 justify-end mt-1 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowClarifyForm(false);
-                          setClarifyComment('');
-                        }}
-                        className="bg-transparent border-none text-slate-400 hover:text-slate-600 font-bold hover:underline cursor-pointer transition-all"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 rounded-lg bg-brand-navy hover:bg-[#121c4a] font-bold text-white border-none cursor-pointer transition-all shadow-sm"
-                      >
-                        Send Request
-                      </button>
-                    </div>
-                  </form>
-                )}
+                      <div className="flex items-center gap-3.5 justify-end mt-1 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowClarifyForm(false);
+                            setClarifyComment('');
+                          }}
+                          className="bg-transparent border-none text-slate-400 hover:text-slate-600 font-bold hover:underline cursor-pointer transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 rounded-lg bg-brand-navy hover:bg-[#121c4a] font-bold text-white border-none cursor-pointer transition-all shadow-sm"
+                        >
+                          Send Request
+                        </button>
+                      </div>
+                    </form>
+                  )}
 
               </div>
               ) : (
