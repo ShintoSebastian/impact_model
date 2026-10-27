@@ -1,0 +1,3359 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+import https from 'https';
+import nodemailer from 'nodemailer';
+import { authenticate } from 'ldap-authentication';
+
+dotenv.config();
+
+const app = express();
+const prisma = new PrismaClient();
+const PORT = process.env.PORT || 7000;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
+const CORPORATE_API_URL = process.env.CORPORATE_API_URL || 'https://hrapps.nestdigital.com:8089';
+
+// Allowed frontend origins: IMPACT_BASE_URL + optional comma-separated CORS_ORIGINS
+// (e.g. live frontend at https://hrapps.nestdigital.com:8085)
+const configuredOrigins = [process.env.IMPACT_BASE_URL, ...(process.env.CORS_ORIGINS || '').split(',')]
+  .map(o => (o || '').trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+const devOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+const allowedOrigins = configuredOrigins.length === 0
+  ? '*'
+  : process.env.NODE_ENV === 'production'
+    ? configuredOrigins
+    : [...configuredOrigins, ...devOrigins];
+app.use(cors({
+  origin: allowedOrigins
+}));
+app.use(express.json());
+
+// Disable TLS certificate validation for corporate API (self-signed/corporate certificates)
+const tlsAgent = new https.Agent({
+  rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0' ? false : true
+});
+
+// ----------------------------------------------------
+// CORPORATE API INTEGRATION (Read-Only, Server-Side Only)
+// Safely fetches employee profile from NestDigital HRMS.
+// Returns null if API is unavailable or employee not found — never crashes.
+// ----------------------------------------------------
+async function fetchCorporateEmployee(email: string): Promise<any | null> {
+  let normEmail = email.toLowerCase().trim();
+  if (normEmail.endsWith('@nestdigital.com')) {
+    normEmail = `${normEmail.split('@')[0]}@nestgroup.net`;
+  }
+  if (normEmail === 'dummy.employee@nestgroup.net' || normEmail === 'dummy.employee') {
+    return {
+      'Employee ID': 'DUMMY-EMP-01',
+      'Employee Name': 'Dummy Employee',
+      'Business Unit': 'Engineering',
+      'Reporting Manager': 'Dummy Manager',
+      'Reporting Manager Email': 'dummy.manager@nestgroup.net',
+      'Project Manager': 'Dummy PM',
+      'Project Manager Email': 'dummy.pm@nestgroup.net',
+      'Business Unit Head': 'Dummy BU Head',
+      'Business Unit Head Email': 'dummy.buhead@nestgroup.net',
+      'role': 'employee',
+      'Designation': 'Software Engineer'
+    };
+  }
+  if (normEmail === 'dummy2.employee@nestgroup.net' || normEmail === 'dummy2.eployee@nestgroup.net' || normEmail === 'dummy2.employee' || normEmail === 'dummy2.eployee') {
+    return {
+      'Employee ID': 'DUMMY-EMP-02',
+      'Employee Name': 'Dummy2 Employee',
+      'Business Unit': 'Engineering',
+      'Reporting Manager': 'Dummy Manager',
+      'Reporting Manager Email': 'dummy.manager@nestgroup.net',
+      'Project Manager': 'Dummy PM',
+      'Project Manager Email': 'dummy.pm@nestgroup.net',
+      'Business Unit Head': 'Not Specified',
+      'Business Unit Head Email': '',
+      'role': 'employee',
+      'Designation': 'Software Engineer'
+    };
+  }
+  if (normEmail === 'dummy.manager@nestgroup.net' || normEmail === 'dummy.manager') {
+    return {
+      'Employee ID': 'DUMMY-MGR-01',
+      'Employee Name': 'Dummy Manager',
+      'Business Unit': 'Engineering',
+      'Reporting Manager': 'Dummy BU Head',
+      'Reporting Manager Email': 'dummy.buhead@nestgroup.net',
+      'Project Manager': 'Dummy PM',
+      'Project Manager Email': 'dummy.pm@nestgroup.net',
+      'Business Unit Head': 'Dummy BU Head',
+      'Business Unit Head Email': 'dummy.buhead@nestgroup.net',
+      'role': 'employee',
+      'Designation': 'Reporting Manager'
+    };
+  }
+  if (normEmail === 'dummy.buhead@nestgroup.net' || normEmail === 'dummy.buhead') {
+    return {
+      'Employee ID': 'DUMMY-BU-01',
+      'Employee Name': 'Dummy BU Head',
+      'Business Unit': 'Engineering',
+      'Reporting Manager': 'Not Specified',
+      'Reporting Manager Email': '',
+      'Project Manager': 'Dummy PM',
+      'Project Manager Email': 'dummy.pm@nestgroup.net',
+      'Business Unit Head': 'Dummy BU Head',
+      'Business Unit Head Email': 'dummy.buhead@nestgroup.net',
+      'role': 'reviewer',
+      'Designation': 'PMO / BU Reviewer'
+    };
+  }
+  if (normEmail === 'dummy.pm@nestgroup.net' || normEmail === 'dummy.pm') {
+    return {
+      'Employee ID': 'DUMMY-PM-01',
+      'Employee Name': 'Dummy PM',
+      'Business Unit': 'Engineering',
+      'Reporting Manager': 'Dummy BU Head',
+      'Reporting Manager Email': 'dummy.buhead@nestgroup.net',
+      'Project Manager': 'Not Specified',
+      'Project Manager Email': '',
+      'Business Unit Head': 'Dummy BU Head',
+      'Business Unit Head Email': 'dummy.buhead@nestgroup.net',
+      'role': 'employee',
+      'Designation': 'Project Manager'
+    };
+  }
+
+  if (!CORPORATE_API_URL) {
+    console.log('[Corporate API] No CORPORATE_API_URL configured, skipping.');
+    return null;
+  }
+
+  // Extract username from email (part before @)
+  const username = email.split('@')[0];
+  const apiUrl = `${CORPORATE_API_URL}/api/employee/GetEmployeeData`;
+
+  try {
+    console.log(`[Corporate API] Fetching profile for username: "${username}" from ${apiUrl}`);
+
+    // Use custom HTTPS agent to bypass self-signed certificate rejection
+    const fetchOptions: any = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ username }),
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    };
+
+    // For HTTPS URLs, attach the custom agent that ignores self-signed certs
+    if (CORPORATE_API_URL.startsWith('https')) {
+      (fetchOptions as any).dispatcher = undefined; // Node 18+ uses dispatcher
+      // For Node.js built-in fetch, we need to set the env var
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    }
+
+    const response = await fetch(apiUrl, fetchOptions);
+
+    if (!response.ok) {
+      console.warn(`[Corporate API] HTTP ${response.status}: ${response.statusText}`);
+      const errorBody = await response.text().catch(() => '');
+      console.warn(`[Corporate API] Error body: ${errorBody.substring(0, 500)}`);
+      return null;
+    }
+
+    const rawText = await response.text();
+    console.log(`[Corporate API] Raw response text (first 1000 chars): ${rawText.substring(0, 1000)}`);
+
+    let result: any;
+    try {
+      result = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.warn(`[Corporate API] ⚠️ Response is not valid JSON`);
+      return null;
+    }
+
+    // Handle multiple response formats:
+    // Format 1: { success: true, data: { ... } }
+    // Format 2: { data: { ... } } (no success field)
+    // Format 3: Direct object { employeeId: ..., name: ..., ... }
+    // Format 4: Array [ { employeeId: ..., ... } ]
+    let employeeData: any = null;
+
+    if (result.success && result.data) {
+      employeeData = result.data;
+    } else if (result.data && typeof result.data === 'object') {
+      employeeData = result.data;
+    } else if (Array.isArray(result) && result.length > 0) {
+      employeeData = result[0];
+    } else if (result.employeeId || result.employee_id || result.empId || result.emp_code || result.name || result.employeeName) {
+      // Direct object response
+      employeeData = result;
+    }
+
+    if (employeeData) {
+      console.log(`[Corporate API] ✅ Employee data found for: ${username}`);
+      console.log(`[Corporate API] Data keys: ${Object.keys(employeeData).join(', ')}`);
+      console.log(`[Corporate API] Employee data:`, JSON.stringify(employeeData, null, 2));
+      return employeeData;
+    } else {
+      console.log(`[Corporate API] ❌ No usable data found for: ${username}`);
+      console.log(`[Corporate API] Full response structure:`, JSON.stringify(result, null, 2));
+      return null;
+    }
+  } catch (err: any) {
+    // Network error, timeout, or API down — silently fall back
+    console.warn(`[Corporate API] ⚠️ Could not reach API: ${err.message}`);
+    console.warn(`[Corporate API] Error stack: ${err.stack?.substring(0, 300)}`);
+    console.warn(`[Corporate API] Falling back to local database.`);
+    return null;
+  }
+}
+
+// Helper: Role Mapping for fallback Auto-Provisioning
+const ROLE_MAP: Record<string, { role: string; designation?: string }> = {
+  'dummy.employee@nestgroup.net': { role: 'employee', designation: 'Software Engineer' },
+  'dummy2.employee@nestgroup.net': { role: 'employee', designation: 'Software Engineer' },
+  'dummy2.eployee@nestgroup.net': { role: 'employee', designation: 'Software Engineer' },
+  'dummy.manager@nestgroup.net': { role: 'employee', designation: 'Reporting Manager' },
+  'dummy.buhead@nestgroup.net': { role: 'reviewer', designation: 'PMO / BU Reviewer - Engineering' },
+  'dummy.pm@nestgroup.net': { role: 'employee', designation: 'Project Manager' },
+  'anoop.chandran@nestgroup.net': { role: 'reviewer', designation: 'Vice President' },
+  'employees@nestgroup.net': { role: 'employee', designation: 'Senior Consultant' },
+  'sony.k@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - HBU' },
+  'jobins.jose@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - BFS' },
+  'jonathan.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - MBU/IBU' },
+  'jose.george@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - GIS' },
+  'madhusudhanan.c@nestgroup.net': { role: 'reviewer', designation: 'BU Reviewer - INS' },
+  'nishant.unnikrishnan@nestgroup.net': { role: 'reviewer', designation: 'Sales - MBU' },
+  'ajish@nestgroup.net': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
+  'ajish.mj@nestgroup.net': { role: 'reviewer', designation: 'Vice President - HR / BU Head' },
+  'anil.george@nestgroup.net': { role: 'reviewer', designation: 'Vice President / BU Head - ISG' }
+};
+
+const BU_REVIEWERS: Record<string, string> = {
+  'hbu': 'sony.k@nestgroup.net',
+  'healthcare business unit': 'sony.k@nestgroup.net',
+  'bfs': 'jobins.jose@nestgroup.net',
+  'banking financial services': 'jobins.jose@nestgroup.net',
+  'mbu': 'jonathan.george@nestgroup.net',
+  'mobility business unit': 'jonathan.george@nestgroup.net',
+  'ibu': 'jonathan.george@nestgroup.net',
+  'industrial business unit': 'jonathan.george@nestgroup.net',
+  'gis': 'jose.george@nestgroup.net',
+  'geographic information service': 'jose.george@nestgroup.net',
+  'ins': 'madhusudhanan.c@nestgroup.net',
+  'insurance service': 'madhusudhanan.c@nestgroup.net',
+  'engineering': 'dummy.buhead@nestgroup.net',
+  'eng': 'dummy.buhead@nestgroup.net',
+  'human resources group': 'ajish@nestgroup.net',
+  'human resources': 'ajish@nestgroup.net',
+  'hr': 'ajish@nestgroup.net',
+  'hrg': 'ajish@nestgroup.net',
+  'isg': 'anil.george@nestgroup.net',
+  'internal systems group': 'anil.george@nestgroup.net',
+  'internal systems': 'anil.george@nestgroup.net'
+};
+
+// Helper to get BU assigned to a reviewer email
+function getAssignedBUsForReviewer(email: string): string[] {
+  let normalizedEmail = email.toLowerCase().trim();
+  if (normalizedEmail.endsWith('@nestdigital.com')) {
+    normalizedEmail = `${normalizedEmail.split('@')[0]}@nestgroup.net`;
+  }
+  const searchEmails = [normalizedEmail];
+  if (normalizedEmail === 'dummy.buhead@nestgroup.net') {
+    searchEmails.push('dummy.buhead@nestgroup.net');
+  }
+  if (normalizedEmail.includes('anoop.chandran') || normalizedEmail.includes('anoop')) {
+    searchEmails.push('jobins.jose@nestgroup.net', 'anoop.chandran@nestgroup.net');
+  }
+  if (normalizedEmail.includes('nishant.unnikrishnan') || normalizedEmail.includes('nishant')) {
+    searchEmails.push('nishant.unnikrishnan@nestgroup.net');
+  }
+  if (normalizedEmail.includes('ajish')) {
+    searchEmails.push('ajish@nestgroup.net', 'ajish.mj@nestgroup.net');
+  }
+  if (normalizedEmail.includes('anil.george') || normalizedEmail.includes('anil')) {
+    searchEmails.push('anil.george@nestgroup.net');
+  }
+  const assignedBUs: string[] = [];
+  for (const [bu, revEmail] of Object.entries(BU_REVIEWERS)) {
+    if (searchEmails.includes(revEmail.toLowerCase())) {
+      assignedBUs.push(bu);
+    }
+  }
+  if (normalizedEmail.includes('anoop.chandran') || normalizedEmail.includes('anoop')) {
+    assignedBUs.push('bfs', 'banking financial services', 'banking');
+  }
+  if (normalizedEmail.includes('nishant.unnikrishnan') || normalizedEmail.includes('nishant')) {
+    assignedBUs.push('mbu', 'mobility business unit', 'mobility');
+  }
+  if (normalizedEmail.includes('ajish')) {
+    assignedBUs.push('human resources group', 'human resources', 'hr', 'hrg');
+  }
+  if (normalizedEmail.includes('anil.george') || normalizedEmail.includes('anil')) {
+    assignedBUs.push('isg', 'internal systems group', 'internal systems');
+  }
+  return Array.from(new Set(assignedBUs));
+}
+
+// ----------------------------------------------------
+// DIAGNOSTIC ENDPOINT (No Auth Required — for debugging corporate API)
+// Usage: GET http://localhost:7000/api/test-corporate-api/jayasankar.j@nestgroup.net
+// ----------------------------------------------------
+app.get('/api/test-corporate-api/:email', async (req, res) => {
+  const email = req.params.email;
+  const username = email.split('@')[0];
+  const apiUrl = `${CORPORATE_API_URL}/api/employee/GetEmployeeData`;
+
+  console.log(`\n========== DIAGNOSTIC: Testing Corporate API ==========`);
+  console.log(`Email: ${email}`);
+  console.log(`Username: ${username}`);
+  console.log(`API URL: ${apiUrl}`);
+  console.log(`CORPORATE_API_URL env: "${CORPORATE_API_URL}"`);
+
+  if (!CORPORATE_API_URL) {
+    return res.json({ error: 'CORPORATE_API_URL not configured in .env', envValue: CORPORATE_API_URL });
+  }
+
+  try {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ username }),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    const rawText = await response.text();
+    console.log(`HTTP Status: ${response.status}`);
+    console.log(`Raw Response: ${rawText.substring(0, 2000)}`);
+    console.log(`========== END DIAGNOSTIC ==========\n`);
+
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      parsed = 'Could not parse as JSON';
+    }
+
+    res.json({
+      status: response.status,
+      statusText: response.statusText,
+      apiUrl,
+      username,
+      rawResponse: rawText.substring(0, 2000),
+      parsedResponse: parsed
+    });
+  } catch (err: any) {
+    console.log(`DIAGNOSTIC ERROR: ${err.message}`);
+    console.log(`Error type: ${err.constructor.name}`);
+    console.log(`========== END DIAGNOSTIC ==========\n`);
+
+    res.json({
+      error: err.message,
+      errorType: err.constructor.name,
+      apiUrl,
+      username,
+      hint: err.message.includes('certificate') || err.message.includes('CERT')
+        ? 'SSL Certificate error — the corporate API uses a self-signed cert'
+        : err.message.includes('ECONNREFUSED')
+          ? 'Connection refused — API server may be down or not reachable from this network'
+          : err.message.includes('ENOTFOUND')
+            ? 'DNS lookup failed — hostname not resolvable from this network'
+            : 'Unknown error — check server terminal for details'
+    });
+  }
+});
+
+// ----------------------------------------------------
+// DIAGNOSTIC ENDPOINT FOR CRM API (No Auth Required)
+// Usage: GET http://localhost:7000/api/test-crm-api
+// ----------------------------------------------------
+app.get('/api/test-crm-api', async (req, res) => {
+  const crmUrl = process.env.CRM_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities';
+
+  const testPayload = {
+    impactIntelligenceId: `IM-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-DIAG`,
+    clientName: 'Diagnostic Health Systems',
+    opportunityTitle: 'CRM API Diagnostic Connection Check',
+    opportunityDescription: 'Testing CRM API integration and payload verification from server diagnostic endpoint.',
+    clientContact: {
+      provided: true,
+      email: 'diagnostic.contact@nestgroup.net',
+      phone: '+1 (555) 999-0000'
+    },
+    sourceDetails: {
+      submittedByEmployeeId: 'DUMMY-EMP-01',
+      submittedByEmployeeName: 'Test Employee',
+      employeeBusinessUnit: 'Digital Transformation Unit (DTU)'
+    },
+    stakeholderMapping: {
+      assignedSalesPerson: 'Not Specified',
+      businessUnitHead: 'Dummy BU Head (dummy.buhead@nestgroup.net)',
+      projectManager: 'Dummy PM (dummy.pm@nestgroup.net)'
+    },
+    submittedAt: new Date().toISOString(),
+    approvedAt: new Date().toISOString()
+  };
+
+  console.log(`\n======================================================`);
+  console.log(`========== DIAGNOSTIC: Testing CRM API (Port 8089) ==========`);
+  console.log(`Target CRM API URL: ${crmUrl}`);
+  console.log(`Request Payload Sent:\n`, JSON.stringify(testPayload, null, 2));
+  console.log(`======================================================`);
+
+  try {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+    const response = await fetch(crmUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(testPayload),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    const rawText = await response.text();
+    console.log(`HTTP Status Code: ${response.status} ${response.statusText}`);
+    console.log(`Raw CRM Response: ${rawText}`);
+
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(rawText);
+      console.log(`Parsed Response Data:`, JSON.stringify(parsed, null, 2));
+      const returnedId = parsed.crmOpportunityId || parsed.crmLeadId;
+      if (returnedId) {
+        console.log(`\n🎉 SUCCESS! CRM Opportunity ID Created: "${returnedId}"`);
+      }
+    } catch {
+      parsed = 'Could not parse response as JSON';
+    }
+    console.log(`================ END CRM DIAGNOSTIC ==================\n`);
+
+    res.json({
+      success: response.ok || response.status === 201,
+      status: response.status,
+      statusText: response.statusText,
+      crmUrl,
+      payloadSent: testPayload,
+      crmOpportunityId: parsed?.crmOpportunityId || parsed?.crmLeadId || null,
+      rawResponse: rawText,
+      parsedResponse: parsed
+    });
+  } catch (err: any) {
+    console.log(`CRM DIAGNOSTIC ERROR: ${err.message}`);
+    console.log(`================ END CRM DIAGNOSTIC ==================\n`);
+
+    res.json({
+      success: false,
+      error: err.message,
+      crmUrl,
+      hint: 'Check if port 8089 is reachable from this server network'
+    });
+  }
+});
+
+// ----------------------------------------------------
+// DIAGNOSTIC ENDPOINT FOR CRM STATUS API (No Auth Required)
+// Usage: GET http://localhost:7000/api/test-crm-status-api
+// ----------------------------------------------------
+app.get('/api/test-crm-status-api', async (req, res) => {
+  const statusApiUrl = process.env.CRM_STATUS_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities/status-changes';
+  const sinceParam = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const queryUrl = `${statusApiUrl}?since=${encodeURIComponent(sinceParam)}`;
+
+  console.log(`\n======================================================`);
+  console.log(`========== DIAGNOSTIC: Testing CRM Status API ==========`);
+  console.log(`Target URL: ${queryUrl}`);
+  console.log(`======================================================`);
+
+  try {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+    const response = await fetch(queryUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    const rawText = await response.text();
+    console.log(`HTTP Status Code: ${response.status} ${response.statusText}`);
+    console.log(`Raw Response: ${rawText.substring(0, 2000)}`);
+
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      parsed = 'Could not parse response as JSON';
+    }
+
+    console.log(`================ END STATUS DIAGNOSTIC ===============\n`);
+
+    res.json({
+      success: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      queryUrl,
+      sinceParam,
+      rawResponse: rawText.substring(0, 2000),
+      parsedResponse: parsed
+    });
+  } catch (err: any) {
+    console.log(`STATUS DIAGNOSTIC ERROR: ${err.message}`);
+    console.log(`================ END STATUS DIAGNOSTIC ===============\n`);
+
+    res.json({
+      success: false,
+      error: err.message,
+      queryUrl,
+      hint: 'Check if port 8089 status endpoint is reachable from this server network'
+    });
+  }
+});
+
+// Authentication Middleware
+const authenticateToken = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Generates unique intelligence IDs: IM-YYYYMMDD-XXXX
+async function generateIntelligenceId(): Promise<string> {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
+  const prefix = `IM-${dateStr}-`;
+
+  // Count submissions created today starting with today's prefix
+  const todaysSubmissions = await prisma.submission.findMany({
+    where: {
+      intelligenceId: {
+        startsWith: prefix,
+      },
+    },
+    select: {
+      intelligenceId: true,
+    },
+  });
+
+  let maxSerial = 0;
+  todaysSubmissions.forEach((s: any) => {
+    const parts = s.intelligenceId.split('-');
+    if (parts.length === 3) {
+      const serial = parseInt(parts[2], 10);
+      if (!isNaN(serial) && serial > maxSerial) {
+        maxSerial = serial;
+      }
+    }
+  });
+
+  const nextSerialStr = String(maxSerial + 1).padStart(3, '0');
+  return `${prefix}${nextSerialStr}`;
+}
+
+// ----------------------------------------------------
+// LDAP AUTHENTICATION
+// ----------------------------------------------------
+async function authLdap(username: string, userPassword?: string) {
+  if (!userPassword) {
+    return { success: false, error: 'Password is required' };
+  }
+
+  const cleanUser = username.split('@')[0].toLowerCase();
+  if (['dummy.employee', 'dummy2.employee', 'dummy2.eployee', 'dummy.manager', 'dummy.buhead', 'dummy.pm'].includes(cleanUser) && userPassword === 'dummy') {
+    return { success: true };
+  }
+
+  let cleanUsername = username;
+  if (username.includes('\\')) {
+    cleanUsername = username.split('\\')[1];
+  } else if (username.includes('@')) {
+    cleanUsername = username.split('@')[0];
+  }
+
+  // Common Active Directory bind formats for NeST corporate network (DC=chn,DC=nestgroup,DC=net)
+  const bindCandidates = [
+    username.includes('@') || username.includes('\\') ? username : `${cleanUsername}@nestgroup.net`,
+    `${cleanUsername}@nestgroup.net`,
+    `CHN\\${cleanUsername}`
+  ];
+  const uniqueBinds = [...new Set(bindCandidates)];
+
+  let lastError = 'Invalid credentials';
+
+  for (const candidateDn of uniqueBinds) {
+    try {
+      let options = {
+        ldapOpts: {
+          url: 'ldap://10.15.0.25:389',
+        },
+        adminDn: candidateDn,
+        adminPassword: userPassword,
+        userPassword: userPassword,
+        userSearchBase: 'DC=chn,DC=nestgroup,DC=net',
+        usernameAttribute: 'sAMAccountName',
+        username: cleanUsername,
+      };
+
+      await authenticate(options);
+      console.log(`[LDAP Auth] ✅ Authenticated successfully for ${username} using bindDn: ${candidateDn}`);
+      return { success: true };
+    } catch (err: any) {
+      lastError = err.message || 'Authentication failed';
+      // If error is connection timeout or network unreachable, no need to retry other DN formats
+      if (lastError.includes('timeout') || lastError.includes('ETIMEDOUT') || lastError.includes('ECONNREFUSED')) {
+        break;
+      }
+    }
+  }
+
+  console.warn(`[LDAP Auth] ⚠️ Failed for user ${username}:`, lastError);
+
+  // Parse human-readable error messages for Active Directory codes
+  let userFriendlyError = lastError;
+  if (lastError.includes('52e')) {
+    userFriendlyError = 'Invalid username or password. Please verify your corporate Windows/domain logon password and try again.';
+  } else if (lastError.includes('532') || lastError.includes('773')) {
+    userFriendlyError = 'Your corporate password has expired. Please reset it.';
+  } else if (lastError.includes('775')) {
+    userFriendlyError = 'Your corporate domain account is locked out. Please contact IT Helpdesk.';
+  } else if (lastError.includes('533')) {
+    userFriendlyError = 'Your corporate domain account is disabled.';
+  } else if (lastError.includes('timeout') || lastError.includes('ETIMEDOUT')) {
+    userFriendlyError = 'Connection to corporate network timed out. Please ensure you are connected to the office network or NeST VPN.';
+  }
+
+  return { success: false, error: userFriendlyError };
+}
+
+// ----------------------------------------------------
+// AUTH ENDPOINTS
+// ----------------------------------------------------
+
+// Strict email format validation and extraction regex
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+function sanitizeEmail(val?: string | null): string | null {
+  if (!val || typeof val !== 'string') return null;
+  const trimmed = val.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none' || trimmed.toLowerCase() === 'not specified') return null;
+
+  // Extract from format "Name (email@domain.com)"
+  const match = trimmed.match(/\(([^)]+)\)/);
+  if (match && match[1]) {
+    const candidate = match[1].trim().toLowerCase();
+    return EMAIL_REGEX.test(candidate) ? candidate : null;
+  }
+
+  // Direct email match
+  const directMatch = trimmed.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (directMatch) {
+    const candidate = directMatch[0].trim().toLowerCase();
+    return EMAIL_REGEX.test(candidate) ? candidate : null;
+  }
+
+  return null;
+}
+
+// Normalize corporate email domain: NeST corporate mail relay exclusively accepts @nestgroup.net
+function normalizeCorporateEmail(val?: string | null): string | null {
+  const candidate = sanitizeEmail(val);
+  if (!candidate) return null;
+  const lower = candidate.toLowerCase();
+  if (lower.endsWith('@nestdigital.com')) {
+    return `${lower.split('@')[0]}@nestgroup.net`;
+  }
+  return lower;
+}
+
+const KNOWN_EMPLOYEE_NAMES: Record<string, string> = {
+  'harikrishnan.kr@nestgroup.net': 'Harikrishnan K R',
+  'roshine.andrews@nestgroup.net': 'Roshine Andrews',
+  'jayasankar.j@nestgroup.net': 'Jayasankar J',
+  'amina.rashad@nestgroup.net': 'Amina Rashad',
+  'anil.george@nestgroup.net': 'Anil K George',
+  'jobins.jose@nestgroup.net': 'Jobins Jose',
+  'sony.k@nestgroup.net': 'Sony John K',
+  'anoop.chandran@nestgroup.net': 'Anoop Chandran',
+  'shaju.u@nestgroup.net': 'Shaju P Unni',
+  'sudipta.mukherjee@nestgroup.net': 'Sudipta Mukherjee',
+  'nishant.unnikrishnan@nestgroup.net': 'Nishant Unnikrishnan',
+  'ajish@nestgroup.net': 'Ajish M J',
+  'ajish.mj@nestgroup.net': 'Ajish M J',
+  'nitha.anilkumar@nestgroup.net': 'Nitha Anilkumar',
+  'pradeep.s@nestgroup.net': 'Pradeep S',
+  'pratheesh.presannan@nestgroup.net': 'Pratheesh Presannan',
+  'dhanya.unnikrishnan@nestgroup.net': 'Dhanya Unnikrishnan',
+  'jayaram.ve@nestgroup.net': 'Jayaram V E',
+  'robin.jacob@nestgroup.net': 'Robin Jacob N R',
+  'jonathan.george@nestgroup.net': 'Jonathan Titus George',
+  'nazneen.jehangir@nestgroup.net': 'Nazneen Jehangir'
+};
+
+function formatEmployeeNameFromEmail(email: string): string {
+  if (!email || typeof email !== 'string') return '';
+  const clean = email.trim().toLowerCase();
+  if (KNOWN_EMPLOYEE_NAMES[clean]) return KNOWN_EMPLOYEE_NAMES[clean];
+  const username = clean.split('@')[0];
+  return username.split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+}
+
+// Safely extracts all valid emails from a single field (handles comma-separated lists e.g. multiple Project Managers from HRMS)
+function extractAllEmails(val?: string | null): string[] {
+  if (!val || typeof val !== 'string') return [];
+  const trimmed = val.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none' || trimmed.toLowerCase() === 'not specified') return [];
+
+  if (trimmed.includes(',')) {
+    const parts = trimmed.split(',');
+    const results: string[] = [];
+    for (const part of parts) {
+      const extracted = normalizeCorporateEmail(part.trim());
+      if (extracted && !results.includes(extracted)) {
+        results.push(extracted);
+      }
+    }
+    return results;
+  }
+
+  const single = normalizeCorporateEmail(trimmed);
+  return single ? [single] : [];
+}
+
+// Extracts and flattens all emails across multiple fields
+function extractEmails(fieldValues: (string | null | undefined)[]): string[] {
+  const validEmails: string[] = [];
+  fieldValues.forEach(val => {
+    const emails = extractAllEmails(val);
+    emails.forEach(email => {
+      if (email && !validEmails.includes(email)) {
+        validEmails.push(email);
+      }
+    });
+  });
+  return validEmails;
+}
+
+function extractSingleEmail(fieldValue?: string | null): string | null {
+  return normalizeCorporateEmail(fieldValue);
+}
+
+// Helper: Safely map corporate HRMS data payload to our Employee schema
+function mapCorporateEmployeeData(corporateData: any, normalizedEmail: string) {
+  const empId = corporateData['Employee ID'] || corporateData.employeeId || corporateData.employee_id || corporateData.empId || corporateData.emp_code || `ND-${Math.floor(10000 + Math.random() * 90000)}`;
+
+  const empName = corporateData['Employee Name'] || corporateData.name || corporateData.employeeName || corporateData.employee_name || corporateData.fullName || corporateData.full_name || normalizedEmail.split('@')[0].split('.').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+
+  const empBU = corporateData['Business Unit'] || corporateData['Department'] || corporateData.businessUnit || corporateData.business_unit || corporateData.department || corporateData.bu || 'Not Specified';
+
+  // 1. Reporting Manager from HRMS
+  const rmName = corporateData['Reporting Manager'] || corporateData.reportingManager || corporateData.reporting_manager || corporateData.manager || corporateData.reportingManagerName || 'Not Specified';
+  let rmEmailRaw = corporateData['Reporting Manager Email'] || corporateData.reportingManagerEmail || corporateData.reporting_manager_email || corporateData.managerEmail || '';
+  const cleanRmEmail = normalizeCorporateEmail(rmEmailRaw);
+
+  let empRM = 'Not Specified';
+  if (rmName !== 'Not Specified' && rmName !== '' && rmName.toLowerCase() !== 'null') {
+    empRM = cleanRmEmail && !String(rmName).includes(cleanRmEmail) ? `${rmName} (${cleanRmEmail})` : String(rmName);
+  } else if (cleanRmEmail) {
+    empRM = `${formatEmployeeNameFromEmail(cleanRmEmail)} (${cleanRmEmail})`;
+  }
+
+  // 2. Project Manager(s) from HRMS
+  const pmEmailListRaw = corporateData['Project Manager Email List']
+    || corporateData['ProjectManagerEmailList']
+    || corporateData['projectManagerEmailList']
+    || corporateData['Project Manager Email list']
+    || corporateData['Project Manager Emails']
+    || corporateData['Project Manager List']
+    || corporateData['ProjectManagerList']
+    || corporateData['projectManagerList']
+    || '';
+
+  const pmNamesRaw = corporateData['Project Manager Names']
+    || corporateData['Project Manager Name List']
+    || corporateData['ProjectManagerNameList']
+    || corporateData['projectManagerNameList']
+    || '';
+
+  let pmListFormatted = '';
+  if (pmEmailListRaw) {
+    let emailArray: string[] = [];
+    if (Array.isArray(pmEmailListRaw)) {
+      emailArray = pmEmailListRaw;
+    } else if (typeof pmEmailListRaw === 'string') {
+      emailArray = pmEmailListRaw.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    let namesArray: string[] = [];
+    if (Array.isArray(pmNamesRaw)) {
+      namesArray = pmNamesRaw;
+    } else if (typeof pmNamesRaw === 'string' && pmNamesRaw) {
+      namesArray = pmNamesRaw.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    if (emailArray.length > 0) {
+      pmListFormatted = emailArray.map((email, idx) => {
+        const cleanEmail = normalizeCorporateEmail(email) || email.trim();
+        const providedName = namesArray[idx]?.trim();
+        const displayName = (providedName && providedName !== 'Not Specified' && !providedName.includes('@')) 
+          ? providedName 
+          : formatEmployeeNameFromEmail(cleanEmail);
+        return `${displayName} (${cleanEmail})`;
+      }).join(', ');
+    }
+  }
+
+  let pmRaw = corporateData['Project Manager']
+    || corporateData['Project Manager Name']
+    || corporateData['ProjectManager']
+    || corporateData.projectManager
+    || corporateData.project_manager
+    || corporateData.projectManagerName
+    || corporateData.pm
+    || corporateData.pmName
+    || corporateData.pm_name
+    || 'Not Specified';
+
+  let pmRawEmail = corporateData['Project Manager Email']
+    || corporateData['ProjectManagerEmail']
+    || corporateData.projectManagerEmail
+    || corporateData.project_manager_email
+    || corporateData.pmEmail
+    || corporateData.pm_email
+    || '';
+
+  if (typeof pmRaw === 'object' && pmRaw !== null) {
+    const obj = pmRaw as any;
+    pmRawEmail = pmRawEmail || obj['Email'] || obj.email || obj['Project Manager Email'] || '';
+    pmRaw = obj['Employee Name'] || obj.name || obj.fullName || obj.employeeName || 'Not Specified';
+  }
+
+  const cleanPmEmail = normalizeCorporateEmail(pmRawEmail);
+  const pmNameStr = String(pmRaw).trim();
+
+  let empPM = 'Not Specified';
+  if (pmListFormatted) {
+    empPM = pmListFormatted;
+  } else if (pmNameStr !== 'Not Specified' && pmNameStr !== '' && pmNameStr.toLowerCase() !== 'null' && pmNameStr.toLowerCase() !== 'undefined') {
+    if (cleanPmEmail && !pmNameStr.includes(cleanPmEmail)) {
+      empPM = `${pmNameStr} (${cleanPmEmail})`;
+    } else {
+      empPM = pmNameStr;
+    }
+  } else if (cleanPmEmail) {
+    empPM = `${formatEmployeeNameFromEmail(cleanPmEmail)} (${cleanPmEmail})`;
+  }
+
+  // 3. Business Unit Head from HRMS
+  const buHeadName = corporateData['Business Unit Head'] || corporateData.buHead || corporateData.bu_head || corporateData.businessUnitHead || 'Not Specified';
+  let buHeadEmailRaw = corporateData['Business Unit Head Email'] || corporateData.buHeadEmail || corporateData.bu_head_email || corporateData.businessUnitHeadEmail || '';
+  const cleanBuHeadEmail = normalizeCorporateEmail(buHeadEmailRaw);
+
+  let empBUHead = 'Not Specified';
+  if (buHeadName !== 'Not Specified' && buHeadName !== '' && buHeadName.toLowerCase() !== 'null') {
+    empBUHead = cleanBuHeadEmail && !String(buHeadName).includes(cleanBuHeadEmail) ? `${buHeadName} (${cleanBuHeadEmail})` : String(buHeadName);
+  } else if (cleanBuHeadEmail) {
+    empBUHead = `${formatEmployeeNameFromEmail(cleanBuHeadEmail)} (${cleanBuHeadEmail})`;
+  }
+
+  // Fallback: If HRMS returns "Not Specified" for BU Head, apply known corporate leadership defaults
+  const isAnoop = normalizedEmail.includes('anoop.chandran') ||
+    normalizedEmail.includes('anoop') ||
+    String(empName).toLowerCase().includes('anoop chandran');
+
+  const isBFS = String(empBU).toLowerCase().includes('banking') ||
+    String(empBU).toLowerCase().includes('bfs') ||
+    String(corporateData['Department'] || '').toLowerCase().includes('banking') ||
+    String(corporateData['Department'] || '').toLowerCase().includes('bfs');
+
+  const isISG = String(empBU).toLowerCase().includes('internal systems') ||
+    String(empBU).toLowerCase().includes('isg') ||
+    String(corporateData['Department'] || '').toLowerCase().includes('internal systems') ||
+    String(corporateData['Department'] || '').toLowerCase().includes('isg');
+
+  if (isAnoop) {
+    empBUHead = 'Not Specified';
+  } else if (empBUHead === 'Not Specified' && isBFS) {
+    empBUHead = 'Anoop Chandran (Anoop.Chandran@nestgroup.net)';
+  } else if (empBUHead === 'Not Specified' && isISG) {
+    empBUHead = 'Anil K George (anil.george@nestgroup.net)';
+  }
+
+  // 4. HRBP and Sales Person
+  const empHRBP = corporateData['HRBP'] || corporateData.hrbp || corporateData.hrBusinessPartner || corporateData.hr_bp || 'Not Specified';
+
+  const rawSales = corporateData['Sales Person'] || corporateData.salesPerson || corporateData.sales_person || corporateData.salesOwner || '';
+  let empSales = 'Not Specified';
+
+  const buStr = String(empBU || '').toLowerCase();
+  const deptStr = String(corporateData['Department'] || '').toLowerCase();
+
+  if (rawSales && rawSales !== 'Not Specified' && rawSales !== 'Not Available' && rawSales.toLowerCase() !== 'null' && rawSales.toLowerCase() !== 'undefined') {
+    empSales = String(rawSales).trim();
+  } else if (buStr.includes('bfs') || buStr.includes('banking') || deptStr.includes('bfs') || deptStr.includes('banking')) {
+    empSales = 'Shaju P Unni (shaju.u@nestgroup.net)';
+  } else if (buStr.includes('hbu') || buStr.includes('healthcare') || deptStr.includes('hbu') || deptStr.includes('healthcare')) {
+    empSales = 'Sudipta Mukherjee (sudipta.mukherjee@nestgroup.net)';
+  } else if (buStr.includes('mbu') || buStr.includes('mobility') || deptStr.includes('mbu') || deptStr.includes('mobility')) {
+    empSales = 'Nishant Unnikrishnan (nishant.unnikrishnan@nestgroup.net)';
+  }
+
+  const empDesignation = corporateData['Designation'] || corporateData.designation || corporateData.title || corporateData.jobTitle || corporateData.job_title || 'Employee';
+  const empJobRole = corporateData['Jobrole'] || corporateData.jobRole || corporateData.job_role || 'Not Specified';
+  const empPhone = corporateData['Phone Number'] || corporateData.phoneNumber || corporateData.phone_number || corporateData.phone || 'Not Specified';
+
+  // Role mapping: grant reviewer role if in mapping or leadership designation
+  const cleanEmail = normalizedEmail.endsWith('@nestdigital.com')
+    ? `${normalizedEmail.split('@')[0]}@nestgroup.net`
+    : normalizedEmail;
+  const mapping = ROLE_MAP[cleanEmail];
+
+  const desigLower = String(empDesignation).toLowerCase();
+  const jobLower = String(empJobRole).toLowerCase();
+  const isLeadership = 
+    desigLower.includes('bu head') ||
+    desigLower.includes('head hr') ||
+    desigLower.includes('vice president') ||
+    desigLower.includes('vp') ||
+    jobLower.includes('head hr') ||
+    jobLower.includes('bu head') ||
+    desigLower.includes('reviewer');
+
+  const empRole = corporateData.role || (mapping ? mapping.role : (isLeadership ? 'reviewer' : 'employee'));
+
+  // 5. Official Submitter Email from HRMS API (e.g. "Email": "user@nestgroup.net")
+  const rawOfficialEmail = corporateData['Email'] ||
+    corporateData['Official Email'] ||
+    corporateData['Email ID'] ||
+    corporateData['EmailAddress'] ||
+    corporateData.email ||
+    corporateData.officialEmail ||
+    corporateData.emailId ||
+    '';
+  let cleanOfficialEmail = normalizeCorporateEmail(rawOfficialEmail);
+  let canonicalEmail = cleanOfficialEmail || normalizeCorporateEmail(normalizedEmail) ||
+    (normalizedEmail.includes('@') ? normalizedEmail : `${normalizedEmail.split('@')[0]}@nestgroup.net`);
+
+  if (canonicalEmail && canonicalEmail.endsWith('@nestdigital.com')) {
+    canonicalEmail = `${canonicalEmail.split('@')[0]}@nestgroup.net`;
+  }
+
+  return {
+    employeeId: String(empId),
+    name: String(empName),
+    email: String(canonicalEmail),
+    businessUnit: String(empBU),
+    reportingManager: String(empRM),
+    projectManager: String(empPM),
+    buHead: String(empBUHead),
+    hrbp: String(empHRBP),
+    salesPerson: String(empSales),
+    role: String(empRole),
+    designation: String(empDesignation),
+    jobRole: String(empJobRole),
+    phoneNumber: String(empPhone)
+  };
+}
+
+// POST /api/auth/login
+app.post('/api/auth/login', async (req, res) => {
+  const { email, username, password } = req.body;
+
+  const loginInput = username || email;
+  if (!loginInput) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required' });
+  }
+
+  // Perform LDAP Authentication First
+  const ldapResult = await authLdap(loginInput, password);
+
+  if (!ldapResult.success) {
+    return res.status(401).json({ error: `LDAP Error: ${ldapResult.error || 'Invalid credentials'}` });
+  }
+
+  const normalizedInput = loginInput.toLowerCase().trim();
+  // Ensure we have an email format for the local database and ROLE_MAP (strictly enforce corporate @nestgroup.net)
+  let normalizedEmail = normalizedInput.includes('@') ? normalizedInput : `${normalizedInput}@nestgroup.net`;
+  if (normalizedEmail.endsWith('@nestdigital.com')) {
+    normalizedEmail = `${normalizedEmail.split('@')[0]}@nestgroup.net`;
+  }
+  if (normalizedInput === 'dummy.buhead' || normalizedInput === 'dummy.buhead@nestgroup.net' || normalizedInput === 'dummy.buhead@nestdigital.com') {
+    normalizedEmail = 'dummy.buhead@nestgroup.net';
+  } else if (['dummy.manager', 'dummy.manager@nestgroup.net', 'dummy.manager@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy.manager@nestgroup.net';
+  } else if (['dummy.pm', 'dummy.pm@nestgroup.net', 'dummy.pm@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy.pm@nestgroup.net';
+  } else if (['dummy2.employee', 'dummy2.eployee', 'dummy2.employee@nestgroup.net', 'dummy2.eployee@nestgroup.net', 'dummy2.employee@nestdigital.com', 'dummy2.eployee@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy2.employee@nestgroup.net';
+  } else if (['dummy.employee', 'dummy.employee@nestgroup.net', 'dummy.employee@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'dummy.employee@nestgroup.net';
+  } else if (['amina.rashad', 'amina.rashad@nestgroup.net', 'amina.rashad@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'amina.rashad@nestgroup.net';
+  } else if (['nishant.unnikrishnan', 'nishant.unnikrishnan@nestgroup.net', 'nishant.unnikrishnan@nestdigital.com'].includes(normalizedInput)) {
+    normalizedEmail = 'nishant.unnikrishnan@nestgroup.net';
+  } else if (['ajish', 'ajish@nestgroup.net', 'ajish@nestdigital.com', 'ajish.mj', 'ajish.mj@nestdigital.com', 'ajish.mj@nestgroup.net'].includes(normalizedInput)) {
+    normalizedEmail = 'ajish@nestgroup.net';
+  }
+
+  try {
+    // STEP 1: ALWAYS try to fetch fresh data from Corporate HRMS API first
+    const corporateData = await fetchCorporateEmployee(normalizedEmail);
+
+    let employee: any = null;
+
+    if (corporateData) {
+      // Corporate API returned real employee data — map it to our schema using unified parser
+      const freshData = mapCorporateEmployeeData(corporateData, normalizedEmail);
+      console.log(`[Login] 📋 HRMS Parsed -> Email: "${freshData.email}", RM: "${freshData.reportingManager}", PM: "${freshData.projectManager}", BU Head: "${freshData.buHead}"`);
+
+      const targetEmail = freshData.email || normalizedEmail;
+
+      try {
+        const existingById = await prisma.employee.findUnique({ where: { employeeId: freshData.employeeId } });
+        const existingByEmail = await prisma.employee.findUnique({ where: { email: targetEmail } });
+
+        if (existingById && existingByEmail && existingById.id !== existingByEmail.id && existingById.email.includes('dummy')) {
+          console.log(`[Login] 🧹 Cleaning up duplicate dummy employee record ${existingById.employeeId} (${existingById.email})`);
+          await prisma.employee.delete({ where: { id: existingById.id } });
+        }
+
+        if (existingById) {
+          employee = await prisma.employee.update({
+            where: { employeeId: freshData.employeeId },
+            data: {
+              ...freshData,
+              email: targetEmail
+            }
+          });
+          console.log(`[Login] ✅ Updated employee record (${freshData.employeeId}) with official email ${targetEmail}: ${employee.name}`);
+        } else if (existingByEmail) {
+          employee = await prisma.employee.update({
+            where: { email: targetEmail },
+            data: freshData
+          });
+          console.log(`[Login] ✅ Updated employee record by email (${targetEmail}): ${employee.name}`);
+        } else {
+          employee = await prisma.employee.create({
+            data: {
+              ...freshData,
+              email: targetEmail
+            }
+          });
+          console.log(`[Login] ✅ Created new employee record from corporate API: ${employee.name} (${freshData.employeeId}, ${targetEmail})`);
+        }
+      } catch (upsertErr: any) {
+        console.warn(`[Login] ⚠️ DB save warning: ${upsertErr.message}`);
+        try {
+          const fallbackEmp = await prisma.employee.findFirst({
+            where: { OR: [{ email: targetEmail }, { email: normalizedEmail }] }
+          });
+          if (fallbackEmp) {
+            employee = await prisma.employee.update({
+              where: { id: fallbackEmp.id },
+              data: { ...freshData, email: targetEmail }
+            });
+          }
+        } catch (fbErr: any) {
+          console.warn(`[Login] ⚠️ Secondary fallback failed: ${fbErr.message}`);
+        }
+      }
+    }
+
+    // STEP 2: Strict HRMS API Security Check
+    // If corporate API is configured and returned no data (user not found in HRMS), DENY ACCESS IMMEDIATELY!
+    if (!employee) {
+      console.warn(`[Login Security Alert] ⛔ Access Denied: Unauthorized login attempt for "${loginInput}". Employee not found in corporate HRMS directory.`);
+      return res.status(401).json({
+        error: `Access Denied: Account "${loginInput}" is not registered in the Corporate HRMS directory.`
+      });
+    }
+
+    const token = jwt.sign(
+      { id: employee.id, employeeId: employee.employeeId, email: employee.email, role: employee.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      token,
+      user: {
+        employeeId: employee.employeeId,
+        name: employee.name,
+        email: employee.email,
+        businessUnit: employee.businessUnit,
+        reportingManager: employee.reportingManager,
+        projectManager: employee.projectManager,
+        buHead: employee.buHead,
+        hrbp: employee.hrbp,
+        salesPerson: employee.salesPerson,
+        role: employee.role,
+        designation: employee.designation,
+        jobRole: employee.jobRole,
+        phoneNumber: employee.phoneNumber
+      }
+    });
+  } catch (error: any) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Server authentication failed' });
+  }
+});
+
+// POST /api/auth/sync-profile
+// On-demand refresh of logged-in user profile from Corporate HRMS API (including latest Project Manager details)
+app.post('/api/auth/sync-profile', authenticateToken, async (req: any, res) => {
+  const userEmail = req.user.email;
+  if (!userEmail) {
+    return res.status(400).json({ error: 'User email not found in token' });
+  }
+
+  try {
+    const corporateData = await fetchCorporateEmployee(userEmail);
+    if (!corporateData) {
+      const currentEmp = await prisma.employee.findUnique({ where: { email: userEmail } });
+      return res.json({
+        message: 'No new data returned from Corporate HRMS API. Existing profile preserved.',
+        user: currentEmp
+      });
+    }
+
+    const freshData = mapCorporateEmployeeData(corporateData, userEmail);
+
+    let updatedEmployee: any = null;
+    try {
+      updatedEmployee = await prisma.employee.upsert({
+        where: { email: userEmail },
+        update: freshData,
+        create: {
+          ...freshData,
+          email: userEmail
+        }
+      });
+    } catch (upsertErr) {
+      console.warn(`[Sync Profile] ⚠️ Upsert failed, resolving:`, upsertErr);
+      const existingByEmail = await prisma.employee.findUnique({ where: { email: userEmail } });
+      const existingById = await prisma.employee.findUnique({ where: { employeeId: freshData.employeeId } });
+      if (existingById && existingByEmail && existingById.id !== existingByEmail.id && existingById.email.includes('dummy')) {
+        await prisma.employee.delete({ where: { id: existingById.id } });
+      }
+      try {
+        updatedEmployee = await prisma.employee.update({
+          where: { email: userEmail },
+          data: freshData
+        });
+      } catch {
+        const { employeeId: _skipId, ...updateWithoutId } = freshData;
+        updatedEmployee = await prisma.employee.update({
+          where: { email: userEmail },
+          data: updateWithoutId
+        });
+      }
+    }
+
+    console.log(`[Sync Profile] ✅ Successfully refreshed HRMS profile for ${userEmail}: PM="${updatedEmployee.projectManager}"`);
+
+    res.json({
+      message: 'Profile and Project Manager details successfully synchronized from HRMS API',
+      user: {
+        employeeId: updatedEmployee.employeeId,
+        name: updatedEmployee.name,
+        email: updatedEmployee.email,
+        businessUnit: updatedEmployee.businessUnit,
+        reportingManager: updatedEmployee.reportingManager,
+        projectManager: updatedEmployee.projectManager,
+        buHead: updatedEmployee.buHead,
+        hrbp: updatedEmployee.hrbp,
+        salesPerson: updatedEmployee.salesPerson,
+        role: updatedEmployee.role,
+        designation: updatedEmployee.designation,
+        jobRole: updatedEmployee.jobRole,
+        phoneNumber: updatedEmployee.phoneNumber
+      }
+    });
+  } catch (error: any) {
+    console.error('[Sync Profile Error]:', error);
+    res.status(500).json({ error: 'Failed to sync profile from HRMS API: ' + error.message });
+  }
+});
+
+// GET /api/employees
+app.get('/api/employees', authenticateToken, async (req: any, res) => {
+  try {
+    const employees = await prisma.employee.findMany({
+      orderBy: { name: 'asc' }
+    });
+    res.json(employees);
+  } catch (error) {
+    console.error('Fetch employees error:', error);
+    res.status(500).json({ error: 'Failed to retrieve employees' });
+  }
+});
+
+// ----------------------------------------------------
+// DYNAMIC STAKEHOLDER RESOLUTION HELPERS
+// Generates all identity aliases (domains, usernames, name parts) for ANY user
+// ----------------------------------------------------
+function getStakeholderTokens(userEmail: string, employeeName?: string, employeeId?: string): string[] {
+  const tokens = new Set<string>();
+  const rawEmail = (userEmail || '').trim().toLowerCase();
+  
+  if (rawEmail) {
+    const cleanEmail = rawEmail.endsWith('@nestdigital.com')
+      ? `${rawEmail.split('@')[0]}@nestgroup.net`
+      : rawEmail;
+    tokens.add(cleanEmail);
+    
+    // Extract username (part before @)
+    const username = rawEmail.split('@')[0];
+    if (username && username.length >= 2) {
+      tokens.add(username);
+      // Dotted username e.g. "harikrishnan.kr" or "roshine.andrews"
+      const parts = username.split('.');
+      if (parts.length > 1) {
+        tokens.add(parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' '));
+        parts.forEach(p => {
+          if (p.length >= 3) {
+            tokens.add(p);
+            tokens.add(p.charAt(0).toUpperCase() + p.slice(1));
+          }
+        });
+      }
+    }
+  }
+
+  if (employeeName && employeeName.trim()) {
+    const cleanName = employeeName.trim();
+    tokens.add(cleanName);
+    const nameWords = cleanName.split(/\s+/).filter(w => w.length >= 3);
+    nameWords.forEach(w => tokens.add(w));
+  }
+
+  if (employeeId && employeeId.trim()) {
+    tokens.add(employeeId.trim());
+  }
+
+  return Array.from(tokens).filter(Boolean);
+}
+
+function checkIsUserStakeholder(submission: any, userEmail: string, employeeName?: string, employeeId?: string): boolean {
+  const tokens = getStakeholderTokens(userEmail, employeeName, employeeId);
+  const fields = [
+    submission.reportingManager || '',
+    submission.projectManager || '',
+    submission.buHead || '',
+    submission.hrbp || '',
+    submission.salesPerson || ''
+  ].join(' ').toLowerCase();
+
+  return tokens.some(token => fields.includes(token.toLowerCase()));
+}
+
+// ----------------------------------------------------
+// SUBMISSIONS ENDPOINTS
+// ----------------------------------------------------
+
+// GET /api/submissions/review-count
+// Returns the count of submissions where the logged-in user is a named stakeholder or reviewer.
+app.get('/api/submissions/review-count', authenticateToken, async (req: any, res) => {
+  const userEmail = req.user.email || '';
+  const userRole = req.user.role || '';
+
+  try {
+    let whereClause: any = {};
+    const assignedBUs = getAssignedBUsForReviewer(userEmail);
+    const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('anoop') && !userEmail.includes('dummy') && !userEmail.includes('ajish')) || userRole === 'admin';
+
+    const notSelfCondition = req.user.employeeId ? { employeeId: { not: req.user.employeeId } } : {};
+
+    if (isGlobalReviewer) {
+      whereClause = notSelfCondition; // Global Reviewers/admins see all submissions to review (excluding own)
+    } else {
+      const tokens = getStakeholderTokens(userEmail, req.user.name, req.user.employeeId);
+      const orConditions: any[] = [];
+
+      tokens.forEach(tok => {
+        orConditions.push(
+          { reportingManager: { contains: tok } },
+          { projectManager: { contains: tok } },
+          { buHead: { contains: tok } },
+          { hrbp: { contains: tok } },
+          { salesPerson: { contains: tok } }
+        );
+      });
+
+      if (userEmail.includes('anoop.chandran') || userEmail.includes('anoop')) {
+        orConditions.push(
+          { employee: { businessUnit: { contains: 'bfs' } } },
+          { employee: { businessUnit: { contains: 'Banking' } } }
+        );
+      }
+      if (userEmail.includes('nishant.unnikrishnan') || userEmail.includes('nishant')) {
+        orConditions.push(
+          { employee: { businessUnit: { contains: 'mbu' } } },
+          { employee: { businessUnit: { contains: 'Mobility' } } }
+        );
+      }
+      if (userEmail.includes('ajish')) {
+        orConditions.push(
+          { employee: { businessUnit: { contains: 'Human Resources' } } },
+          { employee: { businessUnit: { contains: 'HR' } } }
+        );
+      }
+
+      if (assignedBUs.length > 0) {
+        assignedBUs.forEach(bu => {
+          orConditions.push({ employee: { businessUnit: { contains: bu } } });
+        });
+      }
+
+      whereClause = {
+        AND: [
+          notSelfCondition,
+          { OR: orConditions }
+        ]
+      };
+    }
+
+    const count = await prisma.submission.count({ where: whereClause });
+    res.json({ count });
+  } catch (error) {
+    console.error('Review count error:', error);
+    res.status(500).json({ error: 'Failed to get review count' });
+  }
+});
+
+// GET /api/submissions
+// Supports ?mode=review to fetch submissions assigned to the user as a stakeholder or reviewer.
+// Default behavior: returns the user's own submissions by employeeId.
+app.get('/api/submissions', authenticateToken, async (req: any, res) => {
+  const { employeeId, mode } = req.query;
+  const userEmail = req.user.email || '';
+  const userRole = req.user.role || '';
+
+  try {
+    let whereClause: any = {};
+
+    if (employeeId) {
+      // Explicit employeeId filter (used by employee portal to see own submissions)
+      whereClause = { employeeId: String(employeeId) };
+    } else if (mode === 'review') {
+      // Review mode: show all for reviewers/admins or submissions where user is stakeholder
+      const assignedBUs = getAssignedBUsForReviewer(userEmail);
+      const isGlobalReviewer = (userRole === 'reviewer' && assignedBUs.length === 0 && !userEmail.includes('anoop') && !userEmail.includes('dummy') && !userEmail.includes('ajish')) || userRole === 'admin';
+      const notSelfCondition = req.user.employeeId ? { employeeId: { not: req.user.employeeId } } : {};
+
+      if (isGlobalReviewer) {
+        whereClause = notSelfCondition;
+      } else {
+        const tokens = getStakeholderTokens(userEmail, req.user.name, req.user.employeeId);
+        const orConditions: any[] = [];
+
+        tokens.forEach(tok => {
+          orConditions.push(
+            { reportingManager: { contains: tok } },
+            { projectManager: { contains: tok } },
+            { buHead: { contains: tok } },
+            { hrbp: { contains: tok } },
+            { salesPerson: { contains: tok } }
+          );
+        });
+
+        if (userEmail.includes('anoop.chandran') || userEmail.includes('anoop')) {
+          orConditions.push(
+            { employee: { businessUnit: { contains: 'bfs' } } },
+            { employee: { businessUnit: { contains: 'Banking' } } }
+          );
+        }
+        if (userEmail.includes('nishant.unnikrishnan') || userEmail.includes('nishant')) {
+          orConditions.push(
+            { employee: { businessUnit: { contains: 'mbu' } } },
+            { employee: { businessUnit: { contains: 'Mobility' } } }
+          );
+        }
+        if (userEmail.includes('ajish')) {
+          orConditions.push(
+            { employee: { businessUnit: { contains: 'Human Resources' } } },
+            { employee: { businessUnit: { contains: 'HR' } } }
+          );
+        }
+
+        if (assignedBUs.length > 0) {
+          assignedBUs.forEach(bu => {
+            orConditions.push({ employee: { businessUnit: { contains: bu } } });
+          });
+        }
+
+        whereClause = {
+          AND: [
+            notSelfCondition,
+            { OR: orConditions }
+          ]
+        };
+      }
+    } else {
+      // Default: show the user's own submissions
+      whereClause = { employeeId: req.user.employeeId };
+    }
+
+    const submissions = await prisma.submission.findMany({
+      where: whereClause,
+      include: {
+        statusHistory: {
+          orderBy: { timestamp: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Formatting output to match original object formats (camelCase naming, and including employeeName)
+    const formatted = await Promise.all(submissions.map(async (sub: any) => {
+      const emp = await prisma.employee.findUnique({ where: { employeeId: sub.employeeId } });
+      return {
+        ...sub,
+        employeeName: emp ? emp.name : 'Unknown Employee',
+      };
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('Fetch submissions error:', error);
+    res.status(500).json({ error: 'Failed to retrieve submissions' });
+  }
+});
+
+// GET /api/submissions/:id — Fetch a single submission by intelligenceId (any authenticated user)
+app.get('/api/submissions/:id', authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const submission = await prisma.submission.findUnique({
+      where: { intelligenceId: id },
+      include: {
+        statusHistory: { orderBy: { timestamp: 'asc' } }
+      }
+    });
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+    const emp = await prisma.employee.findUnique({ where: { employeeId: submission.employeeId } });
+    res.json({ ...submission, employeeName: emp ? emp.name : 'Unknown Employee' });
+  } catch (error) {
+    console.error('Fetch submission by ID error:', error);
+    res.status(500).json({ error: 'Failed to retrieve submission' });
+  }
+});
+
+
+// PRODUCTION-HARDENED SMTP & NOTIFICATION AUTOMATION
+// Approved Corporate Relay: 10.45.0.12:25 (Unauthenticated internal corporate relay)
+// Approved Sender: peopleexperience@nestgroup.net / NeST People Experience Team
+// Target Production Base URL: https://hrapps.nestdigital.com:8085 (frontend); backend API on :7000
+// ----------------------------------------------------
+const SMTP_HOST = process.env.SMTP_HOST || '10.45.0.12';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '25', 10);
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
+const SENDER_EMAIL = process.env.SMTP_FROM || process.env.SMTP_SENDER_EMAIL || 'peopleexperience@nestgroup.net';
+const SENDER_NAME = process.env.SMTP_FROM_NAME || process.env.SMTP_SENDER_NAME || 'NeST People Experience Team';
+const DEFAULT_REVIEWER_EMAIL = process.env.DEFAULT_REVIEWER_EMAIL || 'peopleexperience@nestgroup.net';
+const EMAIL_SEND_ENABLED = process.env.EMAIL_SEND_ENABLED === 'true';
+const IMPACT_BASE_URL = (process.env.IMPACT_BASE_URL || 'https://hrapps.nestdigital.com:8085').replace(/\/+$/, '');
+
+console.log(`[SMTP Config] Relay: ${SMTP_HOST}:${SMTP_PORT}, From: "${SENDER_NAME}" <${SENDER_EMAIL}>, Live Send Enabled: ${EMAIL_SEND_ENABLED}, Base URL: ${IMPACT_BASE_URL}`);
+
+const smtpTransporter = nodemailer.createTransport({
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_SECURE,
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 100,
+  tls: {
+    // Allow internal corporate IP relay certificates without hostname mismatch errors
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000
+});
+
+// Non-blocking transporter connection verification on startup
+if (EMAIL_SEND_ENABLED) {
+  smtpTransporter.verify((error) => {
+    if (error) {
+      console.warn(`[SMTP Health Check] ⚠️ SMTP relay verification failed (${SMTP_HOST}:${SMTP_PORT}): ${error.message}`);
+    } else {
+      console.log(`[SMTP Health Check] ✅ SMTP relay is reachable and ready at ${SMTP_HOST}:${SMTP_PORT}`);
+    }
+  });
+} else {
+  console.log(`[SMTP Health Check] ℹ️ Live email dispatch is disabled (EMAIL_SEND_ENABLED=false). Notifications are recorded in Outbox as 'QUEUED (SIMULATED)'.`);
+}
+
+// Deep link base URL resolver: prioritizes IMPACT_BASE_URL, with request origin fallback
+function resolveBaseUrl(req?: any): string {
+  if (process.env.IMPACT_BASE_URL && process.env.IMPACT_BASE_URL.trim()) {
+    return process.env.IMPACT_BASE_URL.trim().replace(/\/+$/, '');
+  }
+  if (req) {
+    const origin = req.get('origin') || (req.get('referer') ? new URL(req.get('referer')).origin : null);
+    if (origin) return origin.replace(/\/+$/, '');
+    const host = req.get('host');
+    if (host) {
+      return `${req.protocol}://${host}`.replace('7000', '5174').replace(/\/+$/, '');
+    }
+  }
+  return IMPACT_BASE_URL;
+}
+
+// Calculate SLA review due date: exactly 7 working days (skipping Saturday and Sunday)
+function calculateReviewDueDate(startDate: Date = new Date(), workingDays: number = 7): string {
+  const current = new Date(startDate);
+  let added = 0;
+  while (added < workingDays) {
+    current.setDate(current.getDate() + 1);
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) { // 0 = Sunday, 6 = Saturday
+      added++;
+    }
+  }
+  return current.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// Resolve clean, deduplicated TO and CC recipient sets with zero overlap (supports multiple PMs & stakeholders)
+function resolveRecipients(
+  toCandidates: (string | null | undefined)[],
+  ccCandidates: (string | null | undefined)[],
+  defaultToEmail: string = DEFAULT_REVIEWER_EMAIL
+): { toList: string[]; ccList: string[] } {
+  const toList = extractEmails(toCandidates);
+  if (toList.length === 0 && defaultToEmail) {
+    const cleanedDefault = normalizeCorporateEmail(defaultToEmail);
+    if (cleanedDefault) toList.push(cleanedDefault);
+  }
+
+  const toSet = new Set<string>(toList);
+  const rawCc = extractEmails(ccCandidates);
+  const ccList = rawCc.filter(email => !toSet.has(email));
+
+  return { toList, ccList };
+}
+
+// Outlook / Microsoft 365 friendly Multi-Part HTML + Text builder for Reviewer Mailer
+function buildReviewerEmailContent(params: {
+  salutation: string;
+  submitterName: string;
+  empId: string;
+  bu: string;
+  impactId: string;
+  clientName: string;
+  leadTitle: string;
+  submissionDate: string;
+  reviewDueDate: string;
+  reviewLink: string;
+}): { html: string; text: string } {
+  const { salutation, submitterName, empId, bu, impactId, clientName, leadTitle, submissionDate, reviewDueDate, reviewLink } = params;
+
+  const text = `Dear ${salutation},
+
+A new lead has been submitted by ${submitterName}. Please use the link below to assess the lead, record your decision, and track its current status.
+
+Lead Details:
+• Impact ID: ${impactId}
+• Client: ${clientName}
+• Lead Title: ${leadTitle}
+• Submitted by: ${submitterName}, ${empId}, ${bu}
+• Submitted on: ${submissionDate}
+• Review due date: ${reviewDueDate}
+
+Review and update:
+${reviewLink}
+
+Regards,
+NeST People Experience Team`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Action Required: Review Lead</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px; border-bottom: 3px solid #008080;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <span style="display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #14b8a6; margin-bottom: 6px;">IMPACT Model Portal</span>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">Action Required: Review Lead</h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${salutation}</strong>,</p>
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                A new lead has been submitted by <strong>${submitterName}</strong>. Please use the link below to assess the lead, record your decision, and track its current status.
+              </p>
+
+              <!-- Lead Summary Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 28px;">
+                <tr>
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Lead Summary</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 16px 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="font-size: 13px; line-height: 1.5;">
+                      <tr>
+                        <td width="35%" style="color: #64748b; font-weight: 600; vertical-align: top;">Impact ID:</td>
+                        <td width="65%" style="color: #0f172a; font-weight: 700; font-family: monospace;">${impactId}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Client:</td>
+                        <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Lead Title:</td>
+                        <td style="color: #0f172a;">${leadTitle}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Submitted By:</td>
+                        <td style="color: #0f172a;">${submitterName} (${empId}, ${bu})</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Submitted On:</td>
+                        <td style="color: #0f172a;">${submissionDate}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Review Due Date:</td>
+                        <td style="color: #b91c1c; font-weight: 700;">${reviewDueDate} (7 Working Days)</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action CTA Button -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${reviewLink}" target="_blank" style="display: inline-block; background-color: #008080; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 128, 128, 0.2);">
+                      Assess &amp; Review Lead &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748b; text-align: center;">
+                If the button above does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 12px; color: #0284c7; text-align: center; word-break: break-all;">
+                <a href="${reviewLink}" style="color: #0284c7; text-decoration: underline;">${reviewLink}</a>
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+
+              <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #475569;">
+                Best regards,<br>
+                <strong style="color: #0f172a;">NeST People Experience Team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f1f5f9; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                This is an automated notification from the NeST IMPACT Portal. Please do not reply directly to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { html, text };
+}
+
+// Outlook / Microsoft 365 friendly Multi-Part HTML + Text builder for Submitter Mailer
+function buildSubmitterEmailContent(params: {
+  submitterName: string;
+  impactId: string;
+  clientName: string;
+  leadTitle: string;
+  newStatus: string;
+  reason: string | null;
+  statusLink: string;
+}): { html: string; text: string } {
+  const { submitterName, impactId, clientName, leadTitle, newStatus, reason, statusLink } = params;
+
+  const trimmedReason = reason && reason.trim() ? reason.trim() : null;
+
+  // Context-aware dynamic titles and button labels based on specific stage
+  const isDealStatus = newStatus === 'Deal Won' || newStatus === 'Deal Lost';
+
+  let bannerTitle = isDealStatus ? `Opportunity Update: ${newStatus}` : 'Lead Status Update';
+  let introMessage = isDealStatus
+    ? 'There is an important update on the opportunity you submitted through the IMPACT Model Portal.'
+    : 'There is an important update on the lead you submitted through the IMPACT Model Portal.';
+  let commentsLabel = 'Review Comments:';
+  let actionButtonText = isDealStatus ? 'View Opportunity Details &rarr;' : 'View Lead Details &rarr;';
+  let itemTitleLabel = isDealStatus ? 'Opportunity Title:' : 'Lead Title:';
+
+  if (newStatus === 'Clarification Requested') {
+    bannerTitle = 'Clarification Needed: Lead Details Required';
+    introMessage = 'Clarification has been requested on the lead you submitted through the IMPACT Model Portal. Please review the query below and provide your clarification.';
+    commentsLabel = 'Clarification Query / Comments:';
+    actionButtonText = 'Provide Clarification for Lead &rarr;';
+    itemTitleLabel = 'Lead Title:';
+  } else if (newStatus === 'Closed - Not Valid') {
+    bannerTitle = 'Lead Closed (Not Valid)';
+    introMessage = 'Your lead has been reviewed and closed with the remarks recorded below.';
+    commentsLabel = 'Rejection / Closure Reason:';
+    actionButtonText = 'View Lead Details &rarr;';
+    itemTitleLabel = 'Lead Title:';
+  } else if (newStatus === 'Validated') {
+    bannerTitle = 'Lead Validated &amp; Approved';
+    introMessage = 'Your lead has been successfully validated and approved by the reviewer.';
+    commentsLabel = 'Review Comments:';
+    actionButtonText = 'View Lead Details &rarr;';
+    itemTitleLabel = 'Lead Title:';
+  }
+
+  const commentsBlock = trimmedReason ? `\n\n${commentsLabel}\n"${trimmedReason}"\n` : '';
+
+  const text = `Dear ${submitterName},
+
+${introMessage}
+${commentsBlock}
+Current Status: ${newStatus}
+Impact ID: ${impactId}
+Client: ${clientName}
+${itemTitleLabel} ${leadTitle}
+
+Check ${isDealStatus ? 'opportunity' : 'lead'} status:
+${statusLink}
+
+Please use the link above to view the latest status and details of your submission.
+
+Regards,
+NeST People Experience Team`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${bannerTitle}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px; border-bottom: 3px solid #008080;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <span style="display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #14b8a6; margin-bottom: 6px;">IMPACT Model Portal</span>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">${bannerTitle}</h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${submitterName}</strong>,</p>
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                ${introMessage}
+              </p>
+
+              <!-- Status Badge Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Latest Stage Details</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 16px 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="font-size: 13px; line-height: 1.5;">
+                      <tr>
+                        <td width="35%" style="color: #64748b; font-weight: 600; vertical-align: top;">Impact ID:</td>
+                        <td width="65%" style="color: #0f172a; font-weight: 700; font-family: monospace;">${impactId}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Current Status:</td>
+                        <td style="color: #008080; font-weight: 800; font-size: 14px;">${newStatus}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Client:</td>
+                        <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">${itemTitleLabel}</td>
+                        <td style="color: #0f172a;">${leadTitle}</td>
+                      </tr>
+                      ${trimmedReason ? `
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">${commentsLabel}</td>
+                        <td style="color: #334155; background-color: #ffffff; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-style: italic;">
+                          &ldquo;${trimmedReason}&rdquo;
+                        </td>
+                      </tr>
+                      ` : ''}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action CTA Button -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${statusLink}" target="_blank" style="display: inline-block; background-color: #008080; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 128, 128, 0.2);">
+                      ${actionButtonText}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748b; text-align: center;">
+                If the button above does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 12px; color: #0284c7; text-align: center; word-break: break-all;">
+                <a href="${statusLink}" style="color: #0284c7; text-decoration: underline;">${statusLink}</a>
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+
+              <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #475569;">
+                Best regards,<br>
+                <strong style="color: #0f172a;">NeST People Experience Team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f1f5f9; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                This is an automated notification from the NeST IMPACT Portal. Please do not reply directly to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { html, text };
+}
+
+// Outlook / Microsoft 365 friendly Multi-Part HTML + Text builder for Submitter Confirmation Mailer
+function buildSubmitterConfirmationEmailContent(params: {
+  submitterName: string;
+  empId: string;
+  bu: string;
+  impactId: string;
+  clientName: string;
+  leadTitle: string;
+  submissionDate: string;
+  statusLink: string;
+}): { html: string; text: string } {
+  const { submitterName, empId, bu, impactId, clientName, leadTitle, submissionDate, statusLink } = params;
+
+  const text = `Dear ${submitterName},
+
+Your lead has been successfully registered in the IMPACT Model Portal and submitted for review. Please use the link below to track its current status and timeline.
+
+Lead Details:
+• Impact ID: ${impactId}
+• Client: ${clientName}
+• Lead Title: ${leadTitle}
+• Submitted by: ${submitterName}, ${empId}, ${bu}
+• Submitted on: ${submissionDate}
+• Current Status: Lead Registered (Under Review)
+
+Track Lead Status:
+${statusLink}
+
+Regards,
+NeST People Experience Team`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submission Confirmed: Lead Registered</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px; border-bottom: 3px solid #008080;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <span style="display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #14b8a6; margin-bottom: 6px;">IMPACT Model Portal</span>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.3;">Submission Confirmed: Lead Registered</h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">Dear <strong>${submitterName}</strong>,</p>
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                Your lead has been successfully registered in the IMPACT Model Portal and submitted for review. Please use the link below to track its current status and timeline.
+              </p>
+
+              <!-- Lead Summary Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 28px;">
+                <tr>
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Lead Summary</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 16px 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="font-size: 13px; line-height: 1.5;">
+                      <tr>
+                        <td width="35%" style="color: #64748b; font-weight: 600; vertical-align: top;">Impact ID:</td>
+                        <td width="65%" style="color: #0f172a; font-weight: 700; font-family: monospace;">${impactId}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Client:</td>
+                        <td style="color: #0f172a; font-weight: 600;">${clientName}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Lead Title:</td>
+                        <td style="color: #0f172a;">${leadTitle}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Submitted By:</td>
+                        <td style="color: #0f172a;">${submitterName} (${empId}, ${bu})</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Submitted On:</td>
+                        <td style="color: #0f172a;">${submissionDate}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; font-weight: 600; vertical-align: top;">Current Status:</td>
+                        <td style="color: #008080; font-weight: 800;">Lead Registered (Under Review)</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action CTA Button -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${statusLink}" target="_blank" style="display: inline-block; background-color: #008080; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 128, 128, 0.2);">
+                      Track Lead Status &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748b; text-align: center;">
+                If the button above does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 12px; color: #0284c7; text-align: center; word-break: break-all;">
+                <a href="${statusLink}" style="color: #0284c7; text-decoration: underline;">${statusLink}</a>
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+
+              <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #475569;">
+                Best regards,<br>
+                <strong style="color: #0f172a;">NeST People Experience Team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f1f5f9; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                This is an automated notification from the NeST IMPACT Portal. Please do not reply directly to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { html, text };
+}
+
+// Robust Email Dispatcher:
+// - If EMAIL_SEND_ENABLED=false: records as 'QUEUED (SIMULATED)' in Prisma without network send.
+// - If EMAIL_SEND_ENABLED=true: attempts delivery via 10.45.0.12:25 with a 1-step retry.
+// - Updates Prisma EmailLog status to 'SENT_TO_SMTP' or 'FAILED' with diagnostic errorMessage.
+// - NEVER throws: caller remains completely protected against exceptions.
+async function dispatchRealEmail(
+  emailLogId: string,
+  options: { to: string; cc?: string | null; subject: string; text: string; html?: string }
+): Promise<{ success: boolean; messageId?: string; error?: string; simulated?: boolean }> {
+  if (!EMAIL_SEND_ENABLED) {
+    try {
+      await (prisma.emailLog as any).update({
+        where: { id: emailLogId },
+        data: {
+          status: 'QUEUED (SIMULATED)',
+          errorMessage: null
+        }
+      });
+      console.log(`[SMTP Dispatcher] ℹ️ EMAIL_SEND_ENABLED=false. Email #${emailLogId} logged as 'QUEUED (SIMULATED)'.`);
+    } catch (dbErr: any) {
+      console.warn(`[SMTP Dispatcher] ⚠️ Error updating EmailLog #${emailLogId}: ${dbErr.message}`);
+    }
+    return { success: true, simulated: true };
+  }
+
+  const mailOptions: any = {
+    from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`,
+    to: options.to,
+    subject: options.subject,
+    text: options.text,
+    ...(options.html ? { html: options.html } : {})
+  };
+
+  if (options.cc) {
+    mailOptions.cc = options.cc;
+  }
+
+  // Attempt 1 with 1-step retry
+  let lastError: any = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const info = await smtpTransporter.sendMail(mailOptions);
+      console.log(`[SMTP Dispatcher] ✉️ Real email sent via ${SMTP_HOST}:${SMTP_PORT}. Message ID: ${info.messageId}`);
+
+      await (prisma.emailLog as any).update({
+        where: { id: emailLogId },
+        data: {
+          status: 'SENT_TO_SMTP',
+          errorMessage: null
+        }
+      });
+
+      return { success: true, messageId: info.messageId };
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[SMTP Dispatcher] ⚠️ Attempt ${attempt}/2 failed via ${SMTP_HOST}:${SMTP_PORT}: ${err.message}`);
+      if (attempt < 2) {
+        // Wait 1 second before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+  // Record failure in EmailLog
+  const cleanErrMsg = lastError ? (lastError.message || String(lastError)).slice(0, 500) : 'Unknown delivery failure';
+  try {
+    await (prisma.emailLog as any).update({
+      where: { id: emailLogId },
+      data: {
+        status: 'FAILED',
+        errorMessage: cleanErrMsg
+      }
+    });
+  } catch (updateErr: any) {
+    console.warn(`[SMTP Dispatcher] ⚠️ Failed updating EmailLog #${emailLogId} with error: ${updateErr.message}`);
+  }
+
+  return { success: false, error: cleanErrMsg };
+}
+
+// 1. REVIEWER MAILER
+// Trigger: When a new opportunity is successfully submitted and requires reviewer action.
+// TO: RM, PM, BU Head, Sales Person of BU (deduplicated)
+// CC: HRBP (strictly non-overlapping)
+async function sendReviewerMailer(submission: any, employee: any, baseUrl?: string) {
+  try {
+    const impactId = submission.intelligenceId;
+    const resolvedUrl = baseUrl ? baseUrl.replace(/\/+$/, '') : IMPACT_BASE_URL;
+
+    // Duplicate protection: check if Reviewer Mailer was already created for this opportunity
+    const existing = await prisma.emailLog.findFirst({
+      where: {
+        impactId,
+        type: 'Reviewer Mailer'
+      }
+    });
+
+    if (existing) {
+      console.log(`[Reviewer Mailer] ⚠️ Duplicate mailer prevented for ${impactId}`);
+      return;
+    }
+
+    const submitterName = employee.name || 'NeST Colleague';
+    const clientName = submission.clientName || 'Valued Client';
+    const leadTitle = submission.shortDesc || 'Client Lead';
+    const empId = employee.employeeId || 'N/A';
+    const bu = employee.businessUnit || 'NeST Digital';
+
+    const subDateObj = submission.createdAt ? new Date(submission.createdAt) : new Date();
+    const submissionDate = subDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const reviewDueDate = calculateReviewDueDate(subDateObj, 7);
+
+    // Deep link routes via root /?redirect= so IIS default document serves index.html without 404
+    const reviewLink = `${resolvedUrl}/?redirect=${encodeURIComponent(`/review/${impactId}`)}`;
+    const subject = `Action Required: Review Lead | ${submitterName} | ${impactId} | ${clientName}`;
+
+    // Map to keep track of unique emails to names
+    const reviewersMap = new Map<string, string>();
+
+    const addReviewer = (rawCandidate: string, fallbackName: string) => {
+      if (!rawCandidate) return;
+
+      // Handle comma-separated list of reviewers (e.g. multiple Project Managers from HRMS API)
+      if (rawCandidate.includes(',')) {
+        const parts = rawCandidate.split(',');
+        for (const part of parts) {
+          addReviewer(part.trim(), fallbackName);
+        }
+        return;
+      }
+
+      let email = normalizeCorporateEmail(rawCandidate);
+      if (!email) return;
+
+      // Segregation of Duties: Do not send Reviewer Mailer to the submitter themselves
+      let submitterEmail = normalizeCorporateEmail(employee.email || '');
+      if (submitterEmail && (email.toLowerCase() === submitterEmail.toLowerCase() || email.toLowerCase().split('@')[0] === submitterEmail.toLowerCase().split('@')[0])) {
+        console.log(`[Reviewer Mailer] ℹ️ Skipping submitter ${email} from reviewer notifications (Segregation of Duties).`);
+        return;
+      }
+
+      if (!reviewersMap.has(email)) {
+        let namePart = rawCandidate.includes('(') ? rawCandidate.split('(')[0].trim() : rawCandidate.split('<')[0].trim();
+        // Fallback to derive human-readable name if email or generic
+        if (namePart.includes('@') || namePart.toLowerCase() === 'not specified' || !namePart) {
+          namePart = formatEmployeeNameFromEmail(email) || fallbackName;
+        }
+        reviewersMap.set(email, namePart || fallbackName);
+      }
+    };
+
+    addReviewer(submission.reportingManager, 'Reporting Manager');
+    addReviewer(submission.projectManager, 'Project Manager');
+    addReviewer(submission.buHead, 'BU Head');
+    addReviewer(submission.salesPerson, 'Sales Person');
+    addReviewer(submission.hrbp, 'HRBP'); // HRBP as a regular reviewer with their own email
+
+    // Add BU specific reviewer if BU matches
+    const buLower = (employee.businessUnit || '').toLowerCase();
+    for (const [buKey, revEmail] of Object.entries(BU_REVIEWERS)) {
+      if (buLower.includes(buKey.toLowerCase())) {
+        addReviewer(revEmail as string, 'Review Team');
+      }
+    }
+
+    if (reviewersMap.size === 0 && DEFAULT_REVIEWER_EMAIL) {
+      const email = sanitizeEmail(DEFAULT_REVIEWER_EMAIL);
+      if (email) reviewersMap.set(email, 'Review Team');
+    }
+
+    // Send individual emails to each reviewer
+    for (const [email, name] of reviewersMap.entries()) {
+      const { html, text } = buildReviewerEmailContent({
+        salutation: name,
+        submitterName,
+        empId,
+        bu,
+        impactId,
+        clientName,
+        leadTitle,
+        submissionDate,
+        reviewDueDate,
+        reviewLink
+      });
+
+      // Create log with initial QUEUED status
+      const createdLog = await prisma.emailLog.create({
+        data: {
+          recipient: email,
+          cc: null,
+          subject,
+          body: text,
+          type: 'Reviewer Mailer',
+          impactId,
+          status: 'QUEUED'
+        }
+      });
+
+      console.log(`[Reviewer Mailer] 📝 Queued for ${impactId} to: ${email}`);
+
+      // Dispatch via SMTP relay
+      await dispatchRealEmail(createdLog.id, {
+        to: email,
+        cc: null,
+        subject,
+        text,
+        html
+      });
+    }
+  } catch (err: any) {
+    console.error(`[Reviewer Mailer] ⚠️ Non-blocking error: ${err.message}`);
+  }
+}
+
+// 2. SUBMITTER MAILER
+// Trigger: Notify the employee who submitted an opportunity when there is a material status change.
+// Material changes: 'Validated', 'Closed - Not Valid', 'Clarification Requested'
+// Note: Per user requirement, 'Deal Won', 'Deal Lost', and CRM status changes do NOT trigger emails.
+// TO: Submitter employee email
+// CC: RM, PM, BU Head, HRBP, Sales Person (strictly non-overlapping with TO)
+async function sendSubmitterMailer(submission: any, newStatus: string, reason: string | null = null, employee: any, baseUrl?: string) {
+  try {
+    const impactId = submission.intelligenceId;
+    const resolvedUrl = baseUrl ? baseUrl.replace(/\/+$/, '') : IMPACT_BASE_URL;
+
+    // Material status filter: Only Validated, Closed - Not Valid, Clarification Requested
+    // 'Deal Won', 'Deal Lost', and CRM status changes do NOT trigger emails per user requirement
+    const materialStatuses = [
+      'Validated',
+      'Closed - Not Valid',
+      'Clarification Requested'
+    ];
+
+    if (!materialStatuses.includes(newStatus)) {
+      console.log(`[Submitter Mailer] ℹ️ Skipping mailer for status: ${newStatus} (${impactId}) - email triggers disabled for this status.`);
+      return;
+    }
+
+    // Duplicate protection: Check if Submitter Mailer was already created for this exact status transition
+    const existing = await prisma.emailLog.findFirst({
+      where: {
+        impactId,
+        type: 'Submitter Mailer',
+        subject: { contains: `| ${newStatus}` }
+      }
+    });
+
+    if (existing) {
+      console.log(`[Submitter Mailer] ⚠️ Duplicate mailer prevented for ${impactId} with status ${newStatus}`);
+      return;
+    }
+
+    let submitterEmail = sanitizeEmail(employee.email);
+    if (submitterEmail && submitterEmail.endsWith('@nestdigital.com')) {
+      submitterEmail = `${submitterEmail.split('@')[0]}@nestgroup.net`;
+    }
+    const submitterName = employee.name || 'Colleague';
+    const clientName = submission.clientName || 'Valued Client';
+    const leadTitle = submission.shortDesc || 'Client Lead';
+
+    // CC candidates: RM, PM, BU Head, HRBP, Sales Person
+    const ccCandidates = [
+      submission.reportingManager,
+      submission.projectManager,
+      submission.buHead,
+      submission.hrbp,
+      submission.salesPerson
+    ];
+
+    const { toList, ccList } = resolveRecipients([submitterEmail], ccCandidates, submitterEmail || DEFAULT_REVIEWER_EMAIL);
+
+    let subject = `[IMPACT] Lead Update | ${impactId} | ${newStatus}`;
+    if (newStatus === 'Clarification Requested') {
+      subject = `[IMPACT] Lead Clarification Needed | ${impactId} | ${newStatus}`;
+    } else if (newStatus === 'Closed - Not Valid') {
+      subject = `[IMPACT] Lead Closed (Not Valid) | ${impactId} | ${newStatus}`;
+    } else if (newStatus === 'Validated') {
+      subject = `[IMPACT] Lead Validated | ${impactId} | ${newStatus}`;
+    } else if (newStatus === 'Deal Won' || newStatus === 'Deal Lost') {
+      subject = `[IMPACT] Opportunity Update | ${impactId} | ${newStatus}`;
+    }
+    // Deep link routes via root /?redirect= so IIS default document serves index.html without 404
+    const statusLink = `${resolvedUrl}/?redirect=${encodeURIComponent(`/status/${impactId}`)}`;
+
+    const { html, text } = buildSubmitterEmailContent({
+      submitterName,
+      impactId,
+      clientName,
+      leadTitle,
+      newStatus,
+      reason,
+      statusLink
+    });
+
+    // Create log with initial QUEUED status
+    const createdLog = await prisma.emailLog.create({
+      data: {
+        recipient: toList.join(', '),
+        cc: ccList.length > 0 ? ccList.join(', ') : null,
+        subject,
+        body: text,
+        type: 'Submitter Mailer',
+        impactId,
+        status: 'QUEUED'
+      }
+    });
+
+    console.log(`[Submitter Mailer] 📝 Queued for ${impactId} (${newStatus}) to: ${toList.join(', ')}`);
+
+    // Dispatch via SMTP relay
+    await dispatchRealEmail(createdLog.id, {
+      to: toList.join(', '),
+      cc: ccList.length > 0 ? ccList.join(', ') : null,
+      subject,
+      text,
+      html
+    });
+  } catch (err: any) {
+    console.error(`[Submitter Mailer] ⚠️ Non-blocking error: ${err.message}`);
+  }
+}
+
+// 3. SUBMITTER CONFIRMATION MAILER
+// Trigger: Immediately when an opportunity is submitted by an employee.
+// TO: Submitter employee email
+// CC: null
+async function sendSubmitterConfirmationMailer(submission: any, employee: any, baseUrl?: string, fallbackEmail?: string) {
+  try {
+    const impactId = submission.intelligenceId;
+    const resolvedUrl = baseUrl ? baseUrl.replace(/\/+$/, '') : IMPACT_BASE_URL;
+
+    // Duplicate protection
+    const existing = await prisma.emailLog.findFirst({
+      where: {
+        impactId,
+        type: 'Submitter Mailer',
+        subject: { contains: 'Submission Confirmed' }
+      }
+    });
+
+    if (existing) {
+      console.log(`[Submitter Confirmation Mailer] ⚠️ Duplicate confirmation mailer prevented for ${impactId}`);
+      return;
+    }
+
+    let submitterEmail = sanitizeEmail(employee?.email) || sanitizeEmail(fallbackEmail);
+    if (submitterEmail && submitterEmail.endsWith('@nestdigital.com')) {
+      submitterEmail = `${submitterEmail.split('@')[0]}@nestgroup.net`;
+    }
+    if (!submitterEmail) {
+      console.warn(`[Submitter Confirmation Mailer] ⚠️ Invalid submitter email for employee ${employee?.employeeId || 'unknown'}`);
+      return;
+    }
+
+    const submitterName = employee?.name || 'NeST Colleague';
+    const clientName = submission.clientName || 'Valued Client';
+    const leadTitle = submission.shortDesc || 'Client Lead';
+    const empId = employee?.employeeId || 'N/A';
+    const bu = employee?.businessUnit || 'NeST Digital';
+
+    const subDateObj = submission.createdAt ? new Date(submission.createdAt) : new Date();
+    const submissionDate = subDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    // Deep link to submitter status page
+    const statusLink = `${resolvedUrl}/?redirect=${encodeURIComponent(`/status/${impactId}`)}`;
+    const subject = `Submission Confirmed: Lead Registered | ${impactId}`;
+
+    const { html, text } = buildSubmitterConfirmationEmailContent({
+      submitterName,
+      empId,
+      bu,
+      impactId,
+      clientName,
+      leadTitle,
+      submissionDate,
+      statusLink
+    });
+
+    // Create log with initial QUEUED status
+    const createdLog = await prisma.emailLog.create({
+      data: {
+        recipient: submitterEmail,
+        cc: null,
+        subject,
+        body: text,
+        type: 'Submitter Mailer',
+        impactId,
+        status: 'QUEUED'
+      }
+    });
+
+    console.log(`[Submitter Confirmation Mailer] 📝 Queued for ${impactId} to submitter: ${submitterEmail}`);
+
+    // Dispatch via SMTP relay
+    await dispatchRealEmail(createdLog.id, {
+      to: submitterEmail,
+      cc: null,
+      subject,
+      text,
+      html
+    });
+  } catch (err: any) {
+    console.error(`[Submitter Confirmation Mailer] ⚠️ Non-blocking error: ${err.message}`);
+  }
+}
+
+// ----------------------------------------------------
+// REAL-TIME CRM API INTEGRATION (PORT 8089)
+// Endpoint: POST https://hrapps.nestdigital.com:8089/api/leads/opportunities
+// Automatically creates a live CRM lead when a submission is validated.
+// Returns crmOpportunityId upon HTTP 201 Created.
+// ----------------------------------------------------
+async function pushLeadToCrm(submission: any, employee: any): Promise<string | null> {
+  const crmUrl = process.env.CRM_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities';
+
+  const crmPayload = {
+    impactIntelligenceId: submission.intelligenceId,
+    clientName: submission.clientName,
+    opportunityTitle: submission.shortDesc,
+    opportunityDescription: submission.detailedDesc,
+    clientContact: {
+      provided: !!submission.hasContact,
+      contactPerson: submission.contactPerson || null,
+      companyWebsite: submission.companyWebsite || null,
+      email: submission.contactEmail || null,
+      phone: submission.contactPhone || null
+    },
+    sourceDetails: {
+      submittedByEmployeeId: submission.employeeId,
+      submittedByEmployeeName: employee?.name || 'Unknown Submitter',
+      employeeBusinessUnit: employee?.businessUnit || 'Not Specified'
+    },
+    stakeholderMapping: {
+      assignedSalesPerson: submission.salesPerson || 'Not Specified',
+      businessUnitHead: submission.buHead || 'Not Specified',
+      projectManager: submission.projectManager || 'Not Specified'
+    },
+    submittedAt: submission.createdAt ? new Date(submission.createdAt).toISOString() : new Date().toISOString(),
+    approvedAt: new Date().toISOString()
+  };
+
+  try {
+    console.log(`\n======================================================`);
+    console.log(`[CRM Integration API Call] 🚀 Pushing Lead ${submission.intelligenceId}`);
+    console.log(`CRM Endpoint URL: ${crmUrl}`);
+    console.log(`Payload Sent:\n`, JSON.stringify(crmPayload, null, 2));
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+    const response = await fetch(crmUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(crmPayload),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    console.log(`CRM Response Status: ${response.status} ${response.statusText}`);
+
+    if (response.ok || response.status === 201) {
+      const data: any = await response.json();
+      console.log(`CRM Response Body:\n`, JSON.stringify(data, null, 2));
+      const returnedId = data.crmOpportunityId || data.crmLeadId || null;
+      console.log(`🎉 SUCCESS! CRM Lead Created for ${submission.intelligenceId} — crmOpportunityId: "${returnedId}"`);
+      console.log(`======================================================\n`);
+      return returnedId;
+    } else {
+      const errText = await response.text();
+      console.warn(`⚠️ HTTP ${response.status} Error from CRM API: ${errText.substring(0, 300)}`);
+      console.log(`======================================================\n`);
+      return null;
+    }
+  } catch (err: any) {
+    console.warn(`[CRM Integration] ⚠️ Could not reach CRM API: ${err.message}`);
+    return null;
+  }
+}
+
+// ----------------------------------------------------
+// CRM STATUS MAPPER
+// Maps CRM Opportunity Status strings to IMPACT Model statuses
+// ----------------------------------------------------
+function mapCrmStatusToImpactStatus(crmStatus: string): string | null {
+  if (!crmStatus) return null;
+  const status = crmStatus.trim();
+
+  // Stage 4: Lead Accepted
+  if (['ValueProposition', 'RFPReceived', 'InProgress', 'Value Proposition', 'RFP Received', 'In Progress', 'Accepted'].includes(status)) {
+    return 'Lead Accepted';
+  }
+
+  // Stage 5: Proposal
+  if (['ProposalPreparation', 'ProposalPriceQuote', 'Proposal Preparation', 'Proposal Submitted'].includes(status)) {
+    return 'Proposal';
+  }
+
+  // Stage 5.5: Firm Awaiting PO
+  if (['FirmawaitingPO', 'Firm Awaiting PO'].includes(status)) {
+    return 'Firm Awaiting PO';
+  }
+
+  // Stage 6: Negotiation
+  if (['Negotiation', 'NegotiationReview', 'Commercial Proposal Phase', 'Queries'].includes(status)) {
+    return 'Negotiation';
+  }
+
+  // Stage 7: Deal Won
+  if (['ClosedWon', 'Closed Won'].includes(status)) {
+    return 'Deal Won';
+  }
+
+  // Closed / Dropped / Lost
+  if (['ClosedLost', 'Closed Lost'].includes(status)) {
+    return 'Deal Lost';
+  }
+  if (['Dropped'].includes(status)) {
+    return 'Lead Dropped';
+  }
+
+  // On Hold
+  if (['OnHold', 'On Hold'].includes(status)) {
+    return 'On Hold';
+  }
+
+  return null;
+}
+
+// Global variable tracking last successful status poll timestamp
+let lastCrmPollTimestamp: string = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+// ----------------------------------------------------
+// AUTOMATED BACKGROUND CRM STATUS POLLING SERVICE
+// Periodically calls GET /api/leads/opportunities/status-changes?since=TIMESTAMP
+// ----------------------------------------------------
+async function pollCrmStatusUpdates() {
+  const statusApiUrl = process.env.CRM_STATUS_API_URL || 'https://hrapps.nestdigital.com:8089/api/leads/opportunities/status-changes';
+
+  try {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    // Always use a 30-day lookback window so no CRM updates are ever missed
+    const lookbackTimestamp = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const queryUrl = `${statusApiUrl}?since=${encodeURIComponent(lookbackTimestamp)}`;
+    console.log(`\n[CRM Background Poller] 🔄 Polling status updates since 30 days ago (${lookbackTimestamp})...`);
+
+    const response = await fetch(queryUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      console.warn(`[CRM Background Poller] ⚠️ HTTP ${response.status} from status API`);
+      return;
+    }
+
+    const data: any = await response.json();
+    if (data && data.success && Array.isArray(data.data)) {
+      const records = data.data;
+      console.log(`[CRM Background Poller] 📊 Received ${records.length} updated opportunity records from CRM`);
+
+      for (const record of records) {
+        const crmOppId = record.crmOpportunityId || record.crmLeadId;
+        const crmStatus = record.currentStatus;
+        if (!crmOppId || !crmStatus) continue;
+
+        const impactStatus = mapCrmStatusToImpactStatus(crmStatus);
+        if (!impactStatus) continue;
+
+        // Find matching submission in database by crmLeadId
+        const existingSub = await prisma.submission.findFirst({
+          where: {
+            OR: [
+              { crmLeadId: crmOppId },
+              { intelligenceId: crmOppId }
+            ]
+          }
+        });
+
+        if (existingSub && existingSub.status !== impactStatus) {
+          console.log(`[CRM Background Poller] ✨ Updating ${existingSub.intelligenceId}: "${existingSub.status}" -> "${impactStatus}" (CRM ID: ${crmOppId})`);
+
+          // Update status in SQLite database
+          const updatedSub = await prisma.submission.update({
+            where: { id: existingSub.id },
+            data: {
+              status: impactStatus,
+              reason: record.remarks || undefined,
+              statusHistory: {
+                create: {
+                  status: impactStatus,
+                  changedBy: 'CRM Automated Sync Service',
+                  comment: record.remarks || `Synced from CRM (${crmStatus})`
+                }
+              }
+            }
+          });
+
+          // Fetch submitter employee (or fallback if employee record not found)
+          let emp = await prisma.employee.findUnique({ where: { employeeId: updatedSub.employeeId } });
+          if (!emp) {
+            emp = {
+              id: 'fallback-emp',
+              employeeId: updatedSub.employeeId,
+              name: 'Submitter',
+              email: 'peopleexperience@nestgroup.net',
+              businessUnit: 'Digital Transformation Unit',
+              reportingManager: updatedSub.reportingManager,
+              projectManager: updatedSub.projectManager,
+              buHead: updatedSub.buHead,
+              hrbp: updatedSub.hrbp,
+              salesPerson: updatedSub.salesPerson,
+              role: 'employee',
+              designation: 'Senior Consultant',
+              jobRole: 'Consultant',
+              phoneNumber: '+91 9998887776',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+          }
+
+          // No email triggers for CRM status changes (including Deal Won and Deal Lost) per user requirement
+          // Submissions progress through CRM stages purely with in-app tracking and status updates.
+
+          const stakeholderFields = [
+            updatedSub.reportingManager,
+            updatedSub.projectManager,
+            updatedSub.buHead,
+            updatedSub.hrbp,
+            updatedSub.salesPerson
+          ];
+          const recipientEmails = extractEmails(stakeholderFields);
+          const subEmpEmail = normalizeCorporateEmail(emp.email);
+          const allRecipients = Array.from(new Set([subEmpEmail, ...recipientEmails].filter(Boolean))) as string[];
+          const msg = `${updatedSub.intelligenceId} moved to ${impactStatus} stage via CRM Sync`;
+
+          await Promise.all(allRecipients.map(email =>
+            prisma.notification.create({
+              data: { message: msg, recipientEmail: email }
+            })
+          ));
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[CRM Background Poller] ⚠️ Error during polling: ${err.message}`);
+  }
+}
+// POST /api/submissions
+app.post('/api/submissions', authenticateToken, async (req: any, res) => {
+  const {
+    shortDesc,
+    detailedDesc,
+    hasContact,
+    contactPerson,
+    companyWebsite,
+    contactPhone,
+    contactEmail,
+    clientName,
+    reportingManager,
+    projectManager,
+    buHead,
+    hrbp,
+    salesPerson
+  } = req.body;
+
+  const employeeId = req.user.employeeId;
+
+  try {
+    const employee = await prisma.employee.findUnique({ where: { employeeId } });
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee profile not found' });
+    }
+
+    // Always fetch fresh submitter & reviewer hierarchy from Corporate HRMS API at submission time
+    let effectiveEmployee = employee;
+    try {
+      const freshCorpData = await fetchCorporateEmployee(employee.email || req.user.email);
+      if (freshCorpData) {
+        const freshMapped = mapCorporateEmployeeData(freshCorpData, (employee.email || req.user.email).toLowerCase().trim());
+        effectiveEmployee = await prisma.employee.update({
+          where: { id: employee.id },
+          data: { ...freshMapped, updatedAt: new Date() }
+        });
+        console.log(`[POST /api/submissions] ✅ Fresh HRMS synced: Submitter="${effectiveEmployee.email}", RM="${effectiveEmployee.reportingManager}", PM="${effectiveEmployee.projectManager}", BUHead="${effectiveEmployee.buHead}"`);
+      }
+    } catch (syncErr: any) {
+      console.warn(`[POST /api/submissions] ⚠️ HRMS refresh warning: ${syncErr.message}, using cached profile.`);
+    }
+
+    // Prioritize fresh HRMS reviewer hierarchy with valid corporate emails
+    const finalRM = effectiveEmployee.reportingManager && effectiveEmployee.reportingManager !== 'Not Specified'
+      ? effectiveEmployee.reportingManager
+      : (reportingManager || employee.reportingManager);
+
+    const finalPM = effectiveEmployee.projectManager && effectiveEmployee.projectManager !== 'Not Specified'
+      ? effectiveEmployee.projectManager
+      : (projectManager || employee.projectManager);
+
+    const finalBUHead = effectiveEmployee.buHead && effectiveEmployee.buHead !== 'Not Specified'
+      ? effectiveEmployee.buHead
+      : (buHead || employee.buHead);
+
+    const finalHRBP = effectiveEmployee.hrbp && effectiveEmployee.hrbp !== 'Not Specified'
+      ? effectiveEmployee.hrbp
+      : (hrbp || employee.hrbp);
+
+    const finalSales = effectiveEmployee.salesPerson && effectiveEmployee.salesPerson !== 'Not Specified'
+      ? effectiveEmployee.salesPerson
+      : (salesPerson || employee.salesPerson);
+
+    const intelligenceId = await generateIntelligenceId();
+
+    const submission = await (prisma.submission as any).create({
+      data: {
+        intelligenceId,
+        employeeId: effectiveEmployee.employeeId,
+        shortDesc,
+        detailedDesc,
+        hasContact: !!hasContact,
+        contactPerson: hasContact ? (contactPerson || null) : null,
+        companyWebsite: hasContact ? (companyWebsite || null) : null,
+        contactPhone: hasContact ? (contactPhone || null) : null,
+        contactEmail: hasContact ? (contactEmail || null) : null,
+        clientName,
+        status: 'Opportunity Accepted',
+        reportingManager: finalRM,
+        projectManager: finalPM,
+        buHead: finalBUHead,
+        hrbp: finalHRBP,
+        salesPerson: finalSales,
+        statusHistory: {
+          create: {
+            status: 'Opportunity Accepted',
+            changedBy: 'System',
+            comment: 'Submission recorded'
+          }
+        }
+      },
+      include: {
+        statusHistory: true
+      }
+    });
+
+    // Create Notifications for all stakeholders and submitter
+    const stakeholderFields = [
+      finalRM,
+      finalPM,
+      finalBUHead,
+      finalHRBP,
+      finalSales
+    ];
+    const recipientEmails = extractEmails(stakeholderFields);
+    const subEmpEmail = normalizeCorporateEmail(effectiveEmployee.email);
+    const allRecipients = Array.from(new Set([subEmpEmail, ...recipientEmails].filter(Boolean))) as string[];
+
+    await Promise.all(allRecipients.map(email =>
+      prisma.notification.create({
+        data: {
+          message: `New submission ${intelligenceId} registered`,
+          recipientEmail: email
+        }
+      })
+    ));
+
+    // Auto-trigger Reviewer and Submitter Mailers sequentially to prevent SMTP relay socket concurrency collisions
+    const baseUrl = resolveBaseUrl(req);
+    (async () => {
+      try {
+        await sendReviewerMailer(submission, effectiveEmployee, baseUrl);
+      } catch (mailerErr: any) {
+        console.error(`[POST /api/submissions] Reviewer mailer failure: ${mailerErr.message}`);
+      }
+      // Brief pause to allow the SMTP connection to cleanly release on the relay before next dispatch
+      await new Promise(r => setTimeout(r, 1000));
+      try {
+        await sendSubmitterConfirmationMailer(submission, effectiveEmployee, baseUrl, req.user?.email);
+      } catch (submitterErr: any) {
+        console.error(`[POST /api/submissions] Submitter confirmation failure: ${submitterErr.message}`);
+      }
+    })().catch((err: any) => console.error(`[POST /api/submissions] Mail dispatch error: ${err.message}`));
+
+    res.status(201).json({
+      ...submission,
+      employeeName: employee.name
+    });
+  } catch (error) {
+    console.error('Create submission error:', error);
+    res.status(500).json({ error: 'Failed to create submission' });
+  }
+});
+
+// PATCH /api/submissions/:id
+app.patch('/api/submissions/:id', authenticateToken, async (req: any, res) => {
+  const { id } = req.params; // intelligenceId
+  const { status, reason, clarificationResponse, crmLeadId, salesPerson, timestamp } = req.body;
+  const changedBy = req.user.name || req.user.email;
+
+  try {
+    const existing = await prisma.submission.findUnique({
+      where: { intelligenceId: id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    const userEmail = req.user.email || '';
+    const userRole = req.user.role || '';
+    const isGlobalReviewer = userRole === 'admin';
+    const isStakeholder = checkIsUserStakeholder(existing, userEmail, req.user.name, req.user.employeeId);
+    const assignedBUs = getAssignedBUsForReviewer(userEmail);
+    const submitterEmp = await prisma.employee.findUnique({ where: { employeeId: existing.employeeId } });
+    const submitterBU = (submitterEmp?.businessUnit || '').toLowerCase();
+    const isBUReviewer = assignedBUs.some(bu => submitterBU.includes(bu.toLowerCase()));
+    const isReviewer = userRole === 'reviewer' || isBUReviewer;
+
+    const isSubmitter = existing.employeeId === req.user.employeeId;
+
+    if (!isGlobalReviewer && !isReviewer && !isStakeholder && !isSubmitter) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify this submission.' });
+    }
+
+    // Strict Segregation of Duties Policy:
+    // A submitter is strictly prohibited from reviewing, approving, validating, requesting clarification, or rejecting their own submission.
+    const isReviewAction = status && ['Validated', 'Closed - Not Valid', 'Clarification Requested'].includes(status);
+    if (isSubmitter && isReviewAction) {
+      return res.status(403).json({
+        error: 'Segregation of Duties Policy: You cannot review, validate, or reject your own submission. Your reporting manager or an independent reviewer must perform the review.'
+      });
+    }
+
+    // Capture Reason validation (mandatory on rejection/closure)
+    const isClosure = status && (status === 'Closed - Not Valid' || status === 'Deal Lost' || status === 'Lead Dropped');
+    if (isClosure && (!reason || !reason.trim())) {
+      return res.status(400).json({ error: 'A rejection or closure reason is mandatory.' });
+    }
+
+    const statusChanged = status && status !== existing.status;
+    const providedDate = timestamp ? new Date(timestamp) : undefined;
+
+    const updated = await prisma.submission.update({
+      where: { intelligenceId: id },
+      data: {
+        status: status !== undefined ? status : existing.status,
+        reason: reason !== undefined ? reason : existing.reason,
+        clarificationResponse: clarificationResponse !== undefined ? clarificationResponse : existing.clarificationResponse,
+        crmLeadId: crmLeadId !== undefined ? crmLeadId : existing.crmLeadId,
+        salesPerson: salesPerson !== undefined ? salesPerson : existing.salesPerson,
+        ...(providedDate && { updatedAt: providedDate }),
+        statusHistory: statusChanged ? {
+          create: {
+            status,
+            changedBy,
+            comment: reason || clarificationResponse || undefined,
+            ...(providedDate && { timestamp: providedDate })
+          }
+        } : undefined
+      },
+      include: {
+        statusHistory: {
+          orderBy: { timestamp: 'asc' }
+        }
+      }
+    });
+
+    const emp = await prisma.employee.findUnique({ where: { employeeId: updated.employeeId } });
+    if (!emp) {
+      return res.status(404).json({ error: 'Submitter employee profile not found.' });
+    }
+
+    // Notification trigger on status change
+    if (statusChanged) {
+      let msg = `${id} status changed to ${status}`;
+      if (status === 'Validated') {
+        msg = `${id} has been Validated`;
+      } else if (['Opportunity Accepted', 'Proposal', 'Negotiation', 'Deal Won'].includes(status)) {
+        const stepName = status === 'Deal Won' ? 'Converted Won' : status;
+        msg = `${id} moved to ${stepName} stage`;
+      }
+
+      // Save notification log for all stakeholders and submitter
+      const stakeholderFields = [
+        updated.reportingManager,
+        updated.projectManager,
+        updated.buHead,
+        updated.hrbp,
+        updated.salesPerson
+      ];
+      const recipientEmails = extractEmails(stakeholderFields);
+      const subEmpEmail = normalizeCorporateEmail(emp.email);
+      const allRecipients = Array.from(new Set([subEmpEmail, ...recipientEmails].filter(Boolean))) as string[];
+
+      await Promise.all(allRecipients.map(email =>
+        prisma.notification.create({
+          data: { message: msg, recipientEmail: email }
+        })
+      ));
+
+      // Auto-trigger Submitter Mailer for material status change (isolated non-blocking boundary)
+      try {
+        const baseUrl = resolveBaseUrl(req);
+        await sendSubmitterMailer(updated, status, reason || null, emp, baseUrl);
+      } catch (mailerErr: any) {
+        console.error(`[PATCH /api/submissions/:id] Non-blocking mailer failure: ${mailerErr.message}`);
+      }
+
+      // Auto-push lead to live CRM API (port 8089) when validated
+      if (status === 'Validated' && (!updated.crmLeadId || updated.crmLeadId.startsWith('CRM-LEAD-'))) {
+        const generatedCrmId = await pushLeadToCrm(updated, emp);
+        if (generatedCrmId) {
+          const finalSub = await prisma.submission.update({
+            where: { intelligenceId: id },
+            data: { crmLeadId: generatedCrmId },
+            include: { statusHistory: { orderBy: { timestamp: 'asc' } } }
+          });
+          return res.json({ ...finalSub, employeeName: emp.name });
+        }
+      }
+    }
+
+    res.json({
+      ...updated,
+      employeeName: emp.name
+    });
+  } catch (error) {
+    console.error('Update submission error:', error);
+    res.status(500).json({ error: 'Failed to update submission' });
+  }
+});
+
+// POST /api/submissions/:id/reward
+app.post('/api/submissions/:id/reward', authenticateToken, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { rewardTier, rewardNotes } = req.body;
+
+    if (!['Reward 1', 'Reward 2', 'Reward 3'].includes(rewardTier)) {
+      return res.status(400).json({ error: 'Invalid reward tier specified.' });
+    }
+
+    const existing = await prisma.submission.findUnique({
+      where: { intelligenceId: id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    if (existing.status !== 'Deal Won') {
+      return res.status(400).json({ error: 'Rewards can only be initiated after a deal is won.' });
+    }
+
+    const rewardTitleMap: Record<string, string> = {
+      'Reward 1': 'Bronze Impact Award (Spot Recognition)',
+      'Reward 2': 'Silver Excellence Award (Performance Bonus)',
+      'Reward 3': 'Gold Leadership Award (Executive Excellence)'
+    };
+
+    const rewardTitle = rewardTitleMap[rewardTier] || rewardTier;
+    const reviewerName = req.user.name || req.user.email;
+
+    const updated = await prisma.submission.update({
+      where: { intelligenceId: id },
+      data: {
+        rewardTier,
+        rewardTitle,
+        rewardGrantedBy: reviewerName,
+        rewardGrantedAt: new Date(),
+        rewardNotes: rewardNotes || null
+      },
+      include: {
+        statusHistory: {
+          orderBy: { timestamp: 'asc' }
+        }
+      }
+    });
+
+    const emp = await prisma.employee.findUnique({ where: { employeeId: updated.employeeId } });
+
+    if (emp) {
+      // Create notification for employee
+      await prisma.notification.create({
+        data: {
+          message: `🏆 Congratulations! You have been awarded ${rewardTitle} by ${reviewerName} for winning deal ${id}!`,
+          recipientEmail: emp.email
+        }
+      });
+    }
+
+    res.json({
+      ...updated,
+      employeeName: emp ? emp.name : 'Employee'
+    });
+  } catch (error) {
+    console.error('Reward initiation error:', error);
+    res.status(500).json({ error: 'Failed to initiate reward' });
+  }
+});
+
+// ----------------------------------------------------
+// NOTIFICATIONS ENDPOINTS
+// ----------------------------------------------------
+
+// GET /api/notifications
+app.get('/api/notifications', authenticateToken, async (req: any, res) => {
+  try {
+    const rawEmail = (req.user?.email || '').trim();
+    const userEmail = rawEmail.toLowerCase();
+    const cleanUserEmail = userEmail.endsWith('@nestdigital.com')
+      ? `${userEmail.split('@')[0]}@nestgroup.net`
+      : userEmail;
+    const possibleEmails = Array.from(new Set([
+      cleanUserEmail,
+      rawEmail,
+      userEmail
+    ])).filter(Boolean);
+
+    if (cleanUserEmail === 'dummy2.employee@nestgroup.net' || cleanUserEmail === 'dummy2.eployee@nestgroup.net') {
+      possibleEmails.push('dummy2.employee@nestgroup.net', 'dummy2.eployee@nestgroup.net');
+    }
+
+    const notifications = await prisma.notification.findMany({
+      where: {
+        OR: [
+          { recipientEmail: { in: possibleEmails } },
+          { recipientEmail: null }
+        ]
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 60
+    });
+    res.json(notifications);
+  } catch (error) {
+    console.error('Fetch notifications error:', error);
+    res.status(500).json({ error: 'Failed to retrieve notifications' });
+  }
+});
+
+// POST /api/notifications/read
+app.post('/api/notifications/read', authenticateToken, async (req: any, res) => {
+  const { id } = req.body || {};
+  try {
+    const rawEmail = (req.user?.email || '').trim();
+    const userEmail = rawEmail.toLowerCase();
+    const cleanUserEmail = userEmail.endsWith('@nestdigital.com')
+      ? `${userEmail.split('@')[0]}@nestgroup.net`
+      : userEmail;
+    const possibleEmails = Array.from(new Set([
+      cleanUserEmail,
+      rawEmail,
+      userEmail
+    ])).filter(Boolean);
+
+    if (cleanUserEmail === 'dummy2.employee@nestgroup.net' || cleanUserEmail === 'dummy2.eployee@nestgroup.net') {
+      possibleEmails.push('dummy2.employee@nestgroup.net', 'dummy2.eployee@nestgroup.net');
+    }
+
+    if (id) {
+      await prisma.notification.updateMany({
+        where: { id },
+        data: { read: true }
+      });
+    } else {
+      await prisma.notification.updateMany({
+        where: {
+          read: false,
+          OR: [
+            { recipientEmail: { in: possibleEmails } },
+            { recipientEmail: null }
+          ]
+        },
+        data: { read: true }
+      });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Mark notifications read error:', error);
+    res.status(500).json({ error: 'Failed to mark notifications as read' });
+  }
+});
+
+// ----------------------------------------------------
+// EMAIL LOGS ENDPOINTS
+// ----------------------------------------------------
+
+// GET /api/email-logs
+app.get('/api/email-logs', authenticateToken, async (req: any, res) => {
+  try {
+    const userEmail = req.user?.email || '';
+    const userRole = req.user?.role || '';
+
+    // If reviewer/admin, show all outbox email logs for governance
+    // Otherwise show logs where user is in TO or CC
+    let whereClause: any = {};
+    if (userRole !== 'reviewer' && userRole !== 'admin') {
+      whereClause = {
+        OR: [
+          { recipient: { contains: userEmail } },
+          { cc: { contains: userEmail } }
+        ]
+      };
+    }
+
+    const logs = await prisma.emailLog.findMany({
+      where: whereClause,
+      orderBy: { timestamp: 'desc' }
+    });
+    res.json(logs);
+  } catch (error) {
+    console.error('Fetch email logs error:', error);
+    res.status(500).json({ error: 'Failed to retrieve email logs' });
+  }
+});
+
+// POST /api/email-logs
+app.post('/api/email-logs', authenticateToken, async (req, res) => {
+  const { recipient, subject, body, type } = req.body;
+  try {
+    const log = await prisma.emailLog.create({
+      data: { recipient, subject, body, type }
+    });
+    res.status(201).json(log);
+  } catch (error) {
+    console.error('Create email log error:', error);
+    res.status(500).json({ error: 'Failed to create email log' });
+  }
+});
+
+// ----------------------------------------------------
+// EMPLOYEES ENDPOINTS
+// ----------------------------------------------------
+
+// GET /api/employees
+app.get('/api/employees', authenticateToken, async (req, res) => {
+  try {
+    const employees = await prisma.employee.findMany();
+    res.json(employees);
+  } catch (error) {
+    console.error('Fetch employees error:', error);
+    res.status(500).json({ error: 'Failed to retrieve employees' });
+  }
+});
+
+// POST /api/db/reset
+app.post('/api/db/reset', authenticateToken, async (req, res) => {
+  try {
+    // Delete non-employee records
+    await prisma.statusHistory.deleteMany();
+    await prisma.submission.deleteMany();
+    await prisma.emailLog.deleteMany();
+    await prisma.notification.deleteMany();
+
+    // Re-seed default submissions & notifications
+    const seedSubmissions = [
+      {
+        intelligenceId: "IM-20260701-001",
+        employeeId: "ND-10042",
+        shortDesc: "bdsjbj",
+        detailedDesc: "Detailed intelligence regarding MRF retail expansion lead.",
+        hasContact: true,
+        contactPerson: "Rajiv Sharma (Head of Procurement)",
+        companyWebsite: "https://www.mrftyres.com",
+        contactPhone: "+91 9447012345",
+        contactEmail: "contact@mrf.com",
+        clientName: "MRF",
+        status: "Opportunity Accepted",
+        reportingManager: "Dummy Manager (dummy.manager@nestgroup.net)",
+        projectManager: "Dummy PM (dummy.pm@nestgroup.net)",
+        buHead: "Dummy BU Head (dummy.buhead@nestgroup.net)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
+        createdAt: new Date("2026-07-01T09:30:00Z"),
+        updatedAt: new Date("2026-07-01T09:30:00Z"),
+      },
+      {
+        intelligenceId: "IM-20260629-001",
+        employeeId: "ND-10042",
+        shortDesc: "AI-Powered Chatbot Integration",
+        detailedDesc: "The client is looking for a cognitive conversational chatbot to integrate into their banking app.",
+        hasContact: false,
+        clientName: "Horizon Mutual Bank",
+        status: "Opportunity Accepted",
+        reportingManager: "Dummy Manager (dummy.manager@nestgroup.net)",
+        projectManager: "Dummy PM (dummy.pm@nestgroup.net)",
+        buHead: "Dummy BU Head (dummy.buhead@nestgroup.net)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
+        createdAt: new Date("2026-06-29T14:45:00Z"),
+        updatedAt: new Date("2026-06-29T14:45:00Z"),
+      },
+      {
+        intelligenceId: "IM-20260628-001",
+        employeeId: "ND-10042",
+        shortDesc: "Enterprise Cloud Migration",
+        detailedDesc: "Legacy on-premise ERP application migration to Azure Cloud.",
+        hasContact: true,
+        contactPerson: "Sarah Jenkins (VP Supply Chain)",
+        companyWebsite: "https://www.apexretail.com",
+        contactPhone: "+91 9995551212",
+        contactEmail: "procurement@apexretail.com",
+        clientName: "Apex Retail Solutions",
+        status: "Validated",
+        crmLeadId: "CRM-LEAD-78912",
+        reportingManager: "Dummy Manager (dummy.manager@nestgroup.net)",
+        projectManager: "Dummy PM (dummy.pm@nestgroup.net)",
+        buHead: "Dummy BU Head (dummy.buhead@nestgroup.net)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
+        createdAt: new Date("2026-06-28T10:00:00Z"),
+        updatedAt: new Date("2026-06-30T14:00:00Z"),
+      },
+      {
+        intelligenceId: "IM-20260625-001",
+        employeeId: "ND-10042",
+        shortDesc: "Enterprise Cloud Migration Opportunity",
+        detailedDesc: "The client is planning to migrate their legacy on-premise ERP application to Azure Cloud. They require assistance with migration planning, execution, and subsequent managed services support.",
+        hasContact: true,
+        contactPerson: "David Miller (IT Director)",
+        companyWebsite: "https://www.apexretail.com",
+        contactPhone: "+91 9876543210",
+        contactEmail: "it.buyer@apexretail.com",
+        clientName: "Apex Retail Solutions Inc.",
+        status: "Opportunity Accepted",
+        reportingManager: "Dummy Manager (dummy.manager@nestgroup.net)",
+        projectManager: "Dummy PM (dummy.pm@nestgroup.net)",
+        buHead: "Dummy BU Head (dummy.buhead@nestgroup.net)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
+        createdAt: new Date("2026-06-25T09:30:00Z"),
+        updatedAt: new Date("2026-06-25T09:30:00Z"),
+      },
+      {
+        intelligenceId: "IM-20260624-001",
+        employeeId: "ND-10042",
+        shortDesc: "Telemedicine Platform Upgrade",
+        detailedDesc: "Upgrading client's legacy telemedicine backend to support high-throughput WebRTC streams and HIPAA-compliant database encryption standards.",
+        hasContact: true,
+        contactPerson: "Dr. Evelyn Reed (Chief Medical Officer)",
+        companyWebsite: "https://www.vanguardhealth.org",
+        contactPhone: "+91 9998887776",
+        contactEmail: "partner@vanguardhealth.org",
+        clientName: "Vanguard Health Systems",
+        status: "Deal Won",
+        crmLeadId: "CRM-LEAD-80512",
+        reason: "Successfully closed and converted to opportunity account with $120k ARR.",
+        reportingManager: "Dummy Manager (dummy.manager@nestgroup.net)",
+        projectManager: "Dummy PM (dummy.pm@nestgroup.net)",
+        buHead: "Dummy BU Head (dummy.buhead@nestgroup.net)",
+        hrbp: "Not Specified",
+        salesPerson: "Not Specified",
+        createdAt: new Date("2026-06-24T08:00:00Z"),
+        updatedAt: new Date("2026-06-26T16:30:00Z"),
+      }
+    ];
+
+    const seedHistories = [
+      { id: "IM-20260701-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-07-01T09:30:00Z") },
+      { id: "IM-20260629-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-29T14:45:00Z") },
+      { id: "IM-20260628-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-28T10:00:00Z") },
+      { id: "IM-20260628-001", status: "Validated", changedBy: "Delivery Head", comment: "Approved — CRM Lead created", timestamp: new Date("2026-06-30T14:00:00Z") },
+      { id: "IM-20260625-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-25T09:30:00Z") },
+      { id: "IM-20260624-001", status: "Opportunity Accepted", changedBy: "System", comment: "Submission recorded", timestamp: new Date("2026-06-24T08:00:00Z") },
+      { id: "IM-20260624-001", status: "Validated", changedBy: "Delivery Head", comment: "Approved by Delivery Head", timestamp: new Date("2026-06-24T16:00:00Z") },
+      { id: "IM-20260624-001", status: "Lead Registered", changedBy: "CRM Sync", comment: "CRM Lead created", timestamp: new Date("2026-06-24T16:01:00Z") },
+      { id: "IM-20260624-001", status: "Lead Accepted", changedBy: "CRM Sync", comment: "Sales accepted the lead", timestamp: new Date("2026-06-25T10:00:00Z") },
+      { id: "IM-20260624-001", status: "Opportunity Accepted", changedBy: "CRM Sync", comment: "Opportunity created in CRM", timestamp: new Date("2026-06-25T14:00:00Z") },
+      { id: "IM-20260624-001", status: "Proposal", changedBy: "CRM Sync", comment: "Proposal sent to client", timestamp: new Date("2026-06-26T09:00:00Z") },
+      { id: "IM-20260624-001", status: "Negotiation", changedBy: "CRM Sync", comment: "Contract negotiations started", timestamp: new Date("2026-06-26T14:00:00Z") },
+      { id: "IM-20260624-001", status: "Deal Won", changedBy: "CRM Sync", comment: "Deal won — $120k ARR", timestamp: new Date("2026-06-26T16:30:00Z") }
+    ];
+
+    const seedNotifications = [
+      { message: "IM-20260701-001 moved to Opportunity Accepted", read: false, timestamp: new Date() },
+      { message: "IM-20260628-001 CRM Synced successfully", read: false, timestamp: new Date(Date.now() - 3600 * 1000) },
+      { message: "SLA warning: IM-20260701-001 acknowledgment overdue.", read: false, timestamp: new Date(Date.now() - 2 * 3600 * 1000) }
+    ];
+
+    for (const sub of seedSubmissions) {
+      await prisma.submission.create({ data: sub });
+    }
+
+    for (const h of seedHistories) {
+      const subRecord = await prisma.submission.findUnique({ where: { intelligenceId: h.id } });
+      if (subRecord) {
+        await prisma.statusHistory.create({
+          data: {
+            submissionId: subRecord.id,
+            status: h.status,
+            changedBy: h.changedBy,
+            comment: h.comment,
+            timestamp: h.timestamp
+          }
+        });
+      }
+    }
+
+    for (const n of seedNotifications) {
+      await prisma.notification.create({ data: n });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reset database error:', error);
+    res.status(500).json({ error: 'Failed to reset database' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Backend server running on http://localhost:${PORT}`);
+
+  // Start automated CRM status poller immediately on server start and at specified interval
+  const pollInterval = parseInt(process.env.CRM_POLL_INTERVAL_MS || '300000', 10);
+  pollCrmStatusUpdates();
+  setInterval(pollCrmStatusUpdates, pollInterval);
+});

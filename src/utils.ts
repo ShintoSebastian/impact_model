@@ -59,7 +59,7 @@ export function triggerMailer(
     // Email to employee
     emails.push({
       id: Math.random().toString(36).substr(2, 9),
-      recipient: `${submission.employeeName} (${submission.employeeId}@nestdigital.com)`,
+      recipient: `${submission.employeeName} (${submission.employeeId}@nestgroup.net)`,
       subject: `IMPACT Opportunity Submission Acknowledgment - ${submission.intelligenceId}`,
       body: `Dear ${submission.employeeName},
 
@@ -92,7 +92,7 @@ IMPACT Portal Administration`,
 
     stakeholders.forEach(st => {
       const emailMatch = st.contact.match(/\(([^)]+)\)/);
-      const emailAddress = emailMatch ? emailMatch[1] : 'alerts@nestdigital.com';
+      const emailAddress = emailMatch ? emailMatch[1] : 'peopleexperience@nestgroup.net';
       const nameOnly = st.contact.split(' (')[0];
 
       emails.push({
@@ -123,7 +123,7 @@ IMPACT Portal Workflow Engine`,
   } else if (type === 'validation_rejection') {
     // Rejection notification to Employee and Stakeholders
     const recipients = [
-      { name: submission.employeeName, email: `${submission.employeeId}@nestdigital.com` }
+      { name: submission.employeeName, email: `${submission.employeeId}@nestgroup.net` }
     ];
 
     const stakeholders = [
@@ -178,7 +178,7 @@ IMPACT Portal Governance System`,
     ];
 
     const recipients = [
-      { name: submission.employeeName, email: `${submission.employeeId}@nestdigital.com` }
+      { name: submission.employeeName, email: `${submission.employeeId}@nestgroup.net` }
     ];
 
     stakeholders.forEach(st => {
