@@ -12,7 +12,7 @@ async function testBuReviewerLogic() {
 
   try {
     // 1. Setup a dummy HBU employee if not exists
-    const dummyEmpEmail = 'test.hbu.emp@nestdigital.com';
+    const dummyEmpEmail = 'test.hbu.emp@nestgroup.net';
     let employee = await prisma.employee.findUnique({ where: { email: dummyEmpEmail } });
     if (!employee) {
       employee = await prisma.employee.create({
